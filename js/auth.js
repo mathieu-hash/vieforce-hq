@@ -11,12 +11,14 @@ var SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
 async function login(phone, pin) {
   try {
     var cleaned = phone.replace(/\D/g, '');
-    if (cleaned.startsWith('0')) cleaned = '63' + cleaned.slice(1);
-    if (!cleaned.startsWith('63')) cleaned = '63' + cleaned;
+    // Keep local format (09xx) — that's how phones are stored in Supabase
+    if (cleaned.startsWith('63') && cleaned.length > 11) {
+      cleaned = '0' + cleaned.slice(2);
+    }
 
     var { data, error } = await supabaseClient
       .from('users')
-      .select('id, name, role, region, district, territory, pin, active')
+      .select('id, name, role, region, district, territory, pin_hash, is_active')
       .eq('phone', cleaned)
       .single();
 
@@ -24,11 +26,11 @@ async function login(phone, pin) {
       return { ok: false, error: 'Invalid phone number' };
     }
 
-    if (!data.active) {
+    if (!data.is_active) {
       return { ok: false, error: 'Account is disabled' };
     }
 
-    if (String(data.pin) !== String(pin)) {
+    if (String(data.pin_hash) !== String(pin)) {
       return { ok: false, error: 'Incorrect PIN' };
     }
 
