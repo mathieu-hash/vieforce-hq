@@ -43,11 +43,13 @@ function applyRoleFilter(session, baseWhere) {
     case 'admin':
     case 'ceo':
     case 'evp':
-      return baseWhere
     case 'rsm':
-      return baseWhere + ` AND T0.U_Region = '${session.region}'`
     case 'dsm':
-      return baseWhere + ` AND T0.SlpName = '${session.name}'`
+    case 'tsr':
+      // TODO: Implement region/district filtering via SlpCode JOIN to OSLP
+      // For now, all authenticated users see all data (admin-level access)
+      // Phase 3 will add: RSM filters by OSLP region, DSM by SlpCode
+      return baseWhere
     default:
       return baseWhere + ' AND 1=0'
   }

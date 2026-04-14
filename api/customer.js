@@ -90,7 +90,7 @@ module.exports = async (req, res) => {
         T1.Dscription                     AS item_name,
         ISNULL(SUM(T1.Quantity), 0)       AS volume,
         ISNULL(SUM(T1.LineTotal), 0)      AS revenue,
-        ISNULL(AVG(T1.GrossPrft / NULLIF(T1.Quantity, 0)), 0) AS gmt
+        ISNULL(AVG(T1.GrssProfit / NULLIF(T1.Quantity, 0)), 0) AS gmt
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       WHERE T0.CardCode = @id

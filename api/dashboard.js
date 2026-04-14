@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                   AS revenue,
         ISNULL(SUM(T1.Quantity), 0)                                    AS volume_mt,
-        ISNULL(AVG(T1.GrossPrft / NULLIF(T1.Quantity, 0)), 0)         AS gmt
+        ISNULL(AVG(T1.GrssProfit / NULLIF(T1.Quantity, 0)), 0)        AS gmt
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       ${filteredWhere}

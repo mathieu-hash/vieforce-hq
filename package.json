@@ -2,8 +2,13 @@
   "name": "vieforce-hq",
   "version": "1.0.0",
   "description": "VieForce HQ — Sales Intelligence & BI Dashboard",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "mssql": "^10.0.1",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "mssql": "^10.0.1"
   }
 }
