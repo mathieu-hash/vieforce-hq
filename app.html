@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VieForce HQ — Sales Intelligence</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/hq.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <style>
+    /* Page visibility */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Sidebar icon SVGs */
+    .sidebar-item .icon svg { width: 18px; height: 18px; fill: currentColor; }
+
+    /* Region select in topbar */
+    .topbar-select {
+      padding: 6px 10px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.1);
+      color: var(--white);
+      cursor: pointer;
+      outline: none;
+    }
+    .topbar-select option { color: #222; background: #fff; }
+
+    /* Aging bucket cards */
+    .aging-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .aging-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.2s;
+    }
+    .aging-card:hover { box-shadow: var(--shadow-lg); }
+    .aging-card .aging-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .aging-card .aging-amount {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .aging-card.overdue .aging-amount { color: var(--red); }
+    .aging-card.warning .aging-amount { color: var(--orange); }
+
+    /* Search input */
+    .search-input {
+      padding: 8px 14px;
+      font-family: var(--font);
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--white);
+      color: var(--text-primary);
+      outline: none;
+      width: 260px;
+    }
+    .search-input:focus { border-color: var(--blue); }
+
+    /* Speed gauge card */
+    .speed-gauge {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .speed-gauge .speed-value {
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--navy);
+      line-height: 1;
+    }
+    .speed-gauge .speed-unit {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .speed-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .speed-stat {
+      text-align: center;
+    }
+    .speed-stat .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .speed-stat .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .speed-progress {
+      margin-top: 20px;
+    }
+    .speed-progress .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .speed-progress .progress-bar { height: 16px; border-radius: 8px; }
+    .speed-progress .progress-bar .fill { border-radius: 8px; }
+
+    /* Workday counter */
+    .workday-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      gap: 24px;
+    }
+    .workday-item {
+      text-align: center;
+    }
+    .workday-item .wd-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .workday-item .wd-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Customer detail panel */
+    .customer-detail-panel {
+      position: fixed;
+      top: var(--topbar-height);
+      right: -480px;
+      bottom: 0;
+      width: 480px;
+      background: var(--white);
+      border-left: 1px solid var(--border);
+      box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+      z-index: 800;
+      transition: right 0.3s ease;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .customer-detail-panel.open { right: 0; }
+    .customer-detail-panel .panel-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .customer-detail-panel .panel-close:hover { color: var(--text-primary); }
+
+    /* Detail tabs */
+    .detail-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .detail-tab {
+      padding: 10px 16px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+    }
+    .detail-tab:hover { color: var(--text-primary); }
+    .detail-tab.active {
+      color: var(--navy);
+      border-bottom-color: var(--navy);
+    }
+    .detail-tab-content { display: none; }
+    .detail-tab-content.active { display: block; }
+
+    /* Plant chips */
+    .plant-chips {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .plant-chip {
+      padding: 6px 14px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .plant-chip:hover { color: var(--text-primary); border-color: var(--border-hover); }
+    .plant-chip.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+
+    /* Inventory plant summary */
+    .plant-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pagination button {
+      padding: 6px 12px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--white);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pagination button:hover { border-color: var(--navy); color: var(--navy); }
+    .pagination button.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+    .pagination button:disabled { opacity: 0.4; cursor: default; }
+    .pagination .page-info { font-size: 12px; color: var(--text-muted); }
+
+    /* Data unavailable state */
+    .data-unavailable {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+    .data-unavailable .dua-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
+    .data-unavailable p { font-size: 13px; }
+
+    /* Responsive aging grid */
+    @media (max-width: 768px) {
+      .aging-grid { grid-template-columns: repeat(2, 1fr); }
+      .speed-row { grid-template-columns: 1fr; }
+      .customer-detail-panel { width: 100%; right: -100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">HQ</div>
+      <span class="topbar-title">VieForce HQ</span>
+    </div>
+    <div class="topbar-period" id="period-chips">
+      <button class="chip" data-period="7D">7D</button>
+      <button class="chip active" data-period="MTD">MTD</button>
+      <button class="chip" data-period="QTD">QTD</button>
+      <button class="chip" data-period="YTD">YTD</button>
+    </div>
+    <div class="topbar-right">
+      <select class="topbar-select" id="region-select">
+        <option value="ALL">All Regions</option>
+        <option value="Luzon">Luzon</option>
+        <option value="Visayas">Visayas</option>
+        <option value="Mindanao">Mindanao</option>
+      </select>
+      <span class="topbar-user-name" id="topbar-user-name"></span>
+      <div class="topbar-avatar" id="topbar-avatar"></div>
+    </div>
+  </header>
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Main</div>
+      <div class="sidebar-item active" data-page="dashboard">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg></span>
+        <span>Dashboard</span>
+      </div>
+      <div class="sidebar-item" data-page="sales">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg></span>
+        <span>Sales</span>
+      </div>
+      <div class="sidebar-item" data-page="ar">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></span>
+        <span>AR / SOA</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Operations</div>
+      <div class="sidebar-item" data-page="inventory">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-.9-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg></span>
+        <span>Inventory</span>
+      </div>
+      <div class="sidebar-item" data-page="speed">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M20.38 8.57l-1.23 1.85a8 8 0 01-.22 7.58H5.07A8 8 0 0115.58 6.85l1.85-1.23A10 10 0 003.35 19a2 2 0 001.72 1h13.85a2 2 0 001.74-1 10 10 0 00-.27-10.44zM10.59 15.41a2 2 0 002.83 0l5.66-8.49-8.49 5.66a2 2 0 000 2.83z"/></svg></span>
+        <span>Speed</span>
+      </div>
+      <div class="sidebar-item" data-page="customers">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>
+        <span>Customers</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+
+    <!-- ==================== PAGE: DASHBOARD ==================== -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <div class="page-subtitle">Sales intelligence overview</div>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Revenue MTD</div>
+          <div class="kpi-value" id="kpi-revenue">--</div>
+          <div class="kpi-delta" id="kpi-revenue-delta"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Volume</div>
+          <div class="kpi-value" id="kpi-volume">--</div>
+          <div class="kpi-delta" id="kpi-volume-delta"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">AR Balance</div>
+          <div class="kpi-value" id="kpi-ar">--</div>
+          <div class="kpi-delta" id="kpi-ar-delta"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">GM / Ton</div>
+          <div class="kpi-value" id="kpi-gmt">--</div>
+          <div class="kpi-delta" id="kpi-gmt-delta"></div>
+        </div>
+      </div>
+
+      <!-- Monthly Trend Chart -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Monthly Trend</span>
+          <span class="card-subtitle">Revenue &amp; Volume (12 months)</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-monthly-trend"></canvas>
+        </div>
+      </div>
+
+      <!-- Two columns: Top Brands + Top Customers -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Top Brands</span>
+            <span class="card-subtitle">Volume MT</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-top-brands"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Top Customers</span>
+            <span class="card-action" onclick="navigateTo('customers')">View all</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th class="td-right">Volume MT</th>
+                  <th class="td-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-top-customers">
+                <tr><td colspan="3" class="td-center text-muted">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE: SALES ==================== -->
+    <div class="page" id="page-sales">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sales Intelligence</h1>
+          <div class="page-subtitle">Revenue, volume, and margin analysis</div>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)">Group by:</span>
+        <div class="filter-chips" id="sales-group-chips">
+          <button class="filter-chip active" data-group="brand">Brand</button>
+          <button class="filter-chip" data-group="customer">Customer</button>
+          <button class="filter-chip" data-group="district">District</button>
+          <button class="filter-chip" data-group="category">Category</button>
+        </div>
+      </div>
+
+      <!-- Brand volume chart -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Volume by Brand</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-sales-brand"></canvas>
+        </div>
+      </div>
+
+      <!-- Two columns: Customer Rankings + GM/T by Category -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Customer Rankings</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Customer</th>
+                  <th class="td-right">Volume MT</th>
+                  <th class="td-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="sales-customer-table">
+                <tr><td colspan="4" class="td-center text-muted">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">GM/T by Category</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th class="td-right">Volume MT</th>
+                  <th class="td-right">GM/T</th>
+                </tr>
+              </thead>
+              <tbody id="sales-gmt-table">
+                <tr><td colspan="3" class="td-center text-muted">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE: AR / SOA ==================== -->
+    <div class="page" id="page-ar">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Accounts Receivable</h1>
+          <div class="page-subtitle">Aging analysis &amp; collection tracking</div>
+        </div>
+      </div>
+
+      <!-- Aging Bucket Cards -->
+      <div class="aging-grid">
+        <div class="aging-card">
+          <div class="aging-label">Current</div>
+          <div class="aging-amount" id="aging-current">--</div>
+        </div>
+        <div class="aging-card">
+          <div class="aging-label">1 - 30 Days</div>
+          <div class="aging-amount" id="aging-1-30">--</div>
+        </div>
+        <div class="aging-card warning">
+          <div class="aging-label">31 - 60 Days</div>
+          <div class="aging-amount" id="aging-31-60">--</div>
+        </div>
+        <div class="aging-card overdue">
+          <div class="aging-label">61 - 90 Days</div>
+          <div class="aging-amount" id="aging-61-90">--</div>
+        </div>
+        <div class="aging-card overdue">
+          <div class="aging-label">90+ Days</div>
+          <div class="aging-amount" id="aging-90plus">--</div>
+        </div>
+      </div>
+
+      <!-- AR Chart + DSO -->
+      <div class="grid-2-1">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">AR Aging Distribution</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-ar-aging"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Days Sales Outstanding</span>
+          </div>
+          <div style="text-align:center;padding:24px 0">
+            <div style="font-size:56px;font-weight:800;color:var(--navy)" id="ar-dso">--</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text-muted)">days</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client AR List -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Client AR Details</span>
+          <input type="text" class="search-input" id="ar-search" placeholder="Search customer...">
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>RSM</th>
+                <th class="td-right">Balance</th>
+                <th class="td-right">Days Overdue</th>
+                <th>Bucket</th>
+              </tr>
+            </thead>
+            <tbody id="ar-client-table">
+              <tr><td colspan="5" class="td-center text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE: INVENTORY ==================== -->
+    <div class="page" id="page-inventory">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Inventory</h1>
+          <div class="page-subtitle">Stock levels by plant &amp; product</div>
+        </div>
+      </div>
+
+      <!-- Plant selector chips -->
+      <div class="plant-chips" id="plant-chips">
+        <button class="plant-chip active" data-plant="ALL">All Plants</button>
+      </div>
+
+      <!-- Plant summary cards -->
+      <div class="plant-summary-grid" id="plant-summary-cards"></div>
+
+      <!-- Item-level stock table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Item Stock Levels</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Plant</th>
+                <th>SKU</th>
+                <th>Product</th>
+                <th class="td-right">On Hand</th>
+                <th class="td-right">Committed</th>
+                <th class="td-right">Available</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table">
+              <tr><td colspan="6" class="td-center text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE: SPEED ==================== -->
+    <div class="page" id="page-speed">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sales Speed</h1>
+          <div class="page-subtitle">Run-rate projection &amp; target tracking</div>
+        </div>
+      </div>
+
+      <!-- Big speed gauge card -->
+      <div class="speed-gauge">
+        <div class="speed-value" id="speed-actual">--</div>
+        <div class="speed-unit">MT Actual</div>
+
+        <div class="speed-row">
+          <div class="speed-stat">
+            <div class="stat-label">Projected</div>
+            <div class="stat-value" id="speed-projected">--</div>
+          </div>
+          <div class="speed-stat">
+            <div class="stat-label">Target</div>
+            <div class="stat-value" id="speed-target">--</div>
+          </div>
+          <div class="speed-stat">
+            <div class="stat-label">% of Target</div>
+            <div class="stat-value" id="speed-pct">--%</div>
+          </div>
+        </div>
+
+        <div class="speed-progress">
+          <div class="progress-label">
+            <span>Progress</span>
+            <span id="speed-progress-label">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="fill navy" id="speed-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workday counter -->
+      <div class="workday-card">
+        <div class="workday-item">
+          <div class="wd-value" id="wd-elapsed">--</div>
+          <div class="wd-label">Days Elapsed</div>
+        </div>
+        <div class="workday-item">
+          <div class="wd-value" id="wd-remaining">--</div>
+          <div class="wd-label">Days Remaining</div>
+        </div>
+        <div class="workday-item">
+          <div class="wd-value" id="wd-total">--</div>
+          <div class="wd-label">Total Workdays</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE: CUSTOMERS ==================== -->
+    <div class="page" id="page-customers">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Customers</h1>
+          <div class="page-subtitle">Client directory &amp; profiles</div>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <input type="text" class="search-input" id="customer-search" placeholder="Search by name or code...">
+        <select class="filter-select" id="customer-region-filter">
+          <option value="ALL">All Regions</option>
+          <option value="Luzon">Luzon</option>
+          <option value="Visayas">Visayas</option>
+          <option value="Mindanao">Mindanao</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Customer Name</th>
+                <th>City</th>
+                <th>RSM</th>
+                <th class="td-right">YTD Revenue</th>
+                <th class="td-right">YTD Volume</th>
+                <th>Last Order</th>
+              </tr>
+            </thead>
+            <tbody id="customer-table">
+              <tr><td colspan="7" class="td-center text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="customer-pagination"></div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <!-- ===== CUSTOMER DETAIL PANEL ===== -->
+  <div class="customer-detail-panel" id="customer-detail">
+    <button class="panel-close" onclick="closeCustomerDetail()">&times;</button>
+    <h2 class="page-title mb-8" id="detail-name">--</h2>
+    <div class="page-subtitle mb-16" id="detail-code">--</div>
+
+    <div class="detail-tabs" id="detail-tabs">
+      <button class="detail-tab active" data-tab="detail-overview">Overview</button>
+      <button class="detail-tab" data-tab="detail-ar">AR</button>
+      <button class="detail-tab" data-tab="detail-sales">Sales</button>
+      <button class="detail-tab" data-tab="detail-orders">Orders</button>
+    </div>
+
+    <div class="detail-tab-content active" id="detail-overview">
+      <div class="kpi-card mb-16">
+        <div class="kpi-label">YTD Revenue</div>
+        <div class="kpi-value" id="detail-revenue" style="font-size:24px">--</div>
+      </div>
+      <div class="kpi-card mb-16">
+        <div class="kpi-label">YTD Volume</div>
+        <div class="kpi-value" id="detail-volume" style="font-size:24px">--</div>
+      </div>
+      <div class="kpi-card mb-16">
+        <div class="kpi-label">AR Balance</div>
+        <div class="kpi-value" id="detail-ar-balance" style="font-size:24px">--</div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="kpi-label">City</div>
+        <div style="font-size:14px;font-weight:500" id="detail-city">--</div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="kpi-label">RSM</div>
+        <div style="font-size:14px;font-weight:500" id="detail-rsm">--</div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="kpi-label">Phone</div>
+        <div style="font-size:14px;font-weight:500" id="detail-phone">--</div>
+      </div>
+    </div>
+
+    <div class="detail-tab-content" id="detail-ar">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th class="td-right">Balance</th>
+              <th class="td-right">Days Overdue</th>
+            </tr>
+          </thead>
+          <tbody id="detail-ar-table">
+            <tr><td colspan="3" class="td-center text-muted">Select a customer</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="detail-tab-content" id="detail-sales">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="td-right">Volume MT</th>
+              <th class="td-right">Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="detail-sales-table">
+            <tr><td colspan="3" class="td-center text-muted">Select a customer</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="detail-tab-content" id="detail-orders">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Doc #</th>
+              <th class="td-right">Total</th>
+            </tr>
+          </thead>
+          <tbody id="detail-orders-table">
+            <tr><td colspan="3" class="td-center text-muted">Select a customer</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCRIPTS ===== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/charts.js"></script>
+  <script>
+    // ===== Auth gate =====
+    requireAuth();
+    var session = getSession();
+    var currentPeriod = 'MTD';
+    var currentRegion = 'ALL';
+    var currentSalesGroup = 'brand';
+    var currentPlant = 'ALL';
+    var customerPage = 1;
+    var customerPageSize = 25;
+
+    // Chart instances (for destroy before re-render)
+    var chartInstances = {};
+
+    // ===== Populate user info =====
+    if (session) {
+      var initials = session.name ? session.name.split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2) : '??';
+      document.getElementById('topbar-avatar').textContent = initials;
+      document.getElementById('topbar-user-name').textContent = session.name || '';
+    }
+
+    // ===== Navigation =====
+    var sidebarItems = document.querySelectorAll('.sidebar-item[data-page]');
+    sidebarItems.forEach(function(item) {
+      item.addEventListener('click', function() {
+        navigateTo(item.getAttribute('data-page'));
+      });
+    });
+
+    function navigateTo(pageId) {
+      // Update sidebar
+      sidebarItems.forEach(function(el) { el.classList.remove('active'); });
+      var target = document.querySelector('.sidebar-item[data-page="' + pageId + '"]');
+      if (target) target.classList.add('active');
+
+      // Show/hide pages
+      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+      var page = document.getElementById('page-' + pageId);
+      if (page) page.classList.add('active');
+
+      // Load page data
+      switch(pageId) {
+        case 'dashboard': loadDashboard(); break;
+        case 'sales':     loadSalesPage(); break;
+        case 'ar':        loadARPage(); break;
+        case 'inventory': loadInventoryPage(); break;
+        case 'speed':     loadSpeedPage(); break;
+        case 'customers': loadCustomersPage(); break;
+      }
+
+      // Close customer detail if open
+      closeCustomerDetail();
+    }
+
+    // ===== Period chip handlers =====
+    document.querySelectorAll('#period-chips .chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('#period-chips .chip').forEach(function(c) { c.classList.remove('active'); });
+        chip.classList.add('active');
+        currentPeriod = chip.getAttribute('data-period');
+        reloadCurrentPage();
+      });
+    });
+
+    // ===== Region select handler =====
+    document.getElementById('region-select').addEventListener('change', function() {
+      currentRegion = this.value;
+      reloadCurrentPage();
+    });
+
+    function reloadCurrentPage() {
+      var activePage = document.querySelector('.page.active');
+      if (!activePage) return;
+      var pageId = activePage.id.replace('page-', '');
+      navigateTo(pageId);
+    }
+
+    // ===== Sales group chips =====
+    document.querySelectorAll('#sales-group-chips .filter-chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('#sales-group-chips .filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        chip.classList.add('active');
+        currentSalesGroup = chip.getAttribute('data-group');
+        loadSalesPage();
+      });
+    });
+
+    // ===== AR search =====
+    var arSearchTimeout = null;
+    document.getElementById('ar-search').addEventListener('input', function() {
+      clearTimeout(arSearchTimeout);
+      var query = this.value;
+      arSearchTimeout = setTimeout(function() { filterARTable(query); }, 300);
+    });
+
+    // ===== Customer search =====
+    var custSearchTimeout = null;
+    document.getElementById('customer-search').addEventListener('input', function() {
+      clearTimeout(custSearchTimeout);
+      custSearchTimeout = setTimeout(function() { customerPage = 1; loadCustomersPage(); }, 400);
+    });
+    document.getElementById('customer-region-filter').addEventListener('change', function() {
+      customerPage = 1;
+      loadCustomersPage();
+    });
+
+    // ===== Detail panel tabs =====
+    document.querySelectorAll('#detail-tabs .detail-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('#detail-tabs .detail-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        document.querySelectorAll('.detail-tab-content').forEach(function(c) { c.classList.remove('active'); });
+        var target = document.getElementById(tab.getAttribute('data-tab'));
+        if (target) target.classList.add('active');
+      });
+    });
+
+    // ===== Helper: show skeleton =====
+    function showSkeleton(elementId, rows) {
+      rows = rows || 3;
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      var html = '';
+      for (var i = 0; i < rows; i++) {
+        html += '<tr><td colspan="10"><div class="skeleton skeleton-text"></div></td></tr>';
+      }
+      el.innerHTML = html;
+    }
+
+    // ===== Helper: show data unavailable =====
+    function showUnavailable(elementId, cols) {
+      cols = cols || 3;
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      el.innerHTML = '<tr><td colspan="' + cols + '"><div class="data-unavailable"><div class="dua-icon">&#9888;</div><p>Data unavailable. SAP connection may be down.</p></div></td></tr>';
+    }
+
+    // ===== Helper: destroy chart before re-rendering =====
+    function destroyChart(key) {
+      if (chartInstances[key]) {
+        chartInstances[key].destroy();
+        chartInstances[key] = null;
+      }
+    }
+
+    // ===== Helper: format date =====
+    function fmtDate(d) {
+      if (!d) return '--';
+      var dt = new Date(d);
+      return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // ===== Helper: bucket badge =====
+    function bucketBadge(bucket) {
+      var map = {
+        'current': { cls: 'badge-green', label: 'Current' },
+        '1_30':    { cls: 'badge-gold',  label: '1-30' },
+        '31_60':   { cls: 'badge-orange', label: '31-60' },
+        '61_90':   { cls: 'badge-red',   label: '61-90' },
+        '90plus':  { cls: 'badge-red',   label: '90+' }
+      };
+      var b = map[bucket] || { cls: 'badge-navy', label: bucket };
+      return '<span class="badge ' + b.cls + '">' + b.label + '</span>';
+    }
+
+    // ====================
+    //  PAGE: DASHBOARD
+    // ====================
+    async function loadDashboard() {
+      // Show loading
+      document.getElementById('kpi-revenue').textContent = '...';
+      document.getElementById('kpi-volume').textContent = '...';
+      document.getElementById('kpi-ar').textContent = '...';
+      document.getElementById('kpi-gmt').textContent = '...';
+      showSkeleton('dashboard-top-customers', 5);
+
+      try {
+        var data = await getDashboardData({ period: currentPeriod, region: currentRegion });
+        if (!data) return;
+
+        document.getElementById('kpi-revenue').textContent = formatCurrency(data.revenue);
+        document.getElementById('kpi-volume').textContent = formatNumber(data.volume_mt) + ' MT';
+        document.getElementById('kpi-ar').textContent = formatCurrency(data.ar_balance);
+        document.getElementById('kpi-gmt').textContent = formatCurrency(data.gmt) + '/T';
+
+        // Deltas
+        setDelta('kpi-revenue-delta', data.revenue_delta);
+        setDelta('kpi-volume-delta', data.volume_delta);
+        setDelta('kpi-ar-delta', data.ar_delta);
+        setDelta('kpi-gmt-delta', data.gmt_delta);
+
+        // Top customers table
+        if (data.top_customers && data.top_customers.length > 0) {
+          var html = '';
+          data.top_customers.forEach(function(c) {
+            html += '<tr onclick="openCustomerDetail(\'' + c.customer_code + '\')" style="cursor:pointer">';
+            html += '<td class="td-bold">' + (c.customer_name || c.customer_code) + '</td>';
+            html += '<td class="td-right">' + formatNumber(c.volume_mt) + '</td>';
+            html += '<td class="td-right">' + formatCurrency(c.revenue) + '</td>';
+            html += '</tr>';
+          });
+          document.getElementById('dashboard-top-customers').innerHTML = html;
+        } else {
+          document.getElementById('dashboard-top-customers').innerHTML = '<tr><td colspan="3" class="td-center text-muted">No data</td></tr>';
+        }
+      } catch(e) {
+        console.error('Dashboard load error:', e);
+        document.getElementById('kpi-revenue').textContent = '--';
+        document.getElementById('kpi-volume').textContent = '--';
+        document.getElementById('kpi-ar').textContent = '--';
+        document.getElementById('kpi-gmt').textContent = '--';
+        showUnavailable('dashboard-top-customers', 3);
+      }
+
+      // Load charts
+      loadMonthlyTrend();
+      loadTopBrands();
+    }
+
+    function setDelta(elementId, value) {
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      if (value == null || value === undefined) { el.innerHTML = ''; return; }
+      var n = parseFloat(value);
+      var cls = n >= 0 ? 'up' : 'down';
+      var arrow = n >= 0 ? '&#9650;' : '&#9660;';
+      el.className = 'kpi-delta ' + cls;
+      el.innerHTML = '<span class="arrow">' + arrow + '</span> ' + Math.abs(n).toFixed(1) + '%';
+    }
+
+    async function loadMonthlyTrend() {
+      destroyChart('monthlyTrend');
+      try {
+        var data = await getSalesData({ period: 'YTD', region: currentRegion, view: 'monthly_trend' });
+        if (!data || !data.monthly_trend) return;
+
+        var labels = data.monthly_trend.map(function(r) { return r.month; });
+        var revenue = data.monthly_trend.map(function(r) { return r.revenue; });
+        var volume = data.monthly_trend.map(function(r) { return r.volume_mt; });
+
+        chartInstances.monthlyTrend = createLineChart('chart-monthly-trend', labels, [
+          {
+            label: 'Revenue',
+            data: revenue,
+            borderColor: HQ_CHART_COLORS.navy,
+            backgroundColor: 'rgba(0,77,113,0.08)',
+            fill: true,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Volume MT',
+            data: volume,
+            borderColor: HQ_CHART_COLORS.green,
+            backgroundColor: 'rgba(149,201,61,0.08)',
+            fill: true,
+            yAxisID: 'y1'
+          }
+        ], {
+          plugins: { legend: { display: true, position: 'top' } },
+          scales: {
+            y:  { type: 'linear', position: 'left',  grid: { color: HQ_CHART_COLORS.gridColor }, beginAtZero: true },
+            y1: { type: 'linear', position: 'right', grid: { display: false }, beginAtZero: true }
+          }
+        });
+      } catch(e) {
+        console.error('Monthly trend chart error:', e);
+      }
+    }
+
+    async function loadTopBrands() {
+      destroyChart('topBrands');
+      try {
+        var data = await getSalesData({ period: currentPeriod, region: currentRegion, view: 'top_brands' });
+        if (!data || !data.top_brands) return;
+
+        var labels = data.top_brands.map(function(r) { return r.brand; });
+        var values = data.top_brands.map(function(r) { return r.volume_mt; });
+
+        chartInstances.topBrands = createBarChart('chart-top-brands', labels, [{
+          label: 'Volume MT',
+          data: values,
+          backgroundColor: HQ_CHART_COLORS.navy,
+          borderRadius: 4
+        }]);
+      } catch(e) {
+        console.error('Top brands chart error:', e);
+      }
+    }
+
+    // ====================
+    //  PAGE: SALES
+    // ====================
+    async function loadSalesPage() {
+      showSkeleton('sales-customer-table', 10);
+      showSkeleton('sales-gmt-table', 5);
+      destroyChart('salesBrand');
+
+      try {
+        var data = await getSalesData({ period: currentPeriod, region: currentRegion, groupBy: currentSalesGroup });
+        if (!data) return;
+
+        // Brand volume chart
+        if (data.by_brand && data.by_brand.length > 0) {
+          var labels = data.by_brand.map(function(r) { return r.brand || r.sku; });
+          var values = data.by_brand.map(function(r) { return r.volume_mt; });
+          chartInstances.salesBrand = createBarChart('chart-sales-brand', labels, [{
+            label: 'Volume MT',
+            data: values,
+            backgroundColor: [HQ_CHART_COLORS.navy, HQ_CHART_COLORS.blue, HQ_CHART_COLORS.green, HQ_CHART_COLORS.gold, HQ_CHART_COLORS.orange, HQ_CHART_COLORS.pink],
+            borderRadius: 4
+          }]);
+        }
+
+        // Customer rankings
+        if (data.top_customers && data.top_customers.length > 0) {
+          var html = '';
+          data.top_customers.forEach(function(c, i) {
+            html += '<tr onclick="openCustomerDetail(\'' + c.customer_code + '\')" style="cursor:pointer">';
+            html += '<td class="td-center">' + (i + 1) + '</td>';
+            html += '<td class="td-bold">' + (c.customer_name || c.customer_code) + '</td>';
+            html += '<td class="td-right">' + formatNumber(c.volume_mt) + '</td>';
+            html += '<td class="td-right">' + formatCurrency(c.revenue) + '</td>';
+            html += '</tr>';
+          });
+          document.getElementById('sales-customer-table').innerHTML = html;
+        } else {
+          document.getElementById('sales-customer-table').innerHTML = '<tr><td colspan="4" class="td-center text-muted">No data</td></tr>';
+        }
+
+        // GM/T by category
+        if (data.by_category && data.by_category.length > 0) {
+          var html2 = '';
+          data.by_category.forEach(function(r) {
+            html2 += '<tr>';
+            html2 += '<td class="td-bold">' + r.category + '</td>';
+            html2 += '<td class="td-right">' + formatNumber(r.volume_mt) + '</td>';
+            html2 += '<td class="td-right">' + formatCurrency(r.gmt) + '/T</td>';
+            html2 += '</tr>';
+          });
+          document.getElementById('sales-gmt-table').innerHTML = html2;
+        } else {
+          document.getElementById('sales-gmt-table').innerHTML = '<tr><td colspan="3" class="td-center text-muted">No data</td></tr>';
+        }
+      } catch(e) {
+        console.error('Sales page error:', e);
+        showUnavailable('sales-customer-table', 4);
+        showUnavailable('sales-gmt-table', 3);
+      }
+    }
+
+    // ====================
+    //  PAGE: AR / SOA
+    // ====================
+    var arFullData = []; // stored for client-side filtering
+
+    async function loadARPage() {
+      showSkeleton('ar-client-table', 8);
+      destroyChart('arAging');
+
+      try {
+        var data = await getARData({ region: currentRegion });
+        if (!data) return;
+
+        // Aging buckets
+        if (data.buckets) {
+          document.getElementById('aging-current').textContent = formatCurrency(data.buckets.current || 0);
+          document.getElementById('aging-1-30').textContent    = formatCurrency(data.buckets['1_30'] || 0);
+          document.getElementById('aging-31-60').textContent   = formatCurrency(data.buckets['31_60'] || 0);
+          document.getElementById('aging-61-90').textContent   = formatCurrency(data.buckets['61_90'] || 0);
+          document.getElementById('aging-90plus').textContent  = formatCurrency(data.buckets['90plus'] || 0);
+        }
+
+        // DSO
+        document.getElementById('ar-dso').textContent = data.dso != null ? Math.round(data.dso) : '--';
+
+        // AR aging chart (horizontal bar)
+        if (data.buckets) {
+          chartInstances.arAging = createBarChart('chart-ar-aging',
+            ['Current', '1-30', '31-60', '61-90', '90+'],
+            [{
+              label: 'Amount',
+              data: [
+                data.buckets.current || 0,
+                data.buckets['1_30'] || 0,
+                data.buckets['31_60'] || 0,
+                data.buckets['61_90'] || 0,
+                data.buckets['90plus'] || 0
+              ],
+              backgroundColor: [
+                HQ_CHART_COLORS.green,
+                HQ_CHART_COLORS.gold,
+                HQ_CHART_COLORS.orange,
+                '#e74c3c',
+                '#c0392b'
+              ],
+              borderRadius: 4
+            }],
+            { indexAxis: 'y' }
+          );
+        }
+
+        // Client list
+        arFullData = data.clients || [];
+        renderARTable(arFullData);
+      } catch(e) {
+        console.error('AR page error:', e);
+        showUnavailable('ar-client-table', 5);
+      }
+    }
+
+    function renderARTable(clients) {
+      if (!clients || clients.length === 0) {
+        document.getElementById('ar-client-table').innerHTML = '<tr><td colspan="5" class="td-center text-muted">No data</td></tr>';
+        return;
+      }
+      var html = '';
+      clients.forEach(function(c) {
+        html += '<tr onclick="openCustomerDetail(\'' + c.CardCode + '\')" style="cursor:pointer">';
+        html += '<td class="td-bold">' + (c.CardName || c.CardCode) + '</td>';
+        html += '<td>' + (c.rsm || '--') + '</td>';
+        html += '<td class="td-right td-bold">' + formatCurrency(c.balance) + '</td>';
+        html += '<td class="td-right">' + (c.days_overdue || 0) + '</td>';
+        html += '<td>' + bucketBadge(c.bucket) + '</td>';
+        html += '</tr>';
+      });
+      document.getElementById('ar-client-table').innerHTML = html;
+    }
+
+    function filterARTable(query) {
+      if (!query) { renderARTable(arFullData); return; }
+      var q = query.toLowerCase();
+      var filtered = arFullData.filter(function(c) {
+        return (c.CardName && c.CardName.toLowerCase().indexOf(q) !== -1) ||
+               (c.CardCode && c.CardCode.toLowerCase().indexOf(q) !== -1);
+      });
+      renderARTable(filtered);
+    }
+
+    // ====================
+    //  PAGE: INVENTORY
+    // ====================
+    async function loadInventoryPage() {
+      showSkeleton('inventory-table', 10);
+
+      try {
+        var data = await getInventoryData({ plant: currentPlant });
+        if (!data) return;
+
+        // Build plant chips dynamically
+        if (data.plants && data.plants.length > 0) {
+          var chipsHtml = '<button class="plant-chip' + (currentPlant === 'ALL' ? ' active' : '') + '" data-plant="ALL">All Plants</button>';
+          data.plants.forEach(function(p) {
+            chipsHtml += '<button class="plant-chip' + (currentPlant === p.plant_code ? ' active' : '') + '" data-plant="' + p.plant_code + '">' + (p.plant_name || p.plant_code) + '</button>';
+          });
+          document.getElementById('plant-chips').innerHTML = chipsHtml;
+
+          // Re-bind plant chip events
+          document.querySelectorAll('#plant-chips .plant-chip').forEach(function(chip) {
+            chip.addEventListener('click', function() {
+              currentPlant = chip.getAttribute('data-plant');
+              loadInventoryPage();
+            });
+          });
+        }
+
+        // Plant summary cards
+        if (data.by_plant && data.by_plant.length > 0) {
+          var cardsHtml = '';
+          data.by_plant.forEach(function(p) {
+            cardsHtml += '<div class="kpi-card">';
+            cardsHtml += '<div class="kpi-label">' + (p.plant_name || p.plant_code) + '</div>';
+            cardsHtml += '<div class="kpi-value" style="font-size:20px">' + formatNumber(p.qty_on_hand) + ' MT</div>';
+            cardsHtml += '<div class="kpi-secondary">Committed: ' + formatNumber(p.qty_committed) + ' | Available: ' + formatNumber(p.qty_available) + '</div>';
+            cardsHtml += '</div>';
+          });
+          document.getElementById('plant-summary-cards').innerHTML = cardsHtml;
+        } else {
+          document.getElementById('plant-summary-cards').innerHTML = '';
+        }
+
+        // Item stock table
+        if (data.items && data.items.length > 0) {
+          var html = '';
+          data.items.forEach(function(item) {
+            html += '<tr>';
+            html += '<td>' + (item.plant_name || item.plant_code) + '</td>';
+            html += '<td class="td-bold">' + item.sku + '</td>';
+            html += '<td>' + item.product + '</td>';
+            html += '<td class="td-right">' + formatNumber(item.qty_on_hand) + '</td>';
+            html += '<td class="td-right">' + formatNumber(item.qty_committed) + '</td>';
+            html += '<td class="td-right td-bold">' + formatNumber(item.qty_available) + '</td>';
+            html += '</tr>';
+          });
+          document.getElementById('inventory-table').innerHTML = html;
+        } else {
+          document.getElementById('inventory-table').innerHTML = '<tr><td colspan="6" class="td-center text-muted">No data</td></tr>';
+        }
+      } catch(e) {
+        console.error('Inventory page error:', e);
+        showUnavailable('inventory-table', 6);
+      }
+    }
+
+    // ====================
+    //  PAGE: SPEED
+    // ====================
+    async function loadSpeedPage() {
+      document.getElementById('speed-actual').textContent = '...';
+      document.getElementById('speed-projected').textContent = '...';
+      document.getElementById('speed-target').textContent = '...';
+      document.getElementById('speed-pct').textContent = '--%';
+
+      try {
+        var data = await getSpeedData({ period: currentPeriod, region: currentRegion });
+        if (!data) return;
+
+        var actual = data.actual_mt || 0;
+        var target = data.target_mt || 0;
+        var projected = data.projected_mt || 0;
+        var pct = target > 0 ? ((projected / target) * 100) : 0;
+
+        document.getElementById('speed-actual').textContent = formatNumber(actual);
+        document.getElementById('speed-projected').textContent = formatNumber(projected) + ' MT';
+        document.getElementById('speed-target').textContent = formatNumber(target) + ' MT';
+        document.getElementById('speed-pct').textContent = pct.toFixed(1) + '%';
+
+        // Progress bar = actual / target
+        var actualPct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+        document.getElementById('speed-progress-fill').style.width = actualPct + '%';
+        document.getElementById('speed-progress-label').textContent = actualPct.toFixed(1) + '%';
+
+        // Color the progress bar
+        var fillEl = document.getElementById('speed-progress-fill');
+        fillEl.className = 'fill';
+        if (actualPct >= 80) fillEl.classList.add('green');
+        else if (actualPct >= 50) fillEl.classList.add('gold');
+        else if (actualPct >= 25) fillEl.classList.add('orange');
+        else fillEl.classList.add('red');
+
+        // Workdays
+        document.getElementById('wd-elapsed').textContent = data.workdays_elapsed || '--';
+        document.getElementById('wd-remaining').textContent = data.workdays_remaining || '--';
+        document.getElementById('wd-total').textContent = data.workdays_total || '--';
+      } catch(e) {
+        console.error('Speed page error:', e);
+        document.getElementById('speed-actual').textContent = '--';
+        document.getElementById('speed-projected').textContent = '--';
+        document.getElementById('speed-target').textContent = '--';
+        document.getElementById('speed-pct').textContent = '--%';
+      }
+    }
+
+    // ====================
+    //  PAGE: CUSTOMERS
+    // ====================
+    async function loadCustomersPage() {
+      showSkeleton('customer-table', 10);
+
+      var search = document.getElementById('customer-search').value || '';
+      var regionFilter = document.getElementById('customer-region-filter').value || 'ALL';
+
+      try {
+        var data = await getCustomersData({
+          search: search,
+          region: regionFilter,
+          page: customerPage,
+          limit: customerPageSize
+        });
+        if (!data) return;
+
+        if (data.customers && data.customers.length > 0) {
+          var html = '';
+          data.customers.forEach(function(c) {
+            html += '<tr onclick="openCustomerDetail(\'' + c.CardCode + '\')" style="cursor:pointer">';
+            html += '<td><span class="tag">' + c.CardCode + '</span></td>';
+            html += '<td class="td-bold">' + (c.CardName || '') + '</td>';
+            html += '<td>' + (c.City || '--') + '</td>';
+            html += '<td>' + (c.rsm || '--') + '</td>';
+            html += '<td class="td-right">' + formatCurrency(c.ytd_revenue) + '</td>';
+            html += '<td class="td-right">' + formatNumber(c.ytd_mt) + ' MT</td>';
+            html += '<td>' + fmtDate(c.last_order_date) + '</td>';
+            html += '</tr>';
+          });
+          document.getElementById('customer-table').innerHTML = html;
+        } else {
+          document.getElementById('customer-table').innerHTML = '<tr><td colspan="7" class="td-center text-muted">No customers found</td></tr>';
+        }
+
+        // Pagination
+        renderPagination(data.total || 0, customerPage, customerPageSize);
+      } catch(e) {
+        console.error('Customers page error:', e);
+        showUnavailable('customer-table', 7);
+      }
+    }
+
+    function renderPagination(total, page, pageSize) {
+      var el = document.getElementById('customer-pagination');
+      if (!el) return;
+      var totalPages = Math.ceil(total / pageSize) || 1;
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+      var html = '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="goCustomerPage(' + (page - 1) + ')">Prev</button>';
+      html += '<span class="page-info">Page ' + page + ' of ' + totalPages + '</span>';
+      html += '<button ' + (page >= totalPages ? 'disabled' : '') + ' onclick="goCustomerPage(' + (page + 1) + ')">Next</button>';
+      el.innerHTML = html;
+    }
+
+    function goCustomerPage(p) {
+      customerPage = p;
+      loadCustomersPage();
+    }
+
+    // ====================
+    //  CUSTOMER DETAIL PANEL
+    // ====================
+    function openCustomerDetail(cardCode) {
+      var panel = document.getElementById('customer-detail');
+      panel.classList.add('open');
+
+      // Reset tabs to Overview
+      document.querySelectorAll('#detail-tabs .detail-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelector('#detail-tabs .detail-tab[data-tab="detail-overview"]').classList.add('active');
+      document.querySelectorAll('.detail-tab-content').forEach(function(c) { c.classList.remove('active'); });
+      document.getElementById('detail-overview').classList.add('active');
+
+      // Loading state
+      document.getElementById('detail-name').textContent = 'Loading...';
+      document.getElementById('detail-code').textContent = cardCode;
+      document.getElementById('detail-revenue').textContent = '...';
+      document.getElementById('detail-volume').textContent = '...';
+      document.getElementById('detail-ar-balance').textContent = '...';
+
+      getCustomerProfile({ id: cardCode }).then(function(data) {
+        if (!data) return;
+
+        document.getElementById('detail-name').textContent = data.name || cardCode;
+        document.getElementById('detail-code').textContent = cardCode;
+        document.getElementById('detail-revenue').textContent = formatCurrency(data.ytd_revenue);
+        document.getElementById('detail-volume').textContent = formatNumber(data.ytd_mt) + ' MT';
+        document.getElementById('detail-ar-balance').textContent = formatCurrency(data.ar_balance);
+        document.getElementById('detail-city').textContent = data.city || '--';
+        document.getElementById('detail-rsm').textContent = data.rsm || '--';
+        document.getElementById('detail-phone').textContent = data.phone || '--';
+
+        // AR tab
+        if (data.ar_invoices && data.ar_invoices.length > 0) {
+          var arHtml = '';
+          data.ar_invoices.forEach(function(inv) {
+            arHtml += '<tr>';
+            arHtml += '<td>' + (inv.doc_num || '--') + '</td>';
+            arHtml += '<td class="td-right">' + formatCurrency(inv.balance) + '</td>';
+            arHtml += '<td class="td-right">' + (inv.days_overdue || 0) + '</td>';
+            arHtml += '</tr>';
+          });
+          document.getElementById('detail-ar-table').innerHTML = arHtml;
+        } else {
+          document.getElementById('detail-ar-table').innerHTML = '<tr><td colspan="3" class="td-center text-muted">No open AR</td></tr>';
+        }
+
+        // Sales tab
+        if (data.product_mix && data.product_mix.length > 0) {
+          var salesHtml = '';
+          data.product_mix.forEach(function(p) {
+            salesHtml += '<tr>';
+            salesHtml += '<td>' + (p.product || p.sku) + '</td>';
+            salesHtml += '<td class="td-right">' + formatNumber(p.volume_mt) + '</td>';
+            salesHtml += '<td class="td-right">' + formatCurrency(p.revenue) + '</td>';
+            salesHtml += '</tr>';
+          });
+          document.getElementById('detail-sales-table').innerHTML = salesHtml;
+        } else {
+          document.getElementById('detail-sales-table').innerHTML = '<tr><td colspan="3" class="td-center text-muted">No sales data</td></tr>';
+        }
+
+        // Orders tab
+        if (data.recent_orders && data.recent_orders.length > 0) {
+          var ordHtml = '';
+          data.recent_orders.forEach(function(o) {
+            ordHtml += '<tr>';
+            ordHtml += '<td>' + fmtDate(o.date) + '</td>';
+            ordHtml += '<td>' + (o.doc_num || '--') + '</td>';
+            ordHtml += '<td class="td-right">' + formatCurrency(o.total) + '</td>';
+            ordHtml += '</tr>';
+          });
+          document.getElementById('detail-orders-table').innerHTML = ordHtml;
+        } else {
+          document.getElementById('detail-orders-table').innerHTML = '<tr><td colspan="3" class="td-center text-muted">No recent orders</td></tr>';
+        }
+      }).catch(function(e) {
+        console.error('Customer detail error:', e);
+        document.getElementById('detail-name').textContent = 'Error loading profile';
+      });
+    }
+
+    function closeCustomerDetail() {
+      document.getElementById('customer-detail').classList.remove('open');
+    }
+
+    // ===== Initial load =====
+    loadDashboard();
+  </script>
+
+</body>
+</html>
