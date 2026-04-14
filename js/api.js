@@ -1,7 +1,7 @@
 // VieForce HQ — Frontend API Client
 // Calls Vercel serverless functions under /api/
 
-var API_BASE = '/api';
+var API_BASE = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api';
 
 function getApiHeaders() {
   var session = getSession();
