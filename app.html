@@ -2989,6 +2989,7 @@ function loadPage(id){
 async function loadHome(){
   clearError('pg-home');
   try {
+    if(!DC) DC={};
     if(!DC['pg-home']){
       var results = await Promise.all([
         getDashboardData({period:PD,region:RG}).catch(function(e){console.error('dashboard:',e);return null}),
@@ -2998,7 +2999,8 @@ async function loadHome(){
       ]);
       DC['pg-home'] = {d:results[0], sl:results[1], ar:results[2], sp:results[3]};
     }
-    var d=DC['pg-home'].d, sl=DC['pg-home'].sl, ar=DC['pg-home'].ar, sp=DC['pg-home'].sp;
+    var c=DC['pg-home']||{};
+    var d=c.d||null, sl=c.sl||null, ar=c.ar||null, sp=c.sp||null;
     if(!d && !sl && !ar && !sp){showError('pg-home','Unable to load live data');return}
     console.log('[HOME] Rendering:', {d:!!d, sl:!!sl, ar:!!ar, sp:!!sp});
     // KPI row
@@ -3070,6 +3072,7 @@ async function loadHome(){
 async function loadSales(){
   clearError('pg-sales');
   try {
+    if(!DC) DC={};
     if(!DC['pg-sales']){
       DC['pg-sales'] = await getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null});
     }
@@ -3298,6 +3301,7 @@ async function openCust(code){
 async function loadMargin(){
   clearError('pg-margin');
   try {
+    if(!DC) DC={};
     if(!DC['pg-margin']){
       DC['pg-margin'] = await getMarginData({period:PD}).catch(function(e){console.error('margin:',e);return null});
     }
@@ -3356,6 +3360,7 @@ async function loadMargin(){
 async function loadIntelligence(){
   clearError('pg-insights');
   try {
+    if(!DC) DC={};
     if(!DC['pg-insights']){
       DC['pg-insights'] = await getIntelligenceData().catch(function(e){console.error('intelligence:',e);return null});
     }
@@ -3398,6 +3403,7 @@ async function loadIntelligence(){
 async function loadTeam(){
   clearError('pg-team');
   try {
+    if(!DC) DC={};
     if(!DC['pg-team']){
       DC['pg-team'] = await getTeamData({period:PD}).catch(function(e){console.error('team:',e);return null});
     }
@@ -3430,6 +3436,7 @@ async function loadTeam(){
 async function loadBudget(){
   clearError('pg-budget');
   try {
+    if(!DC) DC={};
     if(!DC['pg-budget']){
       DC['pg-budget'] = await getBudgetData().catch(function(e){console.error('budget:',e);return null});
     }
