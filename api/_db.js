@@ -1,11 +1,11 @@
 const sql = require('mssql')
 
 const config = {
-  server:   process.env.SAP_HOST,
-  port:     parseInt(process.env.SAP_PORT) || 4444,
-  database: process.env.SAP_DB,
-  user:     process.env.SAP_USER,
-  password: process.env.SAP_PASS,
+  server:   process.env.SAP_HOST || process.env.SCOS_SAP_HOST,
+  port:     parseInt(process.env.SAP_PORT || process.env.SCOS_SAP_PORT) || 4444,
+  database: process.env.SAP_DB || process.env.SCOS_SAP_DB,
+  user:     process.env.SAP_USER || process.env.SCOS_SAP_USER,
+  password: process.env.SAP_PASS || process.env.SCOS_SAP_PASS,
   options: {
     encrypt: false,
     trustServerCertificate: true,
