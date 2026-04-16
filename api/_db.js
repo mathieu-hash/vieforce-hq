@@ -31,7 +31,7 @@ async function query(sqlText, params = {}) {
     if (v instanceof Date) {
       request.input(k, sql.DateTime, v)
     } else if (typeof v === 'number') {
-      request.input(k, sql.Float, v)
+      request.input(k, Number.isInteger(v) ? sql.Int : sql.Float, v)
     } else {
       request.input(k, sql.NVarChar, v)
     }
