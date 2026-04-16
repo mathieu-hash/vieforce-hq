@@ -4,13 +4,20 @@ const cors = require('cors')
 const app = express()
 const PORT = process.env.PORT || 8080
 
-// CORS — allow Vercel frontend + localhost
+// CORS — allow Vercel frontend (all preview/branch URLs) + localhost
 app.use(cors({
-  origin: [
-    'https://vieforce-hq.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5500'
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (curl, server-to-server)
+    if (!origin) return callback(null, true);
+    // Allow any *.vercel.app domain (production + all preview deploys)
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+    // Allow Cloud Run domains
+    if (origin.endsWith('.run.app')) return callback(null, true);
+    // Allow localhost for dev
+    if (origin.startsWith('http://localhost:')) return callback(null, true);
+    // Block everything else
+    callback(new Error('CORS not allowed from ' + origin));
+  },
   methods: ['GET', 'OPTIONS'],
   allowedHeaders: ['x-session-id', 'content-type']
 }))
