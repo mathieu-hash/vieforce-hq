@@ -114,8 +114,7 @@ module.exports = async (req, res) => {
           ELSE 0 END                                                      AS gp_pct,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
-          ELSE 0 END                                                      AS gm_ton,
-        SUM(CASE WHEN SUM(T1.GrssProfit) < 0 THEN 1 ELSE 0 END)         AS flag_count
+          ELSE 0 END                                                      AS gm_ton
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
