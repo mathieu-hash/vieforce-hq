@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.local' })
 const express = require('express')
 const cors = require('cors')
 const app = express()
@@ -30,6 +31,11 @@ const inventoryHandler = require('./api/inventory')
 const speedHandler = require('./api/speed')
 const customersHandler = require('./api/customers')
 const customerHandler = require('./api/customer')
+const diagHandler = require('./api/diag')
+const marginHandler = require('./api/margin')
+const intelligenceHandler = require('./api/intelligence')
+const teamHandler = require('./api/team')
+const budgetHandler = require('./api/budget')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -39,6 +45,11 @@ app.get('/api/inventory', inventoryHandler)
 app.get('/api/speed', speedHandler)
 app.get('/api/customers', customersHandler)
 app.get('/api/customer', customerHandler)
+app.get('/api/diag', diagHandler)
+app.get('/api/margin', marginHandler)
+app.get('/api/intelligence', intelligenceHandler)
+app.get('/api/team', teamHandler)
+app.get('/api/budget', budgetHandler)
 
 // CORS preflight for all API routes
 app.options('/api/*', (req, res) => res.status(200).end())

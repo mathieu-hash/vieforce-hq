@@ -16,14 +16,26 @@ async function apiFetch(endpoint, params) {
   var qs = new URLSearchParams(params).toString();
   var url = API_BASE + '/' + endpoint + (qs ? '?' + qs : '');
 
-  var res = await fetch(url, { headers: getApiHeaders() });
+  console.log('[API]', endpoint, qs || '');
+  var res;
+  try {
+    res = await fetch(url, { headers: getApiHeaders() });
+  } catch (e) {
+    console.error('[API] Network error:', endpoint, e.message);
+    throw e;
+  }
 
+  console.log('[API]', endpoint, 'HTTP', res.status);
   if (res.status === 401) {
+    console.error('[API] 401 Unauthorized — session invalid');
     logout();
     return null;
   }
   if (!res.ok) {
-    throw new Error('API error: ' + res.status);
+    var body = '';
+    try { body = await res.text(); } catch(e) {}
+    console.error('[API] Error', res.status, body);
+    throw new Error('API error: ' + res.status + ' ' + body);
   }
   return res.json();
 }
@@ -35,3 +47,7 @@ function getInventoryData(params) { return apiFetch('inventory', params); }
 function getSpeedData(params) { return apiFetch('speed', params); }
 function getCustomersData(params) { return apiFetch('customers', params); }
 function getCustomerProfile(params) { return apiFetch('customer', params); }
+function getMarginData(params) { return apiFetch('margin', params); }
+function getIntelligenceData(params) { return apiFetch('intelligence', params); }
+function getTeamData(params) { return apiFetch('team', params); }
+function getBudgetData(params) { return apiFetch('budget', params); }

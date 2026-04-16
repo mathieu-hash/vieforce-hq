@@ -37,11 +37,8 @@ module.exports = async (req, res) => {
 
     // --- Count total ---
     const countRows = await query(`
-      SELECT COUNT(DISTINCT T0.CardCode) AS total
+      SELECT COUNT(*) AS total
       FROM OCRD T0
-      LEFT JOIN OINV TI ON TI.CardCode = T0.CardCode
-        AND TI.DocDate >= DATEADD(YEAR, -1, GETDATE())
-        AND TI.CANCELED = 'N'
       ${filteredWhere}
     `, { search })
 
@@ -55,14 +52,16 @@ module.exports = async (req, res) => {
         T0.CardName,
         T0.Phone1,
         T0.City,
-        ISNULL(SUM(T1.LineTotal), 0)     AS ytd_revenue,
-        ISNULL(SUM(T1.Quantity), 0)      AS ytd_volume,
-        MAX(TI.DocDate)                  AS last_order_date
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS ytd_revenue,
+        ISNULL(SUM(T1.Quantity), 0)                                       AS ytd_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS ytd_volume,
+        MAX(TI.DocDate)                                                    AS last_order_date
       FROM OCRD T0
       LEFT JOIN OINV TI ON TI.CardCode = T0.CardCode
         AND TI.DocDate >= DATEADD(YEAR, -1, GETDATE())
         AND TI.CANCELED = 'N'
       LEFT JOIN INV1 T1 ON T1.DocEntry = TI.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
       GROUP BY T0.CardCode, T0.CardName, T0.Phone1, T0.City
       ORDER BY ytd_revenue DESC
