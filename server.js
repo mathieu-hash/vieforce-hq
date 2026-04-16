@@ -58,8 +58,7 @@ app.get('/api/intelligence', intelligenceHandler)
 app.get('/api/team', teamHandler)
 app.get('/api/budget', budgetHandler)
 
-// CORS preflight for all API routes
-app.options('/api/*', (req, res) => res.status(200).end())
+// CORS preflight handled by cors() middleware above — no manual handler needed
 
 app.listen(PORT, () => {
   console.log(`VieForce HQ API running on port ${PORT}`)
