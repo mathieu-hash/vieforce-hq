@@ -1661,32 +1661,24 @@ body{
       <div class="page" id="pg-inv">
         <!-- UNIT TOGGLE + FILTER -->
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-          <div class="tb-toggle">
-            <button class="tb-toggle-btn" onclick="setU(this)">MT</button>
-            <button class="tb-toggle-btn active" onclick="setU(this)">Bags</button>
+          <div class="tb-toggle" id="inv-unit-toggle">
+            <button class="tb-toggle-btn" onclick="setInvUnit(this,'MT')">MT</button>
+            <button class="tb-toggle-btn active" onclick="setInvUnit(this,'BAGS')">Bags</button>
           </div>
           <div class="tb-divider"></div>
-          <select style="padding:6px 14px;border-radius:var(--r);background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer" id="inv-product-filter">
-            <option>All Products</option>
-            <option>VIEPRO PREMIUM</option>
-            <option>VIEPRO LAYER</option>
-            <option>VIEPRO PRIME</option>
-            <option>VIEPRO PROBOOST</option>
-            <option>VIEPRO BROILER</option>
-            <option>KEOS PET</option>
-          </select>
+          <input type="text" id="inv-search" placeholder="Filter SKUs by name…" oninput="renderInvProducts()" style="padding:6px 14px;border-radius:var(--r);background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:12px;min-width:260px">
           <div style="flex:1"></div>
-          <div style="font-size:10px;color:var(--text4)">Data Last Updated: 4/15/2026 8:23 PM · SAP B1 OITW</div>
+          <div style="font-size:10px;color:var(--text4)" id="inv-last-updated">Loading…</div>
         </div>
 
         <!-- KPIs -->
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Floor</div><div class="kpi-val" style="font-size:20px">154,429</div><div class="kpi-src">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)">157,680</div><div class="kpi-src">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)">77,640</div><div class="kpi-src">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)">74,389</div><div class="kpi-src">bags (floor + prod - PO)</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Cover Days</div><div class="kpi-val" style="font-size:20px">4.8<span style="font-size:10px;color:var(--text3)"> d</span></div><div class="kpi-src">at current speed</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Negative Avail.</div><div class="kpi-val" style="font-size:20px;color:var(--red)">3</div><div class="kpi-src">plants short</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Floor</div><div class="kpi-val" style="font-size:20px" id="inv-k-floor">—</div><div class="kpi-src" id="inv-k-floor-sub">bags</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="inv-k-po">—</div><div class="kpi-src">bags</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src">bags · not in SAP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src">bags (floor − PO)</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Cover Days</div><div class="kpi-val" style="font-size:20px"><span id="inv-k-cover">—</span><span style="font-size:10px;color:var(--text3)"> d</span></div><div class="kpi-src">at current speed</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Negative Avail.</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="inv-k-neg">—</div><div class="kpi-src">plants short</div></div>
         </div>
 
         <!-- LEFT: Region + Plant + Sales Group  |  RIGHT: Product detail -->
@@ -1708,11 +1700,8 @@ body{
                   .inv-neg{color:var(--red) !important;font-weight:700 !important}
                 </style>
                 <table class="inv-tbl">
-                  <tr><th>Region</th><th>On Floor</th><th>PO, Bags</th><th>On Prod</th><th>Available</th></tr>
-                  <tr><td>LUZON</td><td>85,714</td><td>17,182</td><td>13,320</td><td style="color:var(--green)">81,852</td></tr>
-                  <tr><td>VISAYAS</td><td>35,619</td><td>107,094</td><td>43,800</td><td class="inv-neg">-27,675</td></tr>
-                  <tr><td>MINDANAO</td><td>33,095</td><td>33,404</td><td>20,520</td><td style="color:var(--green)">20,211</td></tr>
-                  <tr><td style="font-weight:800">Grand total</td><td style="font-weight:700">154,429</td><td style="font-weight:700">157,680</td><td style="font-weight:700">77,640</td><td style="font-weight:700">74,389</td></tr>
+                  <thead><tr><th>Region</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <tbody id="inv-region-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -1722,16 +1711,8 @@ body{
               <div class="card-hdr"><div class="card-title">By Plant</div></div>
               <div class="card-body" style="padding-top:8px">
                 <table class="inv-tbl">
-                  <tr><th>Plant ▲</th><th>On Floor</th><th>PO, Bags</th><th>On Prod</th><th>Available</th></tr>
-                  <tr><td>AC</td><td>17,496</td><td>16,906</td><td>13,320</td><td style="color:var(--green)">13,910</td></tr>
-                  <tr><td>ACEXT</td><td>60,974</td><td>0</td><td>0</td><td style="color:var(--green)">60,974</td></tr>
-                  <tr><td>ALAE</td><td>344</td><td>0</td><td>0</td><td>344</td></tr>
-                  <tr><td>ARGAO</td><td>3,665</td><td>40</td><td>15,200</td><td style="color:var(--green)">18,825</td></tr>
-                  <tr><td>BAC</td><td>6,341</td><td>9,549</td><td>0</td><td class="inv-neg">-3,208</td></tr>
-                  <tr><td>BUKID</td><td>24,373</td><td>24,275</td><td>16,120</td><td style="color:var(--green)">16,218</td></tr>
-                  <tr><td>CCPC</td><td>1,758</td><td>2,072</td><td>0</td><td class="inv-neg">-314</td></tr>
-                  <tr><td>CONS</td><td>3,965</td><td>0</td><td>0</td><td style="color:var(--green)">3,965</td></tr>
-                  <tr><td style="font-weight:800">Grand total</td><td style="font-weight:700">154,429</td><td style="font-weight:700">157,680</td><td style="font-weight:700">77,640</td><td style="font-weight:700">74,389</td></tr>
+                  <thead><tr><th>Plant ▲</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <tbody id="inv-plant-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -1741,13 +1722,8 @@ body{
               <div class="card-hdr"><div class="card-title">By Sales Group</div></div>
               <div class="card-body" style="padding-top:8px">
                 <table class="inv-tbl">
-                  <tr><th>Item_SalesGroup</th><th>On Floor</th><th>PO, Bags</th><th>On Prod</th><th>Available</th></tr>
-                  <tr><td>HOGS</td><td>49,493</td><td>113,909</td><td>52,640</td><td class="inv-neg">-11,776</td></tr>
-                  <tr><td>POULTRY</td><td>23,018</td><td>32,543</td><td>9,980</td><td style="color:var(--green)">455</td></tr>
-                  <tr><td>GAMEFOWL</td><td>10,856</td><td>7,939</td><td>12,820</td><td style="color:var(--green)">15,737</td></tr>
-                  <tr><td>SPECIALTIES</td><td>70,540</td><td>841</td><td>0</td><td style="color:var(--green)">69,699</td></tr>
-                  <tr><td>OTHERS</td><td>521</td><td>2,448</td><td>2,200</td><td>273</td></tr>
-                  <tr><td style="font-weight:800">Grand total</td><td style="font-weight:700">154,429</td><td style="font-weight:700">157,680</td><td style="font-weight:700">77,640</td><td style="font-weight:700">74,389</td></tr>
+                  <thead><tr><th>Item Sales Group</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <tbody id="inv-group-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -1758,42 +1734,14 @@ body{
             <div class="card-hdr">
               <div class="card-title">By Product (SKU Level)</div>
               <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:9px;color:var(--text4)">1 – 264 / 264</span>
+                <span style="font-size:9px;color:var(--text4)" id="inv-prod-count">—</span>
                 <div class="card-badge b-blue">OITW</div>
               </div>
             </div>
             <div class="card-body" style="padding-top:8px;max-height:680px;overflow-y:auto">
               <table class="inv-tbl">
-                <tr><th style="min-width:260px">Product ⊕ ▲</th><th>On Floor</th><th>PO, Bags</th><th>On Prod</th><th>Available</th></tr>
-                <tr><td>VP MUSCLY PREM FINISHER PELLET</td><td>1,743</td><td>1,321</td><td>2,000</td><td style="color:var(--green)">2,422</td></tr>
-                <tr><td>VP MUSCLY PREM GROWER PELLET</td><td>12,057</td><td>8,295</td><td>12,480</td><td style="color:var(--green)">16,242</td></tr>
-                <tr><td>VP MUSCLY PREM STARTER PELLET</td><td>13,559</td><td>4,146</td><td>4,880</td><td style="color:var(--green)">14,293</td></tr>
-                <tr><td>VP MUSCLY PRIME GROWER PELLET</td><td>553</td><td>55</td><td>0</td><td style="color:var(--green)">498</td></tr>
-                <tr><td>VP MUSCLY PRIME STARTER PELLET</td><td>175</td><td>12</td><td>0</td><td>163</td></tr>
-                <tr><td>VP PREM BOOSTER 2.5MM 25*1KG</td><td>33</td><td>4</td><td>0</td><td>29</td></tr>
-                <tr><td>VP PREM BOOSTER 2.5MM 25KG</td><td>126</td><td>21</td><td>0</td><td>105</td></tr>
-                <tr><td>VP PREM BOOSTER 3MM 25*1KG</td><td>28</td><td>189</td><td>0</td><td class="inv-neg">-161</td></tr>
-                <tr><td>VP PREM BOOSTER 3MM 25KG</td><td>536</td><td>232</td><td>0</td><td style="color:var(--green)">304</td></tr>
-                <tr><td>VP PREM BOOSTER 3MM 50KG</td><td>38</td><td>0</td><td>0</td><td>38</td></tr>
-                <tr><td>VP PREM BOOSTER CF W/ TIA PARA 25KG</td><td>302</td><td>280</td><td>0</td><td>22</td></tr>
-                <tr><td>VP PREMIUM GESTATING PELLET</td><td>403</td><td>342</td><td>720</td><td style="color:var(--green)">781</td></tr>
-                <tr><td>VP PREM GESTATING 4MM 50KG NON MED</td><td>12</td><td>51,000</td><td>1,000</td><td class="inv-neg">-49,988</td></tr>
-                <tr><td>VP PREM GESTATING 4MM 50KG NON MED…</td><td>237</td><td>237</td><td>0</td><td>0</td></tr>
-                <tr><td>VP PREMIUM LACTATING PELLET</td><td>628</td><td>1,228</td><td>2,320</td><td style="color:var(--green)">1,720</td></tr>
-                <tr><td>VP PREMIUM LACTATING PELLET FF1</td><td>21</td><td>21</td><td>0</td><td>0</td></tr>
-                <tr><td>VP PREMIUM LACTATING PELLET FF2</td><td>17</td><td>0</td><td>0</td><td>17</td></tr>
-                <tr><td>VP PREM PRESTARTER 2 PELLET 4MM 50KG</td><td>780</td><td>2,881</td><td>1,000</td><td class="inv-neg">-1,101</td></tr>
-                <tr><td>VP PREM PRESTARTER 2.5MM 25KG</td><td>938</td><td>4,205</td><td>5,200</td><td style="color:var(--green)">1,933</td></tr>
-                <tr><td>VP PREM PRESTARTER 2.5MM CF W/ LI…</td><td>380</td><td>780</td><td>0</td><td class="inv-neg">-400</td></tr>
-                <tr><td>VP PREM PRESTARTER 3MM 25KG</td><td>3,453</td><td>19,646</td><td>3,600</td><td class="inv-neg">-12,593</td></tr>
-                <tr><td>VP PREM PRESTARTER 3MM 50KG</td><td>2,627</td><td>3,017</td><td>0</td><td class="inv-neg">-390</td></tr>
-                <tr><td>VP LAYER 1 CRUMBLE</td><td>4,280</td><td>3,120</td><td>2,400</td><td style="color:var(--green)">3,560</td></tr>
-                <tr><td>VP LAYER 2 PELLET</td><td>2,840</td><td>1,680</td><td>1,200</td><td style="color:var(--green)">2,360</td></tr>
-                <tr><td>VP 3000 MAINTENANCE PELLET</td><td>3,120</td><td>2,840</td><td>1,800</td><td style="color:var(--green)">2,080</td></tr>
-                <tr><td>VP BROILER STARTER 2.5MM 50KG</td><td>1,980</td><td>2,460</td><td>1,200</td><td>720</td></tr>
-                <tr><td>VP 2000 STARTER BIG CRUMBLE</td><td>2,640</td><td>1,980</td><td>800</td><td style="color:var(--green)">1,460</td></tr>
-                <tr><td>VP PRIME GESTATING PELLET</td><td>1,420</td><td>3,280</td><td>2,400</td><td>540</td></tr>
-                <tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800;font-family:var(--font)">Grand total</td><td style="font-weight:700">154,429</td><td style="font-weight:700">157,680</td><td style="font-weight:700">77,640</td><td style="font-weight:700">74,389</td></tr>
+                <thead><tr><th style="min-width:260px">Product ▲</th><th>Plant</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                <tbody id="inv-product-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3710,33 +3658,183 @@ async function loadAR(){
 }
 
 /* ===== INVENTORY — wired to /api/inventory ===== */
+var INV_STATE = { data: null, unit: 'BAGS' }; // bags default
+
+function setInvUnit(el, unit){
+  if(el) addClickAnimation(el);
+  document.querySelectorAll('#inv-unit-toggle .tb-toggle-btn').forEach(function(b){b.classList.remove('active')});
+  if(el) el.classList.add('active');
+  INV_STATE.unit = unit;
+  if(INV_STATE.data) renderInv();
+}
+
+function fmtInv(bags, mt){
+  return INV_STATE.unit === 'MT' ? (mt==null?'—':(Math.abs(mt)>=100?fcn(Math.round(mt)):mt.toFixed(1)))
+                                  : (bags==null?'—':fcn(Math.round(bags)));
+}
+function availClass(v){
+  if (v == null) return '';
+  if (v < 0)   return 'inv-neg';
+  if (v > 0)   return 'style="color:var(--green)"';
+  return '';
+}
+
 async function loadInv(){
   clearError('pg-inv');
   try {
     var d = await getInventoryData({plant:'ALL'});
     if(!d){showError('pg-inv','Unable to load inventory data');return}
-    console.log('[INV] Rendering:', Object.keys(d));
-    // INV KPIs — look for summary fields
-    if(d.summary){
-      var s=d.summary;
-      var kpis=document.querySelectorAll('#pg-inv .kpi-val');
-      if(kpis[0] && s.on_floor!=null) kpis[0].textContent=fcn(Math.round(s.on_floor));
-      if(kpis[1] && s.pending_po!=null) kpis[1].textContent=fcn(Math.round(s.pending_po));
-      if(kpis[2] && s.on_production!=null) kpis[2].textContent=fcn(Math.round(s.on_production));
-      if(kpis[3] && s.available!=null) kpis[3].textContent=fcn(Math.round(s.available));
-      if(kpis[4] && s.cover_days!=null) kpis[4].innerHTML=s.cover_days.toFixed(1)+'<span style="font-size:10px;color:var(--text3)"> d</span>';
-      if(kpis[5] && s.negative_avail_count!=null) kpis[5].textContent=s.negative_avail_count.toString();
-    }
-    // If plants array returned, update the By Plant table
-    if(d.plants && d.plants.length){
-      console.log('[INV] '+d.plants.length+' plants received — prototype tables show detailed data, keeping layout');
-    }
-    // By Region
-    if(d.by_region && d.by_region.length){
-      console.log('[INV] '+d.by_region.length+' regions received');
+    INV_STATE.data = d;
+    console.log('[INV] Rendering:', Object.keys(d), '|', (d.plants||[]).length, 'plants,', (d.items||[]).length, 'items');
+    renderInv();
+    // Timestamp
+    if(d.last_updated){
+      var dt = new Date(d.last_updated);
+      sett('inv-last-updated', 'Data Last Updated: ' + dt.toLocaleString('en-PH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}) + ' · SAP B1 OITW');
     }
     pulseRefresh('pg-inv');
   } catch(e) { console.error('Inv:', e); showError('pg-inv','Unable to load inventory data'); }
+}
+
+function renderInv(){
+  var d = INV_STATE.data; if(!d) return;
+  var isBags = INV_STATE.unit === 'BAGS';
+
+  // --- KPI strip ---
+  var s = d.summary || {};
+  if(isBags){
+    animateNumber(sel('inv-k-floor'), s.on_floor || 0,    function(v){return fcn(Math.round(v))});
+    animateNumber(sel('inv-k-po'),    s.pending_po || 0,  function(v){return fcn(Math.round(v))});
+    animateNumber(sel('inv-k-avail'), s.available || 0,   function(v){return fcn(Math.round(v))});
+  } else {
+    animateNumber(sel('inv-k-floor'), s.on_floor_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
+    animateNumber(sel('inv-k-po'),    s.pending_po_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
+    animateNumber(sel('inv-k-avail'), s.available_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
+  }
+  sett('inv-k-prod',  s.on_production != null ? fcn(s.on_production) : '—');
+  sett('inv-k-cover', s.cover_days != null ? s.cover_days : '—');
+  sett('inv-k-neg',   s.negative_avail_count != null ? s.negative_avail_count : '—');
+
+  // --- By Region ---
+  if(d.by_region && d.by_region.length){
+    var totOnHand=0, totPo=0, totCom=0, totAvail=0;
+    var rhtml = d.by_region.map(function(r){
+      var onHand = isBags ? r.on_hand_bags : r.on_hand;
+      var po     = isBags ? r.on_order_bags : r.on_order;
+      var com    = isBags ? r.committed_bags : r.committed;
+      var avail  = isBags ? r.available_bags : r.available;
+      totOnHand+=onHand||0; totPo+=po||0; totCom+=com||0; totAvail+=avail||0;
+      var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
+      return '<tr><td>'+esc((r.region||'').toUpperCase())+'</td>'
+        + '<td>'+fcn(Math.round(onHand||0))+'</td>'
+        + '<td>'+fcn(Math.round(po||0))+'</td>'
+        + '<td>'+fcn(Math.round(com||0))+'</td>'
+        + '<td '+availSty+'>'+fcn(Math.round(avail||0))+'</td></tr>';
+    }).join('');
+    rhtml += '<tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800">Grand total</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totOnHand))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totPo))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totCom))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totAvail))+'</td></tr>';
+    seth('inv-region-tbody', rhtml);
+  }
+
+  // --- By Plant (up to 20 plants with volume) ---
+  if(d.plants && d.plants.length){
+    var plants = d.plants.slice().sort(function(a,b){return (b.on_hand_bags||0)-(a.on_hand_bags||0)});
+    var totOH=0, totPO=0, totCM=0, totAV=0;
+    var phtml = plants.map(function(p){
+      var onHand = isBags ? p.on_hand_bags : p.total_on_hand;
+      var po     = isBags ? p.on_order_bags : p.total_on_order;
+      var com    = isBags ? p.committed_bags : p.total_committed;
+      var avail  = isBags ? p.available_bags : p.total_available;
+      totOH+=onHand||0; totPO+=po||0; totCM+=com||0; totAV+=avail||0;
+      var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
+      return '<tr><td>'+esc(p.plant_code)+'</td>'
+        + '<td>'+fcn(Math.round(onHand||0))+'</td>'
+        + '<td>'+fcn(Math.round(po||0))+'</td>'
+        + '<td>'+fcn(Math.round(com||0))+'</td>'
+        + '<td '+availSty+'>'+fcn(Math.round(avail||0))+'</td></tr>';
+    }).join('');
+    phtml += '<tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800">Grand total</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totOH))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totPO))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totCM))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totAV))+'</td></tr>';
+    seth('inv-plant-tbody', phtml);
+  }
+
+  // --- By Sales Group ---
+  if(d.by_sales_group && d.by_sales_group.length){
+    var totOHg=0, totPOg=0, totCMg=0, totAVg=0;
+    var ghtml = d.by_sales_group.map(function(g){
+      var onHand = isBags ? g.on_hand_bags : g.on_hand_mt;
+      var po     = isBags ? g.on_order_bags : (g.on_hand_mt*0);  // MT form doesn't have on_order — keep bags
+      var com    = isBags ? g.committed_bags : 0;
+      var avail  = isBags ? g.available_bags : 0;
+      totOHg+=onHand||0; totPOg+=po||0; totCMg+=com||0; totAVg+=avail||0;
+      var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
+      return '<tr><td>'+esc((g.group_name||'').toUpperCase())+'</td>'
+        + '<td>'+fcn(Math.round(onHand||0))+'</td>'
+        + '<td>'+fcn(Math.round(po||0))+'</td>'
+        + '<td>'+fcn(Math.round(com||0))+'</td>'
+        + '<td '+availSty+'>'+fcn(Math.round(avail||0))+'</td></tr>';
+    }).join('');
+    ghtml += '<tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800">Grand total</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totOHg))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totPOg))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totCMg))+'</td>'
+      + '<td style="font-weight:700">'+fcn(Math.round(totAVg))+'</td></tr>';
+    seth('inv-group-tbody', ghtml);
+  }
+
+  renderInvProducts();
+}
+
+function renderInvProducts(){
+  var d = INV_STATE.data; if(!d || !d.items) return;
+  var q = (sel('inv-search') || {value:''}).value.toLowerCase().trim();
+  var isBags = INV_STATE.unit === 'BAGS';
+
+  // Aggregate by item_code across plants
+  var byItem = {};
+  d.items.forEach(function(it){
+    if(q && !(it.item_name||'').toLowerCase().includes(q) && !(it.item_code||'').toLowerCase().includes(q)) return;
+    var k = it.item_code;
+    if(!byItem[k]) byItem[k] = { item_code:k, item_name:it.item_name, plants:[],
+      on_hand_bags:0, on_order_bags:0, committed_bags:0, available_bags:0,
+      qty_on_hand:0, qty_on_order:0, qty_committed:0, qty_available:0 };
+    byItem[k].plants.push(it.plant_code);
+    byItem[k].on_hand_bags  += Number(it.on_hand_bags||0);
+    byItem[k].on_order_bags += Number(it.on_order_bags||0);
+    byItem[k].committed_bags+= Number(it.committed_bags||0);
+    byItem[k].available_bags+= Number(it.available_bags||0);
+    byItem[k].qty_on_hand   += Number(it.qty_on_hand||0);
+    byItem[k].qty_on_order  += Number(it.qty_on_order||0);
+    byItem[k].qty_committed += Number(it.qty_committed||0);
+    byItem[k].qty_available += Number(it.qty_available||0);
+  });
+  var rows = Object.values(byItem).sort(function(a,b){return (b.on_hand_bags||0)-(a.on_hand_bags||0)});
+  var cap = 200;
+  var shown = rows.slice(0, cap);
+  sett('inv-prod-count', shown.length + ' of ' + rows.length + ' SKUs');
+
+  var html = shown.map(function(r){
+    var onHand = isBags ? r.on_hand_bags : r.qty_on_hand;
+    var po     = isBags ? r.on_order_bags : r.qty_on_order;
+    var com    = isBags ? r.committed_bags : r.qty_committed;
+    var avail  = isBags ? r.available_bags : r.qty_available;
+    var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
+    var plantLbl = r.plants.length === 1 ? r.plants[0] : (r.plants.length + ' plants');
+    return '<tr><td style="font-size:11px">'+esc((r.item_name||r.item_code).slice(0,50))+'</td>'
+      + '<td style="font-size:10px;color:var(--text3)">'+esc(plantLbl)+'</td>'
+      + '<td>'+fcn(Math.round(onHand||0))+'</td>'
+      + '<td>'+fcn(Math.round(po||0))+'</td>'
+      + '<td>'+fcn(Math.round(com||0))+'</td>'
+      + '<td '+availSty+'>'+fcn(Math.round(avail||0))+'</td></tr>';
+  }).join('');
+  if(!html) html = '<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:30px">No SKUs match filter</td></tr>';
+  seth('inv-product-tbody', html);
 }
 
 /* ===== SPEED — wired to /api/speed (mirrors topbar period) ===== */
