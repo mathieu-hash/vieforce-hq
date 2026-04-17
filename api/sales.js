@@ -102,27 +102,80 @@ module.exports = async (req, res) => {
       ORDER BY T0.DocDate ASC
     `)
 
+    // Also get PO headers (for amount + status count — DocStatus='O' then per-line detail above)
+    const pendingPOHeaders = await query(`
+      SELECT TOP 500
+        T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName,
+        ISNULL(T0.DocTotal, 0) AS amount,
+        T0.Confirmed,
+        ISNULL(T0.SlpCode, 0) AS slp
+      FROM ORDR T0
+      WHERE T0.DocStatus='O' AND T0.CANCELED='N'
+      ORDER BY T0.DocDate DESC
+    `)
+
     const po_total_mt = pendingPO.reduce((s, p) => s + p.qty_mt, 0)
+    const po_total_value = pendingPOHeaders.reduce((s, p) => s + (p.amount || 0), 0)
     const po_by_brand = {}
     const po_by_region = {}
+    const po_by_sku = {}
+    const po_by_region_detail = {}  // { region: { orders:Set, mt, value, statuses:{confirmed, credit_hold, awaiting} } }
+    const po_by_customer = {}        // { code: { name, orders:Set, mt, value, statuses:[] } }
     pendingPO.forEach(p => {
       po_by_brand[p.brand] = (po_by_brand[p.brand] || 0) + p.qty_mt
       const region = ['AC','ACEXT','BAC'].includes(p.plant) ? 'Luzon'
         : ['HOREB','ARGAO','ALAE'].includes(p.plant) ? 'Visayas'
         : ['BUKID','CCPC'].includes(p.plant) ? 'Mindanao' : 'Other'
       po_by_region[region] = (po_by_region[region] || 0) + p.qty_mt
+      po_by_sku[p.sku] = po_by_sku[p.sku] || { sku: p.sku, name: p.brand, mt: 0 }
+      po_by_sku[p.sku].mt += p.qty_mt
+      if(!po_by_region_detail[region]) po_by_region_detail[region] = { region, orders: new Set(), mt: 0, value: 0 }
+      po_by_region_detail[region].orders.add(p.DocNum)
+      po_by_region_detail[region].mt += p.qty_mt
+      // approx line value from header allocation (per PO split by line mt share) — quick proxy:
+      po_by_region_detail[region].value += p.amount || 0
+      if(!po_by_customer[p.customer_code]) po_by_customer[p.customer_code] = { customer: p.customer_name, code: p.customer_code, orders: new Set(), mt: 0, value: 0 }
+      po_by_customer[p.customer_code].orders.add(p.DocNum)
+      po_by_customer[p.customer_code].mt += p.qty_mt
+      po_by_customer[p.customer_code].value += p.amount || 0
     })
+
+    const top_po_customers = Object.values(po_by_customer)
+      .map(c => ({ customer: c.customer, code: c.code, orders: c.orders.size, mt: Math.round(c.mt * 10) / 10, value: c.value, status: 'Open' }))
+      .sort((a, b) => b.mt - a.mt).slice(0, 12)
 
     const pending_po = {
       summary: {
         total_mt: Math.round(po_total_mt * 10) / 10,
+        total_value: Math.round(po_total_value),
         total_orders: new Set(pendingPO.map(p => p.DocNum)).size,
         customers_count: new Set(pendingPO.map(p => p.customer_code)).size,
+        avg_order_mt: pendingPOHeaders.length > 0 ? Math.round(po_total_mt / pendingPOHeaders.length) : 0,
         oldest_days: pendingPO.length > 0 ? Math.max(...pendingPO.map(p => p.age_days)) : 0
       },
       by_brand: Object.entries(po_by_brand).map(([brand, mt]) => ({ brand, mt: Math.round(mt * 10) / 10 })).sort((a, b) => b.mt - a.mt),
       by_region: Object.entries(po_by_region).map(([region, mt]) => ({ region, mt: Math.round(mt * 10) / 10 })).sort((a, b) => b.mt - a.mt),
-      top_customers: [...new Map(pendingPO.map(p => [p.customer_code, { customer: p.customer_name, code: p.customer_code }])).values()].slice(0, 10)
+      by_sku:    Object.values(po_by_sku).map(s => ({ sku: s.sku, name: (s.name || '').slice(0, 40), mt: Math.round(s.mt * 10) / 10 })).sort((a, b) => b.mt - a.mt).slice(0, 12),
+      by_region_detail: Object.values(po_by_region_detail).map(r => ({
+        region: r.region,
+        orders: r.orders.size,
+        mt: Math.round(r.mt * 10) / 10,
+        value: Math.round(r.value),
+        avg_size_mt: r.orders.size > 0 ? Math.round((r.mt / r.orders.size) * 10) / 10 : 0
+      })).sort((a, b) => b.mt - a.mt),
+      top_customers: top_po_customers,
+      detail: pendingPO.slice(0, 50).map(p => ({
+        doc_num: p.DocNum,
+        date: p.DocDate,
+        customer: p.customer_name,
+        code: p.customer_code,
+        brand: p.brand,
+        sku: p.sku,
+        plant: p.plant,
+        mt: Math.round(p.qty_mt * 10) / 10,
+        amount: p.amount,
+        age_days: p.age_days
+      }))
     }
 
     // --- Top-level summary KPIs for Sales hero strip ---
