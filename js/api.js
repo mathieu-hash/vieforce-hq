@@ -54,3 +54,4 @@ function getMarginData(params) { return apiFetch('margin', params); }
 function getIntelligenceData(params) { return apiFetch('intelligence', params); }
 function getTeamData(params) { return apiFetch('team', params); }
 function getBudgetData(params) { return apiFetch('budget', params); }
+function getItemizedData(params) { return apiFetch('itemized', params); }

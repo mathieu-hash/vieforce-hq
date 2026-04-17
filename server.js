@@ -43,6 +43,8 @@ const marginHandler = require('./api/margin')
 const intelligenceHandler = require('./api/intelligence')
 const teamHandler = require('./api/team')
 const budgetHandler = require('./api/budget')
+const itemizedHandler = require('./api/itemized')
+const itemizedMetaHandler = require('./api/itemized-meta')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -57,6 +59,8 @@ app.get('/api/margin', marginHandler)
 app.get('/api/intelligence', intelligenceHandler)
 app.get('/api/team', teamHandler)
 app.get('/api/budget', budgetHandler)
+app.get('/api/itemized', itemizedHandler)
+app.get('/api/itemized/meta', itemizedMetaHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 

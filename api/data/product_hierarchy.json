@@ -1,0 +1,1936 @@
+{
+  "skus": {
+    "vpi000159": {
+      "item_code": "vpi000159",
+      "name": "VIEPRO SUPER FORMULA PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000174": {
+      "item_code": "vpi000174",
+      "name": "VIEPRO SUPER FORMULA MASH 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000161": {
+      "item_code": "vpi000161",
+      "name": "VIEPRO SUPER FORMULA PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000118": {
+      "item_code": "vpi000118",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000115": {
+      "item_code": "vpi000115",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER MASH 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000116": {
+      "item_code": "vpi000116",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER MASH 25KG - NON MED",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000117": {
+      "item_code": "vpi000117",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER PELLET 2.5MM 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000120": {
+      "item_code": "vpi000120",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER PELLET 3MM 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000119": {
+      "item_code": "vpi000119",
+      "name": "VIEPRO PREMIUM PIGLET BOOSTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000108": {
+      "item_code": "vpi000108",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000106": {
+      "item_code": "vpi000106",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER MASH 25KG",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000107": {
+      "item_code": "vpi000107",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER MASH 25KG - HD W/ MED",
+      "bag_size_kg": 25,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000104": {
+      "item_code": "vpi000104",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER 2 PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000105": {
+      "item_code": "vpi000105",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER 2 PELLET 50KG W/ DEWORMER",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000109": {
+      "item_code": "vpi000109",
+      "name": "VIEPRO PREMIUM HOG PRE-STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000113": {
+      "item_code": "vpi000113",
+      "name": "VIEPRO PREMIUM HOG STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000110": {
+      "item_code": "vpi000110",
+      "name": "VIEPRO PREMIUM HOG STARTER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000114": {
+      "item_code": "vpi000114",
+      "name": "VIEPRO PREMIUM HOG STARTER PELLET 50KG - DAVAOTFARM",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000188": {
+      "item_code": "vpi000188",
+      "name": "VIEPRO PREMIUM HOG STARTER PELLET 50KG - FF",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000111": {
+      "item_code": "vpi000111",
+      "name": "VIEPRO PREMIUM HOG STARTER MASH 50KG - GS",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000112": {
+      "item_code": "vpi000112",
+      "name": "VIEPRO PREMIUM HOG STARTER MASH 50KG - HD NONMED",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000099": {
+      "item_code": "vpi000099",
+      "name": "VIEPRO PREMIUM HOG GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000098": {
+      "item_code": "vpi000098",
+      "name": "VIEPRO PREMIUM HOG GROWER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000187": {
+      "item_code": "vpi000187",
+      "name": "VIEPRO PREMIUM HOG GROWER MASH 50KG - GS",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000100": {
+      "item_code": "vpi000100",
+      "name": "VIEPRO PREMIUM HOG GROWER PELLET 50KG - DAVAOTFARM",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000101": {
+      "item_code": "vpi000101",
+      "name": "VIEPRO PREMIUM HOG GROWER PELLET 50KG W/ PULMOTIL",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000094": {
+      "item_code": "vpi000094",
+      "name": "VIEPRO PREMIUM HOG FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000093": {
+      "item_code": "vpi000093",
+      "name": "VIEPRO PREMIUM HOG FINISHER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000095": {
+      "item_code": "vpi000095",
+      "name": "VIEPRO PREMIUM HOG FINISHER PELLET 50KG - DAVAOTFARM",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000097": {
+      "item_code": "vpi000097",
+      "name": "VIEPRO PREMIUM HOG GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000096": {
+      "item_code": "vpi000096",
+      "name": "VIEPRO PREMIUM HOG GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000103": {
+      "item_code": "vpi000103",
+      "name": "VIEPRO PREMIUM HOG LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000102": {
+      "item_code": "vpi000102",
+      "name": "VIEPRO PREMIUM HOG LACTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000067": {
+      "item_code": "vpi000067",
+      "name": "VIEPRO BOAR PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO",
+      "sub_group": null
+    },
+    "vpi000129": {
+      "item_code": "vpi000129",
+      "name": "VIEPRO PRIME HOG STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000128": {
+      "item_code": "vpi000128",
+      "name": "VIEPRO PRIME HOG STARTER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000125": {
+      "item_code": "vpi000125",
+      "name": "VIEPRO PRIME HOG GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000124": {
+      "item_code": "vpi000124",
+      "name": "VIEPRO PRIME HOG GROWER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000121": {
+      "item_code": "vpi000121",
+      "name": "VIEPRO PRIME HOG FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000234": {
+      "item_code": "vpi000234",
+      "name": "VIEPRO PRIME HOG FINISHER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000123": {
+      "item_code": "vpi000123",
+      "name": "VIEPRO PRIME HOG GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000122": {
+      "item_code": "vpi000122",
+      "name": "VIEPRO PRIME HOG GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000127": {
+      "item_code": "vpi000127",
+      "name": "VIEPRO PRIME HOG LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000126": {
+      "item_code": "vpi000126",
+      "name": "VIEPRO PRIME HOG LACTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PRIME",
+      "sub_group": null
+    },
+    "vpi000173": {
+      "item_code": "vpi000173",
+      "name": "VIEPROMO HOG STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000171": {
+      "item_code": "vpi000171",
+      "name": "VIEPROMO HOG GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000170": {
+      "item_code": "vpi000170",
+      "name": "VIEPROMO HOG GROWER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000162": {
+      "item_code": "vpi000162",
+      "name": "VIEPROMO HOG FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000164": {
+      "item_code": "vpi000164",
+      "name": "VIEPROMO HOG FINISHER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000163": {
+      "item_code": "vpi000163",
+      "name": "VIEPROMO HOG FINISHER MASH 50KG W/ AMOX+HAQUINOL",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000165": {
+      "item_code": "vpi000165",
+      "name": "VIEPROMO HOG BROOD SOW PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000169": {
+      "item_code": "vpi000169",
+      "name": "VIEPROMO HOG GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000166": {
+      "item_code": "vpi000166",
+      "name": "VIEPROMO HOG BROOD SOW MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000168": {
+      "item_code": "vpi000168",
+      "name": "VIEPROMO HOG GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000172": {
+      "item_code": "vpi000172",
+      "name": "VIEPROMO HOG LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000223": {
+      "item_code": "vpi000223",
+      "name": "VIEPROMO HOG LACTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIEPRO PROMO",
+      "sub_group": null
+    },
+    "vpi000182": {
+      "item_code": "vpi000182",
+      "name": "VIETOP PIGLET PRESTARTER 5% BASEMIX 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000180": {
+      "item_code": "vpi000180",
+      "name": "VIETOP PIG STARTER 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000181": {
+      "item_code": "vpi000181",
+      "name": "VIETOP PIG STARTER 5% BASEMIX 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000178": {
+      "item_code": "vpi000178",
+      "name": "VIETOP PIG GROWER 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000179": {
+      "item_code": "vpi000179",
+      "name": "VIETOP PIG GROWER 5% BASEMIX 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000176": {
+      "item_code": "vpi000176",
+      "name": "VIETOP PIG FINISHER 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000183": {
+      "item_code": "vpi000183",
+      "name": "VIETOP SOW GESTATING 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000184": {
+      "item_code": "vpi000184",
+      "name": "VIETOP SOW GESTATING 5% BASEMIX 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000185": {
+      "item_code": "vpi000185",
+      "name": "VIETOP SOW LACTATING 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000186": {
+      "item_code": "vpi000186",
+      "name": "VIETOP SOW LACTATING 5% BASEMIX 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000175": {
+      "item_code": "vpi000175",
+      "name": "VIETOP BOAR 2% BASEMIX 20KG",
+      "bag_size_kg": 20,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000177": {
+      "item_code": "vpi000177",
+      "name": "VIETOP GILT DEVELOPER 2% BASEMIX 40KG",
+      "bag_size_kg": 40,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000021": {
+      "item_code": "vpi000021",
+      "name": "PRIVATE LABEL HOG PRE-STARTER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000022": {
+      "item_code": "vpi000022",
+      "name": "PRIVATE LABEL HOG STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000019": {
+      "item_code": "vpi000019",
+      "name": "PRIVATE LABEL HOG GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000018": {
+      "item_code": "vpi000018",
+      "name": "PRIVATE LABEL HOG FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000026": {
+      "item_code": "vpi000026",
+      "name": "PRIVATE LABEL HOG GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000016": {
+      "item_code": "vpi000016",
+      "name": "PRIVATE LABEL HOG GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000020": {
+      "item_code": "vpi000020",
+      "name": "PRIVATE LABEL HOG LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000029": {
+      "item_code": "vpi000029",
+      "name": "PRIVATE LABEL SUREGROW STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000027": {
+      "item_code": "vpi000027",
+      "name": "PRIVATE LABEL SUREGROW GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000025": {
+      "item_code": "vpi000025",
+      "name": "PRIVATE LABEL SUREGROW FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000250": {
+      "item_code": "vpi000250",
+      "name": "PRIVATE LABEL SUREGROW GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000028": {
+      "item_code": "vpi000028",
+      "name": "PRIVATE LABEL SUREGROW LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000048": {
+      "item_code": "vpi000048",
+      "name": "SCRS SUPREME HOG PRE-STARTER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000049": {
+      "item_code": "vpi000049",
+      "name": "SCRS SUPREME HOG STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000045": {
+      "item_code": "vpi000045",
+      "name": "SCRS SUPREME HOG GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000044": {
+      "item_code": "vpi000044",
+      "name": "SCRS SUPREME HOG FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000051": {
+      "item_code": "vpi000051",
+      "name": "SCRS SUPREME SOW GESTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000046": {
+      "item_code": "vpi000046",
+      "name": "SCRS SUPREME SOW GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000047": {
+      "item_code": "vpi000047",
+      "name": "SCRS SUPREME SOW LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000039": {
+      "item_code": "vpi000039",
+      "name": "PRIVATE LABEL VIEPROMO STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000036": {
+      "item_code": "vpi000036",
+      "name": "PRIVATE LABEL VIEPROMO GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000035": {
+      "item_code": "vpi000035",
+      "name": "PRIVATE LABEL VIEPROMO GROWER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000033": {
+      "item_code": "vpi000033",
+      "name": "PRIVATE LABEL VIEPROMO FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000017": {
+      "item_code": "vpi000017",
+      "name": "PRIVATE LABEL HOG BROOD SOW PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000034": {
+      "item_code": "vpi000034",
+      "name": "PRIVATE LABEL VIEPROMO GESTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000038": {
+      "item_code": "vpi000038",
+      "name": "PRIVATE LABEL VIEPROMO LACTATING PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000037": {
+      "item_code": "vpi000037",
+      "name": "PRIVATE LABEL VIEPROMO LACTATING MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "VIETOP",
+      "sub_group": null
+    },
+    "vpi000069": {
+      "item_code": "vpi000069",
+      "name": "VIEPRO BROILER BOOSTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000075": {
+      "item_code": "vpi000075",
+      "name": "VIEPRO BROILER STARTER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000074": {
+      "item_code": "vpi000074",
+      "name": "VIEPRO BROILER STARTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000073": {
+      "item_code": "vpi000073",
+      "name": "VIEPRO BROILER GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000071": {
+      "item_code": "vpi000071",
+      "name": "VIEPRO BROILER GROWER PELLET 3MM 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000072": {
+      "item_code": "vpi000072",
+      "name": "VIEPRO BROILER GROWER PELLET 4MM 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000070": {
+      "item_code": "vpi000070",
+      "name": "VIEPRO BROILER FINISHER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000083": {
+      "item_code": "vpi000083",
+      "name": "VIEPRO PREMIUM CHICK GROWER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000252": {
+      "item_code": "vpi000252",
+      "name": "HBFI BROILER BREEDER DEVELOPER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000253": {
+      "item_code": "vpi000253",
+      "name": "VIEPRO BREEDER PULLET STARTER 1 CRUMBLE BSAFE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000254": {
+      "item_code": "vpi000254",
+      "name": "HBFI BROILER BREEDER GROWER 1 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000255": {
+      "item_code": "vpi000255",
+      "name": "HBFI BROILER BREEDER LAYER 1 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000256": {
+      "item_code": "vpi000256",
+      "name": "HBFI BROILER BREEDER DEVELOPER MASH WITH CYROMAZINE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000257": {
+      "item_code": "vpi000257",
+      "name": "HBFI BROILER BREEDER GROWER 2 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000258": {
+      "item_code": "vpi000258",
+      "name": "VIEPRO BREEDER PULLET STARTER 2 CRUMBLE BSAFE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - BROILER"
+    },
+    "vpi000137": {
+      "item_code": "vpi000137",
+      "name": "VIEPRO PULLET BOOSTER SMALL CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000136": {
+      "item_code": "vpi000136",
+      "name": "VIEPRO PULLET BOOSTER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000251": {
+      "item_code": "vpi000251",
+      "name": "VIEPRO PULLET PRELAY COARSE MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000150": {
+      "item_code": "vpi000150",
+      "name": "VIEPRO PULLET PRE-LAY PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000149": {
+      "item_code": "vpi000149",
+      "name": "VIEPRO PULLET PRE-LAY CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000219": {
+      "item_code": "vpi000219",
+      "name": "VIEPRO PULLET STARTER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000151": {
+      "item_code": "vpi000151",
+      "name": "VIEPRO PULLET STARTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000153": {
+      "item_code": "vpi000153",
+      "name": "VIEPRO PULLET STARTER CRUMBLE 50KG - AMOX+TYLOSIN",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000147": {
+      "item_code": "vpi000147",
+      "name": "VIEPRO PULLET GROWER PELLET 50KG - TIAMULIN",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000148": {
+      "item_code": "vpi000148",
+      "name": "VIEPRO PULLET GROWER PELLET 50KG - TYLOSIN+AMOX",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000145": {
+      "item_code": "vpi000145",
+      "name": "VIEPRO PULLET GROWER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000146": {
+      "item_code": "vpi000146",
+      "name": "VIEPRO PULLET GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000143": {
+      "item_code": "vpi000143",
+      "name": "VIEPRO PULLET GROWER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000089": {
+      "item_code": "vpi000089",
+      "name": "VIEPRO LAYER 1 PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000080": {
+      "item_code": "vpi000080",
+      "name": "VIEPRO LAYER 1 CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000082": {
+      "item_code": "vpi000082",
+      "name": "VIEPRO LAYER 1 CRUMBLE 50KG - FENBENDAZOLE",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000085": {
+      "item_code": "vpi000085",
+      "name": "VIEPRO LAYER 1 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000086": {
+      "item_code": "vpi000086",
+      "name": "VIEPRO LAYER 1 MASH HIGH DENSE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000087": {
+      "item_code": "vpi000087",
+      "name": "VIEPRO LAYER 1 PELLET 3MM 50KG - NORFLOXACIN",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000088": {
+      "item_code": "vpi000088",
+      "name": "VIEPRO LAYER 1 PELLET 4MM 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000084": {
+      "item_code": "vpi000084",
+      "name": "VIEPRO LAYER 1 HIGH DENSE CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000081": {
+      "item_code": "vpi000081",
+      "name": "VIEPRO LAYER 1 HIGH DENSE PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000091": {
+      "item_code": "vpi000091",
+      "name": "VIEPRO LAYER 2 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000090": {
+      "item_code": "vpi000090",
+      "name": "VIEPRO LAYER 2 CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000092": {
+      "item_code": "vpi000092",
+      "name": "VIEPRO LAYER 2 PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000226": {
+      "item_code": "vpi000226",
+      "name": "VIEPRO LAYER 3 MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000066": {
+      "item_code": "vpi000066",
+      "name": "VIEPRO BREEDER LAYER 1 BIG CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000065": {
+      "item_code": "vpi000065",
+      "name": "VIEPRO BREEDER LAYER 2 BIG CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000064": {
+      "item_code": "vpi000064",
+      "name": "VIEPRO BREEDER MALE CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000023": {
+      "item_code": "vpi000023",
+      "name": "PRIVATE LABEL LAYER 1 CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000024": {
+      "item_code": "vpi000024",
+      "name": "PRIVATE LABEL LAYER 1 PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000055": {
+      "item_code": "vpi000055",
+      "name": "SCRS SUPREME CHICKEN LAYER 1 CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000054": {
+      "item_code": "vpi000054",
+      "name": "SCRS SUPREME CHICKEN LAYER 1 PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "POULTRY",
+      "sub_group": "VIEPRO - LAYER"
+    },
+    "vpi000144": {
+      "item_code": "vpi000144",
+      "name": "VIEPRO PULLET DEVELOPER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000139": {
+      "item_code": "vpi000139",
+      "name": "VIEPRO PULLET DEVELOPER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000141": {
+      "item_code": "vpi000141",
+      "name": "VIEPRO PULLET DEVELOPER PELLET 3MM 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000142": {
+      "item_code": "vpi000142",
+      "name": "VIEPRO PULLET DEVELOPER PELLET 4MM 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000138": {
+      "item_code": "vpi000138",
+      "name": "VIEPRO PULLET DEVELOPER COARSE MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000140": {
+      "item_code": "vpi000140",
+      "name": "VIEPRO PULLET DEVELOPER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "PDP"
+    },
+    "vpi000078": {
+      "item_code": "vpi000078",
+      "name": "VIEPRO DUCK LAYER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000079": {
+      "item_code": "vpi000079",
+      "name": "VIEPRO DUCK STARTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000077": {
+      "item_code": "vpi000077",
+      "name": "VIEPRO DUCK GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000076": {
+      "item_code": "vpi000076",
+      "name": "VIEPRO DUCK DEVELOPER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000152": {
+      "item_code": "vpi000152",
+      "name": "VIEPRO QUAIL LAYER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000154": {
+      "item_code": "vpi000154",
+      "name": "VIEPRO QUIAL LAYER MASH 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000156": {
+      "item_code": "vpi000156",
+      "name": "VIEPRO RABBIT BREEDER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000157": {
+      "item_code": "vpi000157",
+      "name": "VIEPRO RABBIT GROWER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000158": {
+      "item_code": "vpi000158",
+      "name": "VIEPRO RABBIT LACTATION PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000056": {
+      "item_code": "vpi000056",
+      "name": "VIEPRO BEEF GROWER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000160": {
+      "item_code": "vpi000160",
+      "name": "VIEPRO SUPERLAC PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000015": {
+      "item_code": "vpi000015",
+      "name": "PRIVATE LABEL DUCK LAYER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "OTHERS",
+      "sub_group": "OTHERS"
+    },
+    "vpi000130": {
+      "item_code": "vpi000130",
+      "name": "VIEPRO PROBOOST 1000 BOOSTER SMALL CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000131": {
+      "item_code": "vpi000131",
+      "name": "VIEPRO PROBOOST 2000 STARTER BIG CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000132": {
+      "item_code": "vpi000132",
+      "name": "VIEPRO PROBOOST 2000 STARTER PELLET 2.5MM 50KG",
+      "bag_size_kg": 50,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000133": {
+      "item_code": "vpi000133",
+      "name": "VIEPRO PROBOOST 3000 MAINTENANCE PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000134": {
+      "item_code": "vpi000134",
+      "name": "VIEPRO PROBOOST 4000 BREEDER PELLET 25KG",
+      "bag_size_kg": 25,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000135": {
+      "item_code": "vpi000135",
+      "name": "VIEPRO PROBOOST 4000 BREEDER PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000259": {
+      "item_code": "vpi000259",
+      "name": "VIEPRO POWER BOOST READY MIX 25KG",
+      "bag_size_kg": 25,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000260": {
+      "item_code": "vpi000260",
+      "name": "VIEPRO PROBOOST MIXED GRAINS 7G 25KG",
+      "bag_size_kg": 25,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000261": {
+      "item_code": "vpi000261",
+      "name": "VIEPRO PROBOOST MIXED GRAINS 16G 25KG",
+      "bag_size_kg": 25,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000262": {
+      "item_code": "vpi000262",
+      "name": "VIEPRO PROBOOST MIXED GRAINS 18G 25KG",
+      "bag_size_kg": 25,
+      "group": "PROBOOST",
+      "sub_group": null
+    },
+    "vpi000011": {
+      "item_code": "vpi000011",
+      "name": "PRIVATE LABEL 1000 BOOSTER SMALL CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000013": {
+      "item_code": "vpi000013",
+      "name": "PRIVATE LABEL 2000 STARTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000012": {
+      "item_code": "vpi000012",
+      "name": "PRIVATE LABEL 2000 STARTER BIG CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000014": {
+      "item_code": "vpi000014",
+      "name": "PRIVATE LABEL 3000 MAINTENANCE PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000050": {
+      "item_code": "vpi000050",
+      "name": "SCRS SUPREME CHICK TURBO 1000 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000052": {
+      "item_code": "vpi000052",
+      "name": "SCRS SUPREME CHICK TURBO 2000 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000053": {
+      "item_code": "vpi000053",
+      "name": "SCRS SUPREME CHICK TURBO 3000 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000030": {
+      "item_code": "vpi000030",
+      "name": "PRIVATE LABEL TURBO 1000 BOOSTER SMALL CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000031": {
+      "item_code": "vpi000031",
+      "name": "PRIVATE LABEL TURBO 2000 STARTER CRUMBLE 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000032": {
+      "item_code": "vpi000032",
+      "name": "PRIVATE LABEL TURBO 3000 MAINTENANCE PELLET 50KG",
+      "bag_size_kg": 50,
+      "group": "PRIVATE LABEL",
+      "sub_group": null
+    },
+    "vpi000040": {
+      "item_code": "vpi000040",
+      "name": "SAPPHIRE 1",
+      "bag_size_kg": 10,
+      "group": "AQUA",
+      "sub_group": "VANA"
+    },
+    "vpi000041": {
+      "item_code": "vpi000041",
+      "name": "SAPPHIRE 2",
+      "bag_size_kg": 10,
+      "group": "AQUA",
+      "sub_group": "VANA"
+    },
+    "vpi000042": {
+      "item_code": "vpi000042",
+      "name": "SAPPHIRE 3",
+      "bag_size_kg": 25,
+      "group": "AQUA",
+      "sub_group": "VANA"
+    },
+    "vpi000043": {
+      "item_code": "vpi000043",
+      "name": "SAPPHIRE 4",
+      "bag_size_kg": 25,
+      "group": "AQUA",
+      "sub_group": "VANA"
+    },
+    "vpi000238": {
+      "item_code": "vpi000238",
+      "name": "SAPPHIRE 5",
+      "bag_size_kg": 25,
+      "group": "AQUA",
+      "sub_group": "VANA"
+    },
+    "vpi000010": {
+      "item_code": "vpi000010",
+      "name": "NOVOPET 20KG",
+      "bag_size_kg": 20,
+      "group": "PET FOOD",
+      "sub_group": "NOVOPET"
+    },
+    "vpi000006": {
+      "item_code": "vpi000006",
+      "name": "KEOS DOG ADULT B&V 400G",
+      "bag_size_kg": 0.4,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000004": {
+      "item_code": "vpi000004",
+      "name": "KEOS DOG ADULT B&V 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000005": {
+      "item_code": "vpi000005",
+      "name": "KEOS DOG ADULT B&V 20KG",
+      "bag_size_kg": 20,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000009": {
+      "item_code": "vpi000009",
+      "name": "KEOS DOG PUPPY MC&E 400G",
+      "bag_size_kg": 0.4,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000007": {
+      "item_code": "vpi000007",
+      "name": "KEOS DOG PUPPY MC&E 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000008": {
+      "item_code": "vpi000008",
+      "name": "KEOS DOG PUPPY MC&E 20KG",
+      "bag_size_kg": 20,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - DOG"
+    },
+    "vpi000202": {
+      "item_code": "vpi000202",
+      "name": "KEOS+ DOG DIGESTIVE CARE 400G",
+      "bag_size_kg": 0.4,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000201": {
+      "item_code": "vpi000201",
+      "name": "KEOS+ DOG DIGESTIVE CARE 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000193": {
+      "item_code": "vpi000193",
+      "name": "KEOS+ DOG DIGESTIVE CARE 20KG",
+      "bag_size_kg": 20,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000263": {
+      "item_code": "vpi000263",
+      "name": "KEOS+ DOG ADULT SMALL BREEDS W/ LAMB & RICE 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000264": {
+      "item_code": "vpi000264",
+      "name": "KEOS+ DOG ADULT SMALL BREEDS W L&R - BOX 12 KG (4X3KG)",
+      "bag_size_kg": 3,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000215": {
+      "item_code": "vpi000215",
+      "name": "KEOS+ DOG HI PROTEIN 400G",
+      "bag_size_kg": 0.4,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000217": {
+      "item_code": "vpi000217",
+      "name": "KEOS+ DOG HI PROTEIN 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000216": {
+      "item_code": "vpi000216",
+      "name": "KEOS+ DOG HI PROTEIN 20KG",
+      "bag_size_kg": 20,
+      "group": "PET FOOD",
+      "sub_group": "KEOS+ - DOG"
+    },
+    "vpi000002": {
+      "item_code": "vpi000002",
+      "name": "KEOS CAT ALL STAGES SEAFOOD 350G",
+      "bag_size_kg": 0.35,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000001": {
+      "item_code": "vpi000001",
+      "name": "KEOS CAT ALL STAGES SEAFOOD 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000003": {
+      "item_code": "vpi000003",
+      "name": "KEOS CAT ALL STAGES SEAFOOD 7KG",
+      "bag_size_kg": 7,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000265": {
+      "item_code": "vpi000265",
+      "name": "KEOS CAT ALL STAGES TUNA - BOX 9 KG (6X1.5KG)",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000268": {
+      "item_code": "vpi000268",
+      "name": "KEOS CAT ALL STAGES TUNA 7KG",
+      "bag_size_kg": 7,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000199": {
+      "item_code": "vpi000199",
+      "name": "KEOS+ CAT HAIRBALL CONTROL 350G",
+      "bag_size_kg": 0.35,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000189": {
+      "item_code": "vpi000189",
+      "name": "KEOS+ CAT HAIRBALL CONTROL 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000190": {
+      "item_code": "vpi000190",
+      "name": "KEOS+ CAT HAIRBALL CONTROL 7KG",
+      "bag_size_kg": 7,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000200": {
+      "item_code": "vpi000200",
+      "name": "KEOS+ CAT URINARY CARE 350G",
+      "bag_size_kg": 0.35,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000191": {
+      "item_code": "vpi000191",
+      "name": "KEOS+ CAT URINARY CARE 1.5KG",
+      "bag_size_kg": 1.5,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000192": {
+      "item_code": "vpi000192",
+      "name": "KEOS+ CAT URINARY CARE 7KG",
+      "bag_size_kg": 7,
+      "group": "PET FOOD",
+      "sub_group": "KEOS - CAT"
+    },
+    "vpi000208": {
+      "item_code": "vpi000208",
+      "name": "PLAISER CHUNKS IN GRAVY W/ CHICKEN & VEGETABLE 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000209": {
+      "item_code": "vpi000209",
+      "name": "PLAISER CHUNKS IN GRAVY W/ BEEF & VEGETABLE 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000214": {
+      "item_code": "vpi000214",
+      "name": "PLAISER CHUNKS IN GRAVY W/ CHICKEN 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000210": {
+      "item_code": "vpi000210",
+      "name": "PLAISER TERRINE W/ BEEF & VEGETABLE 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000211": {
+      "item_code": "vpi000211",
+      "name": "PLAISER TERRINE W/ CHICKEN & VEGETABLE 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000212": {
+      "item_code": "vpi000212",
+      "name": "PLAISER TERRINE W/ TURKEY & VEGETABLE 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - DOG"
+    },
+    "vpi000207": {
+      "item_code": "vpi000207",
+      "name": "PLAISER CHUNKS IN GRAVY W/ TROUT & SHRIMP 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    },
+    "vpi000206": {
+      "item_code": "vpi000206",
+      "name": "PLAISER CHUNKS IN GRAVY W/ SALMON & COD 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    },
+    "vpi000203": {
+      "item_code": "vpi000203",
+      "name": "PLAISER TERRINE W/ CHICKEN 300G",
+      "bag_size_kg": 0.3,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    },
+    "vpi000204": {
+      "item_code": "vpi000204",
+      "name": "PLAISER TERRINE W/ SALMON 300G",
+      "bag_size_kg": 0.3,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    },
+    "vpi000205": {
+      "item_code": "vpi000205",
+      "name": "PLAISER TERRINE W/ TUNA 300G",
+      "bag_size_kg": 0.3,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    },
+    "vpi000213": {
+      "item_code": "vpi000213",
+      "name": "PLAISER TERRINE CHICKEN & MILK 100G",
+      "bag_size_kg": 0.1,
+      "group": "PET FOOD",
+      "sub_group": "PLAISIR - CAT"
+    }
+  },
+  "structure": [
+    {
+      "name": "VIEPRO",
+      "order": 1,
+      "skus": [
+        "vpi000159",
+        "vpi000174",
+        "vpi000161",
+        "vpi000118",
+        "vpi000115",
+        "vpi000116",
+        "vpi000117",
+        "vpi000120",
+        "vpi000119",
+        "vpi000108",
+        "vpi000106",
+        "vpi000107",
+        "vpi000104",
+        "vpi000105",
+        "vpi000109",
+        "vpi000113",
+        "vpi000110",
+        "vpi000114",
+        "vpi000188",
+        "vpi000111",
+        "vpi000112",
+        "vpi000099",
+        "vpi000098",
+        "vpi000187",
+        "vpi000100",
+        "vpi000101",
+        "vpi000094",
+        "vpi000093",
+        "vpi000095",
+        "vpi000097",
+        "vpi000096",
+        "vpi000103",
+        "vpi000102",
+        "vpi000067"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "VIEPRO PRIME",
+      "order": 2,
+      "skus": [
+        "vpi000129",
+        "vpi000128",
+        "vpi000125",
+        "vpi000124",
+        "vpi000121",
+        "vpi000234",
+        "vpi000123",
+        "vpi000122",
+        "vpi000127",
+        "vpi000126"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "VIEPRO PROMO",
+      "order": 3,
+      "skus": [
+        "vpi000173",
+        "vpi000171",
+        "vpi000170",
+        "vpi000162",
+        "vpi000164",
+        "vpi000163",
+        "vpi000165",
+        "vpi000169",
+        "vpi000166",
+        "vpi000168",
+        "vpi000172",
+        "vpi000223"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "VIETOP",
+      "order": 4,
+      "skus": [
+        "vpi000182",
+        "vpi000180",
+        "vpi000181",
+        "vpi000178",
+        "vpi000179",
+        "vpi000176",
+        "vpi000183",
+        "vpi000184",
+        "vpi000185",
+        "vpi000186",
+        "vpi000175",
+        "vpi000177",
+        "vpi000021",
+        "vpi000022",
+        "vpi000019",
+        "vpi000018",
+        "vpi000026",
+        "vpi000016",
+        "vpi000020",
+        "vpi000029",
+        "vpi000027",
+        "vpi000025",
+        "vpi000250",
+        "vpi000028",
+        "vpi000048",
+        "vpi000049",
+        "vpi000045",
+        "vpi000044",
+        "vpi000051",
+        "vpi000046",
+        "vpi000047",
+        "vpi000039",
+        "vpi000036",
+        "vpi000035",
+        "vpi000033",
+        "vpi000017",
+        "vpi000034",
+        "vpi000038",
+        "vpi000037"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "POULTRY",
+      "order": 5,
+      "skus": [],
+      "sub_groups": [
+        {
+          "name": "VIEPRO - BROILER",
+          "skus": [
+            "vpi000069",
+            "vpi000075",
+            "vpi000074",
+            "vpi000073",
+            "vpi000071",
+            "vpi000072",
+            "vpi000070",
+            "vpi000083",
+            "vpi000252",
+            "vpi000253",
+            "vpi000254",
+            "vpi000255",
+            "vpi000256",
+            "vpi000257",
+            "vpi000258"
+          ]
+        },
+        {
+          "name": "VIEPRO - LAYER",
+          "skus": [
+            "vpi000137",
+            "vpi000136",
+            "vpi000251",
+            "vpi000150",
+            "vpi000149",
+            "vpi000219",
+            "vpi000151",
+            "vpi000153",
+            "vpi000147",
+            "vpi000148",
+            "vpi000145",
+            "vpi000146",
+            "vpi000143",
+            "vpi000089",
+            "vpi000080",
+            "vpi000082",
+            "vpi000085",
+            "vpi000086",
+            "vpi000087",
+            "vpi000088",
+            "vpi000084",
+            "vpi000081",
+            "vpi000091",
+            "vpi000090",
+            "vpi000092",
+            "vpi000226",
+            "vpi000066",
+            "vpi000065",
+            "vpi000064",
+            "vpi000023",
+            "vpi000024",
+            "vpi000055",
+            "vpi000054"
+          ]
+        }
+      ],
+      "is_parent": true
+    },
+    {
+      "name": "OTHERS",
+      "order": 6,
+      "skus": [],
+      "sub_groups": [
+        {
+          "name": "PDP",
+          "skus": [
+            "vpi000144",
+            "vpi000139",
+            "vpi000141",
+            "vpi000142",
+            "vpi000138",
+            "vpi000140"
+          ]
+        },
+        {
+          "name": "OTHERS",
+          "skus": [
+            "vpi000078",
+            "vpi000079",
+            "vpi000077",
+            "vpi000076",
+            "vpi000152",
+            "vpi000154",
+            "vpi000156",
+            "vpi000157",
+            "vpi000158",
+            "vpi000056",
+            "vpi000160",
+            "vpi000015"
+          ]
+        },
+        {
+          "name": "GAMEFOWL",
+          "skus": []
+        }
+      ],
+      "is_parent": true
+    },
+    {
+      "name": "PROBOOST",
+      "order": 7,
+      "skus": [
+        "vpi000130",
+        "vpi000131",
+        "vpi000132",
+        "vpi000133",
+        "vpi000134",
+        "vpi000135",
+        "vpi000259",
+        "vpi000260",
+        "vpi000261",
+        "vpi000262"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "PRIVATE LABEL",
+      "order": 8,
+      "skus": [
+        "vpi000011",
+        "vpi000013",
+        "vpi000012",
+        "vpi000014",
+        "vpi000050",
+        "vpi000052",
+        "vpi000053",
+        "vpi000030",
+        "vpi000031",
+        "vpi000032"
+      ],
+      "sub_groups": []
+    },
+    {
+      "name": "AQUA",
+      "order": 9,
+      "skus": [],
+      "sub_groups": [
+        {
+          "name": "VANA",
+          "skus": [
+            "vpi000040",
+            "vpi000041",
+            "vpi000042",
+            "vpi000042",
+            "vpi000043",
+            "vpi000238"
+          ]
+        }
+      ],
+      "is_parent": true
+    },
+    {
+      "name": "PET FOOD",
+      "order": 10,
+      "skus": [],
+      "sub_groups": [
+        {
+          "name": "NOVOPET",
+          "skus": [
+            "vpi000010"
+          ]
+        },
+        {
+          "name": "KEOS",
+          "skus": []
+        },
+        {
+          "name": "KEOS - DOG",
+          "skus": [
+            "vpi000006",
+            "vpi000004",
+            "vpi000005",
+            "vpi000009",
+            "vpi000007",
+            "vpi000008"
+          ]
+        },
+        {
+          "name": "KEOS+ - DOG",
+          "skus": [
+            "vpi000202",
+            "vpi000201",
+            "vpi000193",
+            "vpi000263",
+            "vpi000264",
+            "vpi000215",
+            "vpi000217",
+            "vpi000216"
+          ]
+        },
+        {
+          "name": "KEOS - CAT",
+          "skus": [
+            "vpi000002",
+            "vpi000001",
+            "vpi000003",
+            "vpi000265",
+            "vpi000268",
+            "vpi000199",
+            "vpi000189",
+            "vpi000190",
+            "vpi000200",
+            "vpi000191",
+            "vpi000192"
+          ]
+        },
+        {
+          "name": "PLAISIR - DOG",
+          "skus": [
+            "vpi000208",
+            "vpi000209",
+            "vpi000214",
+            "vpi000210",
+            "vpi000211",
+            "vpi000212"
+          ]
+        },
+        {
+          "name": "PLAISIR - CAT",
+          "skus": [
+            "vpi000207",
+            "vpi000206",
+            "vpi000203",
+            "vpi000204",
+            "vpi000205",
+            "vpi000213"
+          ]
+        }
+      ],
+      "is_parent": true
+    }
+  ]
+}
