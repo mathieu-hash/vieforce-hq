@@ -1048,15 +1048,15 @@ body{
             <div class="kpi-enr-status ok" id="hk-dso-pct">On target</div>
             <div class="kpi-enr-badge" id="hk-dso-badge" style="display:none">+0d from delinquent</div>
           </div>
-          <!-- 6. Daily Pullout (period-aware) -->
+          <!-- 6. SPEED (period-aware — projected volume vs budget) -->
           <div class="kpi kpi-sm kpi-enr">
-            <div class="kpi-label" id="hk-speed-label">Daily Pullout · MTD</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-speed">—<span style="font-size:11px;color:var(--text3)"> MT/d</span></div>
-            <div class="kpi-delta" id="hk-speed-d">vs prior period</div>
+            <div class="kpi-label" id="hk-speed-label">Speed · MTD</div>
+            <div class="kpi-val" style="font-size:20px" id="hk-speed">—<span style="font-size:11px;color:var(--text3)"> MT</span></div>
+            <div class="kpi-delta" id="hk-speed-d">projected (vs target)</div>
             <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-speed-days">— of —</span><span class="kpi-enr-ytd-budget">shipping days</span></div>
+            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-speed-days">— of —</span><span class="kpi-enr-ytd-budget">shipping days · <span id="hk-speed-rate">—</span> MT/d</span></div>
             <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-speed-bar" style="width:0%;background:var(--blue)"></div></div>
-            <div class="kpi-enr-status" style="color:var(--text3)" id="hk-speed-pct">— days remaining</div>
+            <div class="kpi-enr-status" style="color:var(--text3)" id="hk-speed-pct">—</div>
           </div>
           <!-- 7. Pending PO -->
           <div class="kpi kpi-sm kpi-enr" style="border-left:3px solid var(--gold);cursor:pointer" onclick="navTo('pg-sales')">
@@ -1921,98 +1921,86 @@ body{
         <!-- HERO -->
         <div class="detail-hero" style="display:flex;gap:28px;align-items:flex-start">
           <div style="flex:1;position:relative">
-            <h1>Metro Feeds Corp.</h1>
-            <div class="detail-meta">CA-001 · Luzon · Metro Manila · Distribution</div>
-            <div class="detail-sub">Sales Rep: <b style="color:var(--text)">J. Santos</b> · Credit Line: <b style="color:var(--text)">₱30M</b> · Terms: <b style="color:var(--text)">45 days</b></div>
-            <div class="detail-badges">
-              <span class="badge b-green">Active</span>
-              <span class="badge b-blue">Top 5 Account</span>
-              <span class="badge b-green">Growing +8% YoY</span>
-            </div>
+            <h1 id="cd-name">—</h1>
+            <div class="detail-meta" id="cd-meta">—</div>
+            <div class="detail-sub" id="cd-sub">Sales Rep: <b id="cd-rep" style="color:var(--text)">—</b></div>
+            <div class="detail-badges" id="cd-badges"></div>
           </div>
           <div style="display:flex;gap:16px;position:relative;flex-shrink:0">
             <div style="text-align:center">
               <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">LAST ORDER</div>
-              <div style="font-family:var(--mono);font-size:16px;font-weight:700">Apr 11</div>
-              <div style="font-size:10px;color:var(--green);font-weight:600">4 days ago</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:700" id="cd-last-date">—</div>
+              <div style="font-size:10px;color:var(--green);font-weight:600" id="cd-last-days">—</div>
             </div>
             <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
             <div style="text-align:center">
               <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">ACCT AGE</div>
-              <div style="font-family:var(--mono);font-size:16px;font-weight:700">6.2 yr</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:500">Since Oct 2019</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:700" id="cd-age">—</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:500" id="cd-age-sub">—</div>
             </div>
             <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
             <div style="text-align:center">
               <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">RANK</div>
-              <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold)">#1</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:500">National MTD</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold)" id="cd-rank">—</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:500">National YTD</div>
             </div>
             <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
             <div style="text-align:center">
-              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">CREDIT USE</div>
-              <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold)">95%</div>
-              <div style="font-size:10px;color:var(--gold);font-weight:600">₱28.4M / ₱30M</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">AR BALANCE</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:700" id="cd-ar-total">—</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:500" id="cd-ar-sub">— open invoices</div>
             </div>
           </div>
         </div>
 
         <!-- KPIs row — 8 metrics -->
         <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:16px" class="stagger">
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Vol</div><div class="kpi-val" style="font-size:18px">4,820<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up">▲ 8.2%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Sales</div><div class="kpi-val" style="font-size:18px">₱198M</div><div class="kpi-delta up">▲ 6.4%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Vol</div><div class="kpi-val" style="font-size:18px">420<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up">▲ 14.1%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px">₱18.2M</div><div class="kpi-delta up">▲ 11.0%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">GM/Ton</div><div class="kpi-val" style="font-size:18px;color:var(--green)">₱6,240</div><div class="kpi-delta up">▲ 3.8%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">DSO</div><div class="kpi-val" style="font-size:18px">32<span style="font-size:10px;color:var(--text3)">d</span></div><div class="kpi-delta up">▼ 5d</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:18px">38<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src">per delivery</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Frequency</div><div class="kpi-val" style="font-size:18px">2.8<span style="font-size:10px;color:var(--text3)"> /wk</span></div><div class="kpi-src">order cadence</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Vol</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-ytdvol">—</div><div class="kpi-delta" id="cd-kpi-ytdvol-d">—</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Sales</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-ytdsales">—</div><div class="kpi-src">revenue</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Vol</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-mtdvol">—</div><div class="kpi-src">current period</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-mtdsales">—</div><div class="kpi-src">revenue</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">GM/Ton</div><div class="kpi-val" style="font-size:18px;color:var(--green)" id="cd-kpi-gmt">—</div><div class="kpi-src">₱/MT</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">DSO</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-dso">—</div><div class="kpi-src">days</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-avg">—</div><div class="kpi-src">per delivery</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Frequency</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-freq">—</div><div class="kpi-src">orders/week</div></div>
         </div>
 
         <!-- Insights row -->
         <div class="grid-4 gap-sm" style="margin-bottom:16px">
-          <div class="card" style="border-left:3px solid var(--green)">
+          <div class="card" style="border-left:3px solid var(--green)" id="cd-insight-growth-card">
             <div class="card-body" style="padding:14px 16px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:14px">📈</span>
                 <span style="font-size:11px;font-weight:700;color:var(--green)">GROWTH SIGNAL</span>
               </div>
-              <div style="font-size:12px;color:var(--text2);line-height:1.6">
-                4-week avg volume <b style="color:var(--text)">+14%</b> above 8-week baseline. Consistent uptrend across 3 consecutive months.
-              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.6" id="cd-insight-growth">Computing…</div>
             </div>
           </div>
-          <div class="card" style="border-left:3px solid var(--blue)">
+          <div class="card" style="border-left:3px solid var(--blue)" id="cd-insight-sku-card">
             <div class="card-body" style="padding:14px 16px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:14px">🔄</span>
-                <span style="font-size:11px;font-weight:700;color:var(--blue)">SKU MIX SHIFT</span>
+                <span style="font-size:11px;font-weight:700;color:var(--blue)">SKU MIX</span>
               </div>
-              <div style="font-size:12px;color:var(--text2);line-height:1.6">
-                Poultry share rose from <b style="color:var(--text)">22% → 31%</b> in 90 days. Hog share declined proportionally. New Layer Feed adoption.
-              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.6" id="cd-insight-sku">Computing…</div>
             </div>
           </div>
-          <div class="card" style="border-left:3px solid var(--gold)">
+          <div class="card" style="border-left:3px solid var(--gold)" id="cd-insight-credit-card">
             <div class="card-body" style="padding:14px 16px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:14px">⚠️</span>
-                <span style="font-size:11px;font-weight:700;color:var(--gold)">CREDIT WATCH</span>
+                <span style="font-size:11px;font-weight:700;color:var(--gold)">AR WATCH</span>
               </div>
-              <div style="font-size:12px;color:var(--text2);line-height:1.6">
-                Credit utilization at <b style="color:var(--gold)">95%</b>. Three recent orders required manual override. Consider credit line review → ₱35M.
-              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.6" id="cd-insight-credit">Computing…</div>
             </div>
           </div>
-          <div class="card" style="border-left:3px solid var(--cyan)">
+          <div class="card" style="border-left:3px solid var(--cyan)" id="cd-insight-opp-card">
             <div class="card-body" style="padding:14px 16px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:14px">💡</span>
-                <span style="font-size:11px;font-weight:700;color:var(--cyan)">OPPORTUNITY</span>
+                <span style="font-size:11px;font-weight:700;color:var(--cyan)">PRODUCT MIX</span>
               </div>
-              <div style="font-size:12px;color:var(--text2);line-height:1.6">
-                Zero Gamefowl sales despite regional demand. Estimated whitespace: <b style="color:var(--text)">₱2.4M/yr</b> based on territory benchmark.
-              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.6" id="cd-insight-opp">Computing…</div>
             </div>
           </div>
         </div>
@@ -2428,31 +2416,16 @@ body{
         <div class="sec-hdr"><div class="sec-title-lg">Behavioral Alerts</div><div class="sec-line"></div><div class="sec-count">₱12.4M at-risk · ₱18.2M growing</div></div>
         <div class="grid-3" style="margin-bottom:16px">
           <div class="card" style="border-left:3px solid var(--red)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--red)">🔴 Silent ≥30 days</div><div class="sec-count">8 accounts</div></div>
-            <div class="card-body" style="padding:0">
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Zamboanga Feeds</b><br><span style="color:var(--text3);font-size:10px">42d ago · ₱3.4M/yr · Hogs only</span></div><span class="badge b-red">CRITICAL</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Cotabato Agri</b><br><span style="color:var(--text3);font-size:10px">38d ago · ₱2.8M/yr · KA Mindanao</span></div><span class="badge b-red">CRITICAL</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Dumaguete Feed Supply</b><br><span style="color:var(--text3);font-size:10px">34d ago · ₱1.9M/yr · 1 brand only</span></div><span class="badge b-red">CRITICAL</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>+ 5 more</b><br><span style="color:var(--text3);font-size:10px">Combined ₱4.3M/yr at risk</span></div></div>
-            </div>
+            <div class="card-hdr"><div class="card-title" style="color:var(--red)">🔴 Silent ≥30 days</div><div class="sec-count" id="intel-silent-count">—</div></div>
+            <div class="card-body" style="padding:0" id="intel-silent-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
           </div>
           <div class="card" style="border-left:3px solid var(--gold)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--gold)">🟡 Volume Drops &gt;30%</div><div class="sec-count">14 accounts</div></div>
-            <div class="card-body" style="padding:0">
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Leyte Premium Feeds</b><br><span style="color:var(--text3);font-size:10px">28→45 MT · dropped Hog Grower entirely</span></div><span class="badge b-gold">-38%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Bacolod Supply House</b><br><span style="color:var(--text3);font-size:10px">15→24 MT · shifted to competitor Layer</span></div><span class="badge b-gold">-37%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>CDO Livestock Center</b><br><span style="color:var(--text3);font-size:10px">22→32 MT · irregular ordering pattern</span></div><span class="badge b-gold">-31%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>+ 11 more</b><br><span style="color:var(--text3);font-size:10px">Combined ₱8.6M/yr declining</span></div></div>
-            </div>
+            <div class="card-hdr"><div class="card-title" style="color:var(--gold)">🟡 Volume Drops &gt;30%</div><div class="sec-count" id="intel-drops-count">—</div></div>
+            <div class="card-body" style="padding:0" id="intel-drops-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
           </div>
           <div class="card" style="border-left:3px solid var(--green)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--green)">🟢 Growing &gt;25%</div><div class="sec-count">22 accounts</div></div>
-            <div class="card-body" style="padding:0">
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Pampanga Agri Supply</b><br><span style="color:var(--text3);font-size:10px">68→52 MT · added Premium brand</span></div><span class="badge b-green">+31%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Bulacan Feeds Direct</b><br><span style="color:var(--text3);font-size:10px">42→32 MT · new Broiler line adopted</span></div><span class="badge b-green">+28%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>Cathay Farms Dev.</b><br><span style="color:var(--text3);font-size:10px">38→28 MT · expanded from 2→5 SKUs</span></div><span class="badge b-green">+36%</span></div>
-              <div class="list-row"><div style="flex:1;font-size:12px"><b>+ 19 more</b><br><span style="color:var(--text3);font-size:10px">Combined ₱18.2M/yr growing</span></div></div>
-            </div>
+            <div class="card-hdr"><div class="card-title" style="color:var(--green)">🟢 Growing &gt;25%</div><div class="sec-count" id="intel-growing-count">—</div></div>
+            <div class="card-body" style="padding:0" id="intel-growing-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
           </div>
         </div>
 
@@ -3370,36 +3343,54 @@ async function loadHome(){
       if(badge){ badge.style.display=''; badge.textContent = '+'+Math.round(dsoTotal-dsoActive)+'d from delinquent accounts'; }
     }
 
-    // Daily Pullout — period-aware (label, value, days, delta, progress)
+    // SPEED card — period-aware projected volume vs target
     if(sp){
-      sett('hk-speed-label', 'Daily Pullout · ' + PD);
-      var dpVal = sp.daily_pullout!=null ? sp.daily_pullout : sp.speed_per_day;
-      if(dpVal!=null) animateNumber(sel('hk-speed'), dpVal, function(v){ return fcn(Math.round(v))+'<span style="font-size:11px;color:var(--text3)"> MT/d</span>'; });
-      // Delta vs prior period
-      var vsPrior = sp.vs_prior_period_pct;
+      sett('hk-speed-label', 'Speed · ' + PD);
+      var dpVal   = sp.daily_pullout!=null ? sp.daily_pullout : sp.speed_per_day;
+      var elapsed = sp.shipping_days_elapsed!=null ? sp.shipping_days_elapsed : (sp.days_elapsed!=null?sp.days_elapsed:sp.elapsed_days);
+      var total   = sp.shipping_days_total!=null   ? sp.shipping_days_total   : (sp.days_total!=null?sp.days_total:sp.total_days);
+      var remain  = sp.shipping_days_remaining!=null ? sp.shipping_days_remaining : (sp.days_remaining!=null?sp.days_remaining:sp.remaining_days);
+      var projected = sp.projected_period_volume!=null ? sp.projected_period_volume
+                    : sp.projected_mtd!=null ? sp.projected_mtd
+                    : (dpVal!=null && total!=null ? dpVal * total : null);
+      // Period target from /api/budget context
+      var target = null;
+      if(d && d.budget){
+        if(PD==='YTD')      target = d.budget.ytd_mt ? d.budget.ytd_mt * (12/Math.max(1,d.budget.months_elapsed)) : null; // scale to full year projection
+        else if(PD==='MTD') target = d.budget.mtd_mt;
+        else if(PD==='QTD') target = d.budget.ytd_mt ? d.budget.ytd_mt * 3/Math.max(1,d.budget.months_elapsed) : null;   // rough Q approx
+        else if(PD==='7D')  target = d.budget.mtd_mt ? d.budget.mtd_mt * 7/26 : null;
+        if(PD==='YTD') target = d.budget.fy_mt;     // for YTD compare to full FY target
+      }
+      // Big number: projected volume
+      if(projected!=null) animateNumber(sel('hk-speed'), projected, function(v){ return fcn(Math.round(v))+'<span style="font-size:11px;color:var(--text3)"> MT</span>'; });
+      // Rate in subtitle
+      if(dpVal!=null) sett('hk-speed-rate', fcn(Math.round(dpVal)));
+      // Delta = projected vs target
       var dEl = sel('hk-speed-d');
       if(dEl){
-        if(vsPrior!=null && !isNaN(vsPrior) && vsPrior !== 0){
-          var arrow = vsPrior >= 0 ? '▲' : '▼';
-          dEl.className = 'kpi-delta ' + (vsPrior >= 0 ? 'up' : 'down');
-          dEl.textContent = arrow + ' ' + Math.abs(vsPrior).toFixed(1) + '% vs prior ' + PD;
+        if(target && target > 0 && projected!=null){
+          var pct = (projected / target) * 100;
+          dEl.className = 'kpi-delta ' + (pct>=95?'up':(pct>=80?'':'down'));
+          dEl.style.color = pct>=95?'var(--green)' : pct>=80?'var(--gold)' : 'var(--red)';
+          dEl.textContent = Math.round(pct) + '% of target (' + fcn(Math.round(target)) + ' MT)';
         } else {
           dEl.className = 'kpi-delta';
           dEl.style.color = 'var(--text3)';
-          dEl.textContent = 'vs prior ' + PD;
+          dEl.textContent = 'target unavailable';
         }
       }
-      var elapsed = sp.shipping_days_elapsed!=null ? sp.shipping_days_elapsed
-                  : sp.days_elapsed!=null ? sp.days_elapsed : sp.elapsed_days;
-      var total   = sp.shipping_days_total!=null ? sp.shipping_days_total
-                  : sp.days_total!=null ? sp.days_total : sp.total_days;
-      var remain  = sp.shipping_days_remaining!=null ? sp.shipping_days_remaining
-                  : sp.days_remaining!=null ? sp.days_remaining : sp.remaining_days;
+      // Shipping-days secondary line
       if(elapsed!=null && total!=null){
         sett('hk-speed-days', elapsed + ' of ' + total);
         var dayPct = total>0 ? Math.round((elapsed/total)*100) : 0;
         var spBar = sel('hk-speed-bar');
-        if(spBar){ spBar.style.width = dayPct + '%'; spBar.style.background = 'var(--blue)'; }
+        if(spBar){
+          // Fill = target achievement (not calendar progress) — more meaningful
+          var achPct = target && target > 0 && projected!=null ? Math.min(100, Math.round((projected/target)*100)) : dayPct;
+          spBar.style.width = achPct + '%';
+          spBar.style.background = achPct>=95?'var(--green)' : achPct>=80?'var(--gold)' : 'var(--red)';
+        }
         var spStatus = sel('hk-speed-pct');
         if(spStatus){
           spStatus.textContent = (remain!=null ? remain : (total - elapsed)) + ' days remaining';
@@ -4055,23 +4046,169 @@ async function openCust(code){
     if(!d){showError('pg-custdetail','Unable to load customer profile');return}
     console.log('[CUSTDETAIL] Rendering:', code, Object.keys(d));
     var pg=sel('pg-custdetail');
-    // Hero
-    if(d.info){
-      var h1=pg.querySelector('.detail-hero h1');if(h1)h1.textContent=d.info.CardName||code;
-      var meta=pg.querySelector('.detail-meta');if(meta)meta.textContent=(d.info.CardCode||'')+' · '+(d.info.City||'')+' · '+(d.info.rsm||'');
+    var info = d.info || {};
+    // Hero — wire explicit IDs
+    sett('cd-name', info.CardName || code);
+    var metaParts = [info.CardCode, info.City, info.rsm].filter(function(x){return x});
+    sett('cd-meta', metaParts.join(' · ') || '—');
+    // Sales rep + phone
+    var repText = info.rsm || '—';
+    if(info.Phone1) repText += ' · ' + info.Phone1;
+    else if(info.Cellular) repText += ' · ' + info.Cellular;
+    if(info.email) repText += ' · ' + info.email;
+    sett('cd-rep', repText);
+    // Badges — derived from account state
+    var badgesEl = sel('cd-badges');
+    if(badgesEl){
+      var rank = d.rank_by_volume;
+      var age = d.account_age_days;
+      var badges = [];
+      badges.push('<span class="badge b-green">Active</span>');
+      if(rank && rank <= 10) badges.push('<span class="badge b-blue">Top '+rank+' Account</span>');
+      else if(rank && rank <= 50) badges.push('<span class="badge b-blue">Top 50</span>');
+      if(age && age > 3650) badges.push('<span class="badge b-gold">10+ yr Partner</span>');
+      else if(age && age > 1825) badges.push('<span class="badge b-gold">5+ yr Partner</span>');
+      badgesEl.innerHTML = badges.join(' ');
     }
-    // KPI row (8 KPIs)
-    var kpis=pg.querySelectorAll('.kpi-val');
-    if(d.ytd_sales){
-      if(kpis[0] && d.ytd_sales.volume!=null) kpis[0].innerHTML=fn(d.ytd_sales.volume)+'<span style="font-size:10px;color:var(--text3)"> MT</span>';
-      if(kpis[1] && d.ytd_sales.revenue!=null) kpis[1].textContent=fc(d.ytd_sales.revenue);
+    // Last order date + days ago
+    var recentArr = d.recent_orders || [];
+    if(recentArr.length > 0){
+      var lastOrder = recentArr[0];
+      var lastDate = lastOrder.doc_date || lastOrder.DocDate;
+      if(lastDate){
+        var dt = new Date(lastDate);
+        sett('cd-last-date', dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+        var daysAgo = Math.round((Date.now() - dt.getTime()) / 86400000);
+        sett('cd-last-days', daysAgo + ' days ago');
+      }
+    } else {
+      sett('cd-last-date', '—'); sett('cd-last-days','no orders');
     }
-    if(d.mtd_sales!=null && kpis[2]) kpis[2].innerHTML=fn(d.mtd_sales)+'<span style="font-size:10px;color:var(--text3)"> MT</span>';
-    if(d.gmt!=null && kpis[4]) kpis[4].textContent='₱'+fcn(Math.round(d.gmt));
-    if(d.dso!=null && kpis[5]) kpis[5].innerHTML=Math.round(d.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>';
+    // Account age
+    if(d.account_age_days != null){
+      var years = (d.account_age_days / 365).toFixed(1);
+      sett('cd-age', years + ' yr');
+      var since = new Date(Date.now() - d.account_age_days * 86400000);
+      sett('cd-age-sub', 'Since ' + since.toLocaleDateString('en-US',{month:'short',year:'numeric'}));
+    }
+    // Rank
+    if(d.rank_by_volume != null) sett('cd-rank', '#' + d.rank_by_volume);
+    // AR summary
+    var arInvoices = d.ar_invoices || [];
+    var arTotal = arInvoices.reduce(function(s,inv){return s+(+inv.balance||0)},0);
+    sett('cd-ar-total', fc(arTotal));
+    sett('cd-ar-sub', arInvoices.length + ' open invoice' + (arInvoices.length===1?'':'s'));
+
+    // KPI row — bind by ID
+    var k = d.kpis || {};
+    var ytdSales = d.ytd_sales || {};
+    animateNumber(sel('cd-kpi-ytdvol'),   k.ytd_vol    != null ? k.ytd_vol    : (ytdSales.volume || 0), function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    animateNumber(sel('cd-kpi-ytdsales'), k.ytd_sales  != null ? k.ytd_sales  : (ytdSales.revenue || 0), fc);
+    animateNumber(sel('cd-kpi-mtdvol'),   k.mtd_vol    || 0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    animateNumber(sel('cd-kpi-mtdsales'), k.mtd_sales  || 0, fc);
+    if(k.gm_ton    != null) sett('cd-kpi-gmt',  '₱'+fcn(Math.round(k.gm_ton)));
+    if(k.dso       != null) seth('cd-kpi-dso',  Math.round(k.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>');
+    if(k.avg_order != null) seth('cd-kpi-avg',  fcn(Math.round(k.avg_order))+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
+    if(k.frequency != null) seth('cd-kpi-freq', k.frequency.toFixed(1)+'<span style="font-size:10px;color:var(--text3)"> /wk</span>');
+    // YTD vs LY delta — from monthly_table
+    if(d.monthly_table && d.monthly_table.length){
+      var ytdCy = d.monthly_table.reduce(function(s,m){return s+(+m.vol_cy||0)},0);
+      var ytdLy = d.monthly_table.reduce(function(s,m){return s+(+m.vol_ly||0)},0);
+      var vsLy = ytdLy > 0 ? ((ytdCy - ytdLy) / ytdLy * 100) : null;
+      var dEl = sel('cd-kpi-ytdvol-d');
+      if(dEl && vsLy != null){
+        var arrow = vsLy >= 0 ? '▲' : '▼';
+        dEl.className = 'kpi-delta ' + (vsLy >= 0 ? 'up' : 'down');
+        dEl.textContent = arrow + ' ' + Math.abs(vsLy).toFixed(1) + '% vs LY';
+      } else if(dEl){
+        dEl.className = 'kpi-delta'; dEl.style.color = 'var(--text3)'; dEl.textContent = 'vs LY';
+      }
+    }
+
+    // ---- 4 Insight cards — DERIVED client-side from existing data ----
+    // 1. Growth Signal — from cy_vs_ly trend (last 3 months vs prior 3)
+    var insightGrowth = sel('cd-insight-growth');
+    var growthCard = sel('cd-insight-growth-card');
+    if(d.cy_vs_ly && d.cy_vs_ly.length >= 6){
+      var cy = d.cy_vs_ly.map(function(m){return m.cy_volume||0});
+      var last3 = cy.slice(-3).reduce(function(s,v){return s+v},0) / 3;
+      var prior3 = cy.slice(-6,-3).reduce(function(s,v){return s+v},0) / 3;
+      var trendPct = prior3 > 0 ? ((last3 - prior3) / prior3 * 100) : 0;
+      if(trendPct >= 10){
+        if(insightGrowth) insightGrowth.innerHTML = '3-month avg vol <b style="color:var(--text)">+' + trendPct.toFixed(0) + '%</b> vs prior 3 months. Uptrend.';
+        if(growthCard) growthCard.style.borderLeftColor = 'var(--green)';
+      } else if(trendPct <= -10){
+        if(insightGrowth) insightGrowth.innerHTML = '3-month avg vol <b style="color:var(--red)">' + trendPct.toFixed(0) + '%</b> vs prior 3 months. Declining.';
+        if(growthCard) growthCard.style.borderLeftColor = 'var(--red)';
+      } else {
+        if(insightGrowth) insightGrowth.innerHTML = 'Stable volume: <b style="color:var(--text)">' + (trendPct>=0?'+':'') + trendPct.toFixed(0) + '%</b> vs prior 3 months.';
+        if(growthCard) growthCard.style.borderLeftColor = 'var(--text4)';
+      }
+    } else {
+      if(insightGrowth) insightGrowth.textContent = 'Insufficient history to compute trend.';
+    }
+    // 2. SKU Mix — from product_breakdown top 3
+    var insightSku = sel('cd-insight-sku');
+    if(d.product_breakdown && d.product_breakdown.length){
+      var totVol = d.product_breakdown.reduce(function(s,p){return s+(+p.volume||+p.vol||0)},0);
+      var top = d.product_breakdown.slice().sort(function(a,b){return (+b.volume||+b.vol||0)-(+a.volume||+a.vol||0)})[0];
+      if(top && totVol > 0){
+        var topPct = (+top.volume||+top.vol||0) / totVol * 100;
+        var skuCount = d.product_breakdown.filter(function(p){return (+p.volume||+p.vol||0) > 0}).length;
+        if(insightSku) insightSku.innerHTML = '<b style="color:var(--text)">' + esc((top.item_name||top.name||'top SKU').slice(0, 30)) + '</b> = <b>' + topPct.toFixed(0) + '%</b> of volume. ' + skuCount + ' active SKUs.';
+      }
+    } else {
+      if(insightSku) insightSku.textContent = 'No product breakdown available.';
+    }
+    // 3. AR Watch — from ar_invoices aging
+    var insightCredit = sel('cd-insight-credit');
+    var creditCard = sel('cd-insight-credit-card');
+    if(arInvoices.length){
+      var overdueCount = arInvoices.filter(function(x){return (x.days_overdue||0) > 0}).length;
+      var overdueAmt = arInvoices.filter(function(x){return (x.days_overdue||0) > 0}).reduce(function(s,x){return s+(+x.balance||0)},0);
+      if(overdueCount > 0){
+        if(insightCredit) insightCredit.innerHTML = '<b style="color:var(--red)">' + overdueCount + ' overdue invoices</b> · ' + fc(overdueAmt) + ' past due. Total AR ' + fc(arTotal) + '.';
+        if(creditCard) creditCard.style.borderLeftColor = 'var(--red)';
+      } else {
+        if(insightCredit) insightCredit.innerHTML = '<b style="color:var(--green)">Current</b> — all ' + arInvoices.length + ' invoices within terms. Total AR ' + fc(arTotal) + '.';
+        if(creditCard) creditCard.style.borderLeftColor = 'var(--green)';
+      }
+    } else {
+      if(insightCredit) insightCredit.innerHTML = '<b style="color:var(--green)">No open invoices</b>.';
+      if(creditCard) creditCard.style.borderLeftColor = 'var(--green)';
+    }
+    // 4. Product Mix — opportunity
+    var insightOpp = sel('cd-insight-opp');
+    if(d.product_breakdown && d.product_breakdown.length){
+      // Count brands carried (first word of name)
+      var brands = new Set();
+      d.product_breakdown.forEach(function(p){
+        if ((+p.volume||+p.vol||0) > 0){
+          var n = (p.item_name||p.name||'').toUpperCase();
+          if(n.indexOf('KEOS')>=0) brands.add('KEOS');
+          else if(n.indexOf('PLAISIR')>=0 || n.indexOf('PLAISER')>=0) brands.add('PLAISIR');
+          else if(n.indexOf('NOVOPET')>=0) brands.add('NOVOPET');
+          else if(n.indexOf('VIEPROMO')>=0) brands.add('VIEPROMO');
+          else if(n.indexOf('VIETOP')>=0) brands.add('VIETOP');
+          else if(n.indexOf('VIEPRO PRIME')>=0) brands.add('VIEPRO PRIME');
+          else if(n.indexOf('VIEPRO')>=0) brands.add('VIEPRO');
+        }
+      });
+      var brandCount = brands.size;
+      if(brandCount === 1){
+        if(insightOpp) insightOpp.innerHTML = '<b style="color:var(--text)">' + Array.from(brands)[0] + '</b> only. Horizontal whitespace across other brand lines.';
+      } else if(brandCount <= 3){
+        if(insightOpp) insightOpp.innerHTML = 'Carries <b>' + brandCount + ' brands</b> (' + Array.from(brands).slice(0,3).join(', ') + '). Room to expand.';
+      } else {
+        if(insightOpp) insightOpp.innerHTML = '<b style="color:var(--green)">Broad adoption</b> — ' + brandCount + ' brands carried.';
+      }
+    } else {
+      if(insightOpp) insightOpp.textContent = 'No product history to analyse.';
+    }
+
     // Breadcrumb
     var bc=pg.querySelectorAll('.breadcrumb span');
-    if(bc.length>=3 && d.info) bc[2].textContent=d.info.CardName||code;
+    if(bc.length>=3) bc[2].textContent = info.CardName || code;
     // CY vs LY chart
     if(d.cy_vs_ly && d.cy_vs_ly.length && charts.custVolBar){
       var months=d.cy_vs_ly.map(function(m){return m.month_label||m.month||''});
@@ -4341,9 +4478,51 @@ async function loadIntelligence(){
       seth('intel-pattern-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No pattern data</td></tr>');
     }
 
-    // Health distribution — logged only (matrix inside prototype bar is complex)
+    // Behavioral alerts — 3 lists (silent, drops, growing)
+    function renderAlertList(listId, countId, items, kind){
+      var el = sel(listId); if(!el) return;
+      if(!items || !items.length){
+        el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">No accounts in this band</div>';
+        sett(countId, '0 accounts');
+        return;
+      }
+      var html = items.slice(0, 10).map(function(x){
+        var name = x.customer || x.name || x.CardName || '—';
+        var code = x.code || x.CardCode || '';
+        var meta = '';
+        if(kind === 'silent'){
+          var daysSilent = x.days_silent || x.days_since_last || x.days_overdue;
+          var yearly = x.yearly_value || x.revenue || x.est_value;
+          meta = (daysSilent!=null?daysSilent+'d ago':'—') + (yearly?' · '+fc(yearly)+'/yr':'') + (code?' · '+code:'');
+        } else if(kind === 'drops'){
+          var prev = x.prev_vol || x.prior_vol;
+          var curr = x.current_vol || x.recent_vol;
+          meta = (prev!=null && curr!=null ? prev+'→'+curr+' MT' : (code||''));
+        } else {
+          var p = x.prev_vol || x.prior_vol, c = x.current_vol || x.recent_vol;
+          meta = (p!=null && c!=null ? p+'→'+c+' MT' : (code||''));
+        }
+        var badgeCls = kind==='silent'?'b-red' : kind==='drops'?'b-gold' : 'b-green';
+        var badgeText;
+        if(kind==='silent') badgeText = x.days_silent || x.days_since_last ? (x.days_silent||x.days_since_last)+'d' : 'SILENT';
+        else if(kind==='drops') badgeText = x.change_pct!=null ? x.change_pct.toFixed(0)+'%' : (x.vs_prior_pct!=null ? x.vs_prior_pct.toFixed(0)+'%' : '▼');
+        else badgeText = x.change_pct!=null ? '+'+x.change_pct.toFixed(0)+'%' : (x.vs_prior_pct!=null ? '+'+x.vs_prior_pct.toFixed(0)+'%' : '▲');
+        return '<div class="list-row" '+(code?'onclick="openCust(\''+esc(code)+'\')" style="cursor:pointer"':'')+'>'
+          + '<div style="flex:1;font-size:12px"><b>'+esc(name)+'</b><br>'
+          + '<span style="color:var(--text3);font-size:10px">'+esc(meta)+'</span></div>'
+          + '<span class="badge '+badgeCls+'">'+esc(badgeText)+'</span></div>';
+      }).join('');
+      el.innerHTML = html;
+      sett(countId, items.length + ' accounts');
+    }
+    var alerts = d.behavioral_alerts || {};
+    renderAlertList('intel-silent-list',  'intel-silent-count',  alerts.silent,  'silent');
+    renderAlertList('intel-drops-list',   'intel-drops-count',   alerts.drops,   'drops');
+    renderAlertList('intel-growing-list', 'intel-growing-count', alerts.growing, 'growing');
+
+    // Health distribution (logged only; bar is prototype)
     if(d.health_distribution && d.health_distribution.length){
-      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands available (prototype bar retained)');
+      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands (prototype bar retained)');
     }
     pulseRefresh('pg-insights');
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
