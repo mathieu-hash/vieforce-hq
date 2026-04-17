@@ -68,6 +68,21 @@ module.exports = async (req, res) => {
       ORDER BY T0.DocDate DESC
     `)
 
+    // TEMP: ItemCode probe for itemized endpoint
+    const itemProbe = await query(`
+      SELECT TOP 20 T1.ItemCode, MAX(T1.Dscription) AS desc1, SUM(T1.Quantity) AS qty
+      FROM INV1 T1 INNER JOIN OINV T0 ON T0.DocEntry = T1.DocEntry
+      WHERE T0.CANCELED = 'N' AND YEAR(T0.DocDate) = 2026
+      GROUP BY T1.ItemCode
+      ORDER BY qty DESC
+    `)
+    const itemCount = await query(`
+      SELECT COUNT(DISTINCT T1.ItemCode) AS total_distinct,
+             SUM(CASE WHEN UPPER(T1.ItemCode) LIKE 'VPI%' THEN 1 ELSE 0 END) AS vpi_matches
+      FROM INV1 T1 INNER JOIN OINV T0 ON T0.DocEntry = T1.DocEntry
+      WHERE T0.CANCELED = 'N' AND YEAR(T0.DocDate) = 2026
+    `)
+
     // Daily speed (last 14 days from ODLN)
     const dailySpeed = await query(`
       SELECT
@@ -89,7 +104,9 @@ module.exports = async (req, res) => {
         inv1_weight_columns: inv1Cols,
         sample_items: sampleItems,
         odln_check: odlnCheck,
-        daily_speed: dailySpeed
+        daily_speed: dailySpeed,
+        _item_probe: itemProbe,
+        _item_count: itemCount
       })
     }
     const ACTIVE = `(ISNULL(C.frozenFor,'N')<>'Y' AND C.U_BpStatus='Active')`
