@@ -108,16 +108,14 @@
 
 ---
 
-## SHOWSTOPPER: UNDEFINED API FUNCTIONS
+## CORRECTION — ORIGINAL "SHOWSTOPPER" CLAIM IS FALSE
 
-**CRITICAL:** These functions are called but NEVER DEFINED in app.html:
-- getSpeedData({period})
-- getCustomersData(params)
-- getCustomerProfile({id})
+The original audit claimed `getSpeedData/getCustomersData/getCustomerProfile` were undefined.
+**This is wrong.** They are defined in `js/api.js` (lines 50-52), which is loaded in `app.html` line 3002:
+`<script src="js/api.js"></script>`
 
-**NO fetch() calls exist anywhere in codebase.**
-
-**Result:** ReferenceError on page load for all three pages.
+All three functions exist as `function getXxxData(params){ return apiFetch('xxx', params); }`.
+No ReferenceError occurs at runtime. The pages load and execute their loaders.
 
 ---
 
