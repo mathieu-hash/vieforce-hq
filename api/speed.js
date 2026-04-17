@@ -217,6 +217,25 @@ module.exports = async (req, res) => {
       }))
     }
 
+    // Last month comparison (same-day-of-month window)
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const lastMonthEnd   = new Date(today.getFullYear(), today.getMonth(), 0)
+    const lastMonthSameDay = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+    const lastMonthRow = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt_full,
+        ISNULL(SUM(CASE WHEN T0.DocDate <= @lmSameDay THEN T1.Quantity * ISNULL(I.NumInSale, 1) ELSE 0 END) / 1000.0, 0) AS mt_to_same_day
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @lmStart AND @lmEnd AND T0.CANCELED='N'
+    `, { lmStart: lastMonthStart, lmEnd: lastMonthEnd, lmSameDay: lastMonthSameDay })
+
+    const lm_full = lastMonthRow[0]?.mt_full || 0
+    const lm_same = lastMonthRow[0]?.mt_to_same_day || 0
+    const vs_lm_volume = actual_mt - lm_same
+    const vs_lm_pct = lm_same > 0 ? Math.round(((actual_mt - lm_same) / lm_same) * 1000) / 10 : 0
+
     const result = {
       period,
       // Canonical (new) names — prefer these on the frontend
@@ -226,6 +245,11 @@ module.exports = async (req, res) => {
       days_total:     total_days,
       days_remaining: total_days - elapsed_days,
       projected_mtd:  projected_mt,
+      // Last-month comparison
+      last_month_full_mt:      Math.round(lm_full * 10) / 10,
+      last_month_same_day_mt:  Math.round(lm_same * 10) / 10,
+      vs_last_month_volume:    Math.round(vs_lm_volume * 10) / 10,
+      vs_last_month_pct:       vs_lm_pct,
       // Legacy names (kept for back-compat with existing pages)
       actual_mt:     Math.round(actual_mt * 10) / 10,
       speed_per_day: Math.round(speed_per_day * 10) / 10,

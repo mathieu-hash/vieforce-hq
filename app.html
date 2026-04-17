@@ -1656,11 +1656,11 @@ body{
             <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-pullout">602</div>
             <div style="font-size:11px;font-weight:700;color:var(--red)">↓ -0.2%</div>
           </div>
-          <!-- Avg Speed -->
+          <!-- Projected (End of Month) -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
-            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Speed</div>
-            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">15,649</div>
-            <div style="font-size:11px;font-weight:700;color:var(--red)">↓ -0.2%</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Projected (End of Month)</div>
+            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">13,104</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text3)">MT at current pace</div>
           </div>
           <!-- Mini speed sparkline area -->
           <div style="padding:12px 20px;display:flex;flex-direction:column;justify-content:center">
@@ -1741,17 +1741,11 @@ body{
                 .speed-tbl tr:hover td{background:rgba(255,255,255,0.02)}
                 .speed-tbl tr:last-child td{border-bottom:none;border-top:2px solid var(--divider);font-weight:700;background:rgba(0,174,239,0.05)}
               </style>
-              <table class="speed-tbl">
-                <tr><th>RSM</th><th>Vol, MT</th><th>% Δ</th><th>Avg Speed ▼</th><th>% Δ</th></tr>
-                <tr><td>MART ESPLIGUEZ</td><td class="sv">2,203</td><td class="sd up">5.4% ↑</td><td class="sv">6,365</td><td class="sd up">40.6% ↑</td></tr>
-                <tr><td>JOE EYOY</td><td class="sv">1,300</td><td class="sd down">-17.3% ↓</td><td class="sv">3,756</td><td class="sd up">10.2% ↑</td></tr>
-                <tr><td>ERIC SALAZAR</td><td class="sv">871</td><td class="sd down">-18.8% ↓</td><td class="sv">2,265</td><td class="sd down">-2.6% ↓</td></tr>
-                <tr><td>EDFREY BUENAVENTURA</td><td class="sv">563</td><td class="sd down">-29.9% ↓</td><td class="sv">1,627</td><td class="sd down">-6.5% ↓</td></tr>
-                <tr><td>MATHIEU GUILLAUME</td><td class="sv">457</td><td class="sd down">-9.4% ↓</td><td class="sv">1,319</td><td class="sd up">20.8% ↑</td></tr>
-                <tr><td>CARMINDA CALDERON</td><td class="sv">244</td><td class="sd down">-65.1% ↓</td><td class="sv">1,266</td><td class="sd down">-16.2% ↓</td></tr>
-                <tr><td>RICHARD LAGDAAN</td><td class="sv">380</td><td class="sd down">-23.2% ↓</td><td class="sv">1,234</td><td class="sd up">15.2% ↑</td></tr>
-                <tr><td>MA LYNIE GASINGAN</td><td class="sv">1</td><td class="sd down">-64.3% ↓</td><td class="sv">6</td><td class="sd down">-21.5% ↓</td></tr>
-                <tr><td style="font-weight:800;font-size:12px">Grand total</td><td class="sv" style="font-weight:700">6,019</td><td class="sd down" style="font-weight:700">-16.8% ↓</td><td class="sv" style="font-weight:700">15,649</td><td class="sd down" style="font-weight:700">-0.2% ↓</td></tr>
+              <table class="speed-tbl" id="speed-rsm-tbl">
+                <thead><tr><th>RSM</th><th>Vol, MT</th><th>% Δ</th></tr></thead>
+                <tbody id="speed-rsm-tbody">
+                  <tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -1763,20 +1757,11 @@ body{
               <div class="card-badge b-blue">MTD</div>
             </div>
             <div class="card-body" style="padding-top:8px">
-              <table class="speed-tbl">
-                <tr><th>Brand</th><th>Vol, MT</th><th>% Δ</th><th>Avg Speed ▼</th><th>% Δ</th></tr>
-                <tr><td>VIEPRO PREMIUM</td><td class="sv">2,744</td><td class="sd down">-15.0% ↓</td><td class="sv">7,134</td><td class="sd up">2.0% ↑</td></tr>
-                <tr><td>VIEPRO LAYER</td><td class="sv">1,023</td><td class="sd down">-14.0% ↓</td><td class="sv">2,661</td><td class="sd up">3.2% ↑</td></tr>
-                <tr><td>VIEPRO PRIME</td><td class="sv">775</td><td class="sd down">-24.6% ↓</td><td class="sv">2,016</td><td class="sd down">-9.5% ↓</td></tr>
-                <tr><td>VIEPRO PROBOOST</td><td class="sv">555</td><td class="sd down">-18.1% ↓</td><td class="sv">1,442</td><td class="sd down">-1.7% ↓</td></tr>
-                <tr><td>VIEPRO BROILER</td><td class="sv">446</td><td class="sd up">9.0% ↑</td><td class="sv">1,288</td><td class="sd up">33.3% ↑</td></tr>
-                <tr><td>VIEPROMO</td><td class="sv">257</td><td class="sd down">-12.7% ↓</td><td class="sv">742</td><td class="sd up">16.4% ↑</td></tr>
-                <tr><td>VIEPRO PDP</td><td class="sv">169</td><td class="sd down">-9.1% ↓</td><td class="sv">441</td><td class="sd up">9.1% ↑</td></tr>
-                <tr><td>UNTAGGED</td><td class="sv">9</td><td class="sd down">-70.7% ↓</td><td class="sv">60</td><td class="sd down">-48.7% ↓</td></tr>
-                <tr><td>VIEPRO POWERBOOST</td><td class="sv">17</td><td class="sd down">-24.3% ↓</td><td class="sv">48</td><td class="sd up">0.9% ↑</td></tr>
-                <tr><td>VIETOP</td><td class="sv">7</td><td class="sd down">-46.0% ↓</td><td class="sv">47</td><td class="sd down">-32.5% ↓</td></tr>
-                <tr><td>PRIVATE LABEL</td><td class="sv">14</td><td class="sd down">-90.8% ↓</td><td class="sv">46</td><td class="sd down">-87.4% ↓</td></tr>
-                <tr><td style="font-weight:800;font-size:12px">Grand total</td><td class="sv" style="font-weight:700">6,019</td><td class="sd down" style="font-weight:700">-16.8% ↓</td><td class="sv" style="font-weight:700">15,649</td><td class="sd down" style="font-weight:700">-0.2% ↓</td></tr>
+              <table class="speed-tbl" id="speed-feed-tbl">
+                <thead><tr><th>Brand</th><th>Vol, MT</th><th>Share</th></tr></thead>
+                <tbody id="speed-feed-tbody">
+                  <tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -1942,20 +1927,8 @@ body{
               <div class="card-hdr"><div class="card-title">Monthly Breakdown</div></div>
               <div class="card-body" style="padding-top:8px">
                 <table class="tbl">
-                  <tr><th>Month</th><th class="num">Vol CY</th><th class="num">Vol LY</th><th class="num">vs LY</th><th class="num">Sales CY</th><th class="num">GM/Ton</th><th class="num">DSO</th></tr>
-                  <tr><td style="font-weight:600">Apr '26</td><td class="num">420</td><td class="num" style="color:var(--text3)">365</td><td class="num up">+15.1%</td><td class="num">₱18.2M</td><td class="num" style="color:var(--green)">₱6,240</td><td class="num">32d</td></tr>
-                  <tr><td style="font-weight:600">Mar '26</td><td class="num">460</td><td class="num" style="color:var(--text3)">410</td><td class="num up">+12.2%</td><td class="num">₱17.6M</td><td class="num">₱6,180</td><td class="num">34d</td></tr>
-                  <tr><td style="font-weight:600">Feb '26</td><td class="num">440</td><td class="num" style="color:var(--text3)">400</td><td class="num up">+10.0%</td><td class="num">₱16.8M</td><td class="num">₱6,090</td><td class="num">36d</td></tr>
-                  <tr><td style="font-weight:600">Jan '26</td><td class="num">410</td><td class="num" style="color:var(--text3)">380</td><td class="num up">+7.9%</td><td class="num">₱15.8M</td><td class="num">₱5,940</td><td class="num">37d</td></tr>
-                  <tr><td style="font-weight:600">Dec '25</td><td class="num">450</td><td class="num" style="color:var(--text3)">420</td><td class="num up">+7.1%</td><td class="num">₱17.2M</td><td class="num">₱5,880</td><td class="num">35d</td></tr>
-                  <tr><td style="font-weight:600">Nov '25</td><td class="num">420</td><td class="num" style="color:var(--text3)">390</td><td class="num up">+7.7%</td><td class="num">₱16.1M</td><td class="num">₱5,820</td><td class="num">38d</td></tr>
-                  <tr><td style="font-weight:600">Oct '25</td><td class="num">390</td><td class="num" style="color:var(--text3)">370</td><td class="num up">+5.4%</td><td class="num">₱14.8M</td><td class="num">₱5,750</td><td class="num">40d</td></tr>
-                  <tr><td style="font-weight:600">Sep '25</td><td class="num">400</td><td class="num" style="color:var(--text3)">360</td><td class="num up">+11.1%</td><td class="num">₱15.2M</td><td class="num">₱5,680</td><td class="num">39d</td></tr>
-                  <tr><td style="font-weight:600">Aug '25</td><td class="num">360</td><td class="num" style="color:var(--text3)">350</td><td class="num up">+2.9%</td><td class="num">₱13.8M</td><td class="num">₱5,620</td><td class="num">41d</td></tr>
-                  <tr><td style="font-weight:600">Jul '25</td><td class="num">380</td><td class="num" style="color:var(--text3)">340</td><td class="num up">+11.8%</td><td class="num">₱14.5M</td><td class="num">₱5,580</td><td class="num">42d</td></tr>
-                  <tr><td style="font-weight:600">Jun '25</td><td class="num">340</td><td class="num" style="color:var(--text3)">310</td><td class="num up">+9.7%</td><td class="num">₱13.0M</td><td class="num">₱5,510</td><td class="num">44d</td></tr>
-                  <tr><td style="font-weight:600">May '25</td><td class="num">320</td><td class="num" style="color:var(--text3)">300</td><td class="num up">+6.7%</td><td class="num">₱12.0M</td><td class="num">₱5,480</td><td class="num">45d</td></tr>
-                  <tr class="total"><td style="font-weight:800">12mo Total</td><td class="num" style="font-weight:800">4,790</td><td class="num" style="font-weight:800;color:var(--text3)">4,395</td><td class="num up" style="font-weight:800">+9.0%</td><td class="num" style="font-weight:800">₱184.9M</td><td class="num" style="font-weight:800">₱5,856</td><td class="num" style="font-weight:800">38d avg</td></tr>
+                  <thead><tr><th>Month</th><th class="num">Vol CY</th><th class="num">Vol LY</th><th class="num">vs LY</th><th class="num">Sales CY</th></tr></thead>
+                  <tbody id="cust-monthly-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -2004,87 +1977,16 @@ body{
             <!-- Top Products -->
             <div class="card" style="margin-bottom:12px">
               <div class="card-hdr"><div class="card-title">Top Products · YTD</div></div>
-              <div class="card-body" style="padding:0">
-                <div class="list-row">
-                  <div style="flex:1;font-size:12px">
-                    <b>VP Premium Hog Grower</b>
-                    <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">
-                      <span>1,420 MT</span><span>29%</span><span style="color:var(--green)">▲ 12%</span>
-                    </div>
-                  </div>
-                  <div class="prog" style="width:100px"><div class="prog-fill" style="width:65%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:12px">
-                    <b>VP Premium Hog Finisher</b>
-                    <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">
-                      <span>980 MT</span><span>20%</span><span style="color:var(--green)">▲ 8%</span>
-                    </div>
-                  </div>
-                  <div class="prog" style="width:100px"><div class="prog-fill" style="width:45%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:12px">
-                    <b>VP Prime Broiler Starter</b>
-                    <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">
-                      <span>720 MT</span><span>15%</span><span style="color:var(--green)">▲ 22%</span>
-                    </div>
-                  </div>
-                  <div class="prog" style="width:100px"><div class="prog-fill" style="width:33%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:12px">
-                    <b>VP Premium Layer Feed</b>
-                    <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">
-                      <span>540 MT</span><span>11%</span><span style="color:var(--cyan)">NEW</span>
-                    </div>
-                  </div>
-                  <div class="prog" style="width:100px"><div class="prog-fill" style="width:25%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:12px">
-                    <b>VP Hog Pre-Starter</b>
-                    <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">
-                      <span>320 MT</span><span>7%</span><span style="color:var(--red)">▼ 5%</span>
-                    </div>
-                  </div>
-                  <div class="prog" style="width:100px"><div class="prog-fill" style="width:15%;background:linear-gradient(90deg,rgba(255,255,255,0.15),rgba(255,255,255,0.08))"></div></div>
-                </div>
+              <div class="card-body" style="padding:0" id="cust-products-list">
+                <div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div>
               </div>
             </div>
 
             <!-- Recent Orders -->
             <div class="card" style="margin-bottom:12px">
               <div class="card-hdr"><div class="card-title">Recent Orders</div></div>
-              <div class="card-body" style="padding:0">
-                <div class="list-row">
-                  <div style="flex:1;font-size:11px">
-                    <b>OINV-8842</b> · Apr 11
-                    <div style="color:var(--text3);font-size:10px;margin-top:2px">VP Hog Grower (18t) + VP Broiler Starter (12t)</div>
-                  </div>
-                  <div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">₱1.3M</div><div style="font-size:9px;color:var(--text3)">30 MT</div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:11px">
-                    <b>OINV-8836</b> · Apr 9
-                    <div style="color:var(--text3);font-size:10px;margin-top:2px">VP Hog Finisher (22t) + VP Layer Feed (8t)</div>
-                  </div>
-                  <div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">₱1.1M</div><div style="font-size:9px;color:var(--text3)">30 MT</div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:11px">
-                    <b>OINV-8829</b> · Apr 7
-                    <div style="color:var(--text3);font-size:10px;margin-top:2px">VP Premium Hog Grower (25t)</div>
-                  </div>
-                  <div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">₱0.9M</div><div style="font-size:9px;color:var(--text3)">25 MT</div></div>
-                </div>
-                <div class="list-row">
-                  <div style="flex:1;font-size:11px">
-                    <b>OINV-8821</b> · Apr 4
-                    <div style="color:var(--text3);font-size:10px;margin-top:2px">VP Broiler Starter (15t) + VP Hog Finisher (20t)</div>
-                  </div>
-                  <div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">₱1.4M</div><div style="font-size:9px;color:var(--text3)">35 MT</div></div>
-                </div>
+              <div class="card-body" style="padding:0" id="cust-orders-list">
+                <div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div>
               </div>
             </div>
 
@@ -2211,26 +2113,17 @@ body{
         </div>
 
         <!-- WARNING TABLE -->
-        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">🟡 Warning — Low Gross Profit (0-10%)</div><div class="sec-line"></div><div class="sec-count">7 accounts · ₱38.4M combined sales</div></div>
+        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">🟡 Warning — Low Gross Profit (0-10%)</div><div class="sec-line"></div><div class="sec-count" id="margin-warn-count">Loading…</div></div>
         <div class="card" style="margin-bottom:20px"><div class="card-body" style="padding-top:8px"><table class="tbl">
-          <tr><th>Customer</th><th>Code</th><th>Region</th><th>BU</th><th>Plant</th><th>Group</th><th>Rep</th><th class="num">Sales</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr>
-          <tr><td style="font-weight:700">Negros Feed House</td><td style="color:var(--text3)">CA-019</td><td>Visayas</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">ARGAO</td><td style="font-size:11px">Hogs</td><td style="font-size:11px;color:var(--text3)">F. Cruz</td><td class="num">₱8.2M</td><td class="num">210 MT</td><td class="num" style="color:var(--gold);font-weight:700">4.2%</td><td class="num" style="color:var(--gold)">₱1,640</td></tr>
-          <tr><td style="font-weight:700">Cotabato Agri Trading</td><td style="color:var(--text3)">CA-035</td><td>Mindanao</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">BUKID</td><td style="font-size:11px">Hogs</td><td style="font-size:11px;color:var(--text3)">E. Ramos</td><td class="num">₱6.1M</td><td class="num">165 MT</td><td class="num" style="color:var(--gold);font-weight:700">5.8%</td><td class="num" style="color:var(--gold)">₱2,145</td></tr>
-          <tr><td style="font-weight:700">Tacloban Feeds Inc.</td><td style="color:var(--text3)">CA-026</td><td>Visayas</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">HOREB</td><td style="font-size:11px">Poultry</td><td style="font-size:11px;color:var(--text3)">A. Dizon</td><td class="num">₱5.4M</td><td class="num">148 MT</td><td class="num" style="color:var(--gold);font-weight:700">6.1%</td><td class="num" style="color:var(--gold)">₱2,227</td></tr>
-          <tr><td style="font-weight:700">Bacolod Supply House</td><td style="color:var(--text3)">CA-020</td><td>Visayas</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">ARGAO</td><td style="font-size:11px">Hogs</td><td style="font-size:11px;color:var(--text3)">A. Dizon</td><td class="num">₱4.8M</td><td class="num">130 MT</td><td class="num" style="color:var(--gold);font-weight:700">7.3%</td><td class="num" style="color:var(--gold)">₱2,692</td></tr>
-          <tr><td style="font-weight:700">CDO Livestock Center</td><td style="color:var(--text3)">CA-034</td><td>Mindanao</td><td style="font-size:11px">Key Accts</td><td style="font-size:11px;color:var(--text3)">BUKID</td><td style="font-size:11px">Hogs</td><td style="font-size:11px;color:var(--text3)">A. Torres</td><td class="num">₱5.6M</td><td class="num">152 MT</td><td class="num" style="color:var(--gold);font-weight:700">8.0%</td><td class="num" style="color:var(--gold)">₱2,947</td></tr>
-          <tr><td style="font-weight:700">Iloilo Feed Center</td><td style="color:var(--text3)">CA-028</td><td>Visayas</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">HOREB</td><td style="font-size:11px">Poultry</td><td style="font-size:11px;color:var(--text3)">A. Dizon</td><td class="num">₱4.9M</td><td class="num">135 MT</td><td class="num" style="color:var(--gold);font-weight:700">8.9%</td><td class="num" style="color:var(--gold)">₱3,230</td></tr>
-          <tr><td style="font-weight:700">Leyte Premium Feeds</td><td style="color:var(--text3)">CA-027</td><td>Visayas</td><td style="font-size:11px">Distribution</td><td style="font-size:11px;color:var(--text3)">HOREB</td><td style="font-size:11px">Hogs</td><td style="font-size:11px;color:var(--text3)">A. Dizon</td><td class="num">₱3.4M</td><td class="num">92 MT</td><td class="num" style="color:var(--gold);font-weight:700">9.4%</td><td class="num" style="color:var(--gold)">₱3,478</td></tr>
+          <thead><tr><th>Customer</th><th>Code</th><th>Rep</th><th class="num">Sales</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
+          <tbody id="margin-warn-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
         </table></div></div>
 
         <!-- BY REGION + BY GROUP -->
         <div class="grid-2" style="margin-bottom:16px">
           <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton by Region</div><div class="card-badge b-blue">YTD</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
-            <tr><th>Region</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP</th><th class="num">GP%</th><th class="num">GM/Ton</th><th class="num">Flag</th></tr>
-            <tr><td style="font-weight:700">LUZON</td><td class="num">₱294M</td><td class="num">8,420 MT</td><td class="num" style="color:var(--green)">₱52.3M</td><td class="num" style="color:var(--green)">17.8%</td><td class="num" style="color:var(--green)">₱6,210</td><td class="num"><span class="badge b-green">0</span></td></tr>
-            <tr><td style="font-weight:700">VISAYAS</td><td class="num">₱108M</td><td class="num">3,180 MT</td><td class="num">₱16.6M</td><td class="num">15.3%</td><td class="num">₱5,210</td><td class="num"><span class="badge b-gold">4</span></td></tr>
-            <tr><td style="font-weight:700">MINDANAO</td><td class="num">₱80M</td><td class="num">2,600 MT</td><td class="num" style="color:var(--gold)">₱9.1M</td><td class="num" style="color:var(--gold)">11.4%</td><td class="num" style="color:var(--red)">₱3,500</td><td class="num"><span class="badge b-red">3+3</span></td></tr>
-            <tr class="total"><td style="font-weight:800">NATIONAL</td><td class="num" style="font-weight:800">₱482M</td><td class="num" style="font-weight:800">14,200 MT</td><td class="num" style="font-weight:800">₱78.0M</td><td class="num" style="font-weight:800">16.1%</td><td class="num" style="font-weight:800">₱5,493</td><td class="num"></td></tr>
+            <thead><tr><th>Region</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
+            <tbody id="margin-region-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
           </table></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton by Sales Group</div><div class="card-badge b-blue">YTD</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
             <tr><th>Group</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th><th class="num">vs LY</th><th class="num">Flag</th></tr>
@@ -2245,11 +2138,8 @@ body{
         <!-- BY BRAND + BY BU -->
         <div class="grid-2" style="margin-bottom:16px">
           <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton by Brand</div><div class="card-badge b-blue">YTD</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
-            <tr><th>Brand</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th><th class="num">vs LY</th></tr>
-            <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px"></span>VIEPro Premium</td><td class="num">₱286M</td><td class="num">8,240 MT</td><td class="num" style="color:var(--green)">18.2%</td><td class="num" style="color:var(--green)">₱6,320</td><td class="num up">+3.1%</td></tr>
-            <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px"></span>PowerBoost</td><td class="num">₱142M</td><td class="num">4,620 MT</td><td class="num">14.8%</td><td class="num">₱4,560</td><td class="num down">-1.4%</td></tr>
-            <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px"></span>VP Prime</td><td class="num">₱38M</td><td class="num">980 MT</td><td class="num" style="color:var(--green)">22.1%</td><td class="num" style="color:var(--green)">₱8,580</td><td class="num up">+6.4%</td></tr>
-            <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-right:8px"></span>Keos (Pet)</td><td class="num">₱16M</td><td class="num">360 MT</td><td class="num" style="color:var(--green)">28.4%</td><td class="num" style="color:var(--green)">₱12,640</td><td class="num up">+8.2%</td></tr>
+            <thead><tr><th>Brand</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
+            <tbody id="margin-brand-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
           </table></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton by Business Unit</div><div class="card-badge b-blue">YTD</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
             <tr><th>BU</th><th class="num">Sales</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th><th class="num">vs LY</th><th class="num">Flag</th></tr>
@@ -2263,28 +2153,12 @@ body{
         <!-- BY PLANT + WORST SKUs -->
         <div class="grid-2" style="margin-bottom:16px">
           <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton by Plant</div><div class="card-badge b-blue">YTD</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
-            <tr><th>Plant</th><th>Region</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th><th class="num">vs LY</th><th class="num">Flag</th></tr>
-            <tr><td style="font-weight:700">AC</td><td style="color:var(--text3)">Luzon</td><td class="num">8,420 MT</td><td class="num" style="color:var(--green)">18.4%</td><td class="num" style="color:var(--green)">₱6,420</td><td class="num up">+3.8%</td><td class="num"><span class="badge b-green">0</span></td></tr>
-            <tr><td style="font-weight:700">ACEXT</td><td style="color:var(--text3)">Luzon</td><td class="num">4,200 MT</td><td class="num" style="color:var(--green)">17.1%</td><td class="num">₱5,980</td><td class="num up">+2.4%</td><td class="num"><span class="badge b-green">0</span></td></tr>
-            <tr><td style="font-weight:700">BAC</td><td style="color:var(--text3)">Luzon</td><td class="num">2,200 MT</td><td class="num">16.8%</td><td class="num">₱5,820</td><td class="num up">+1.1%</td><td class="num"><span class="badge b-green">0</span></td></tr>
-            <tr><td style="font-weight:700">HOREB</td><td style="color:var(--text3)">Visayas</td><td class="num">4,120 MT</td><td class="num">15.6%</td><td class="num">₱5,340</td><td class="num down">-0.9%</td><td class="num"><span class="badge b-gold">3</span></td></tr>
-            <tr><td style="font-weight:700">ARGAO</td><td style="color:var(--text3)">Visayas</td><td class="num">2,480 MT</td><td class="num">14.8%</td><td class="num">₱4,980</td><td class="num down">-2.1%</td><td class="num"><span class="badge b-gold">1</span></td></tr>
-            <tr><td style="font-weight:700">ALAE</td><td style="color:var(--text3)">Visayas</td><td class="num">1,640 MT</td><td class="num">15.2%</td><td class="num">₱5,180</td><td class="num up">+0.6%</td><td class="num"><span class="badge b-green">0</span></td></tr>
-            <tr><td style="font-weight:700">BUKID</td><td style="color:var(--text3)">Mindanao</td><td class="num">3,540 MT</td><td class="num" style="color:var(--gold)">10.2%</td><td class="num" style="color:var(--red)">₱3,280</td><td class="num down">-5.8%</td><td class="num"><span class="badge b-red">4</span></td></tr>
-            <tr><td style="font-weight:700">CCPC</td><td style="color:var(--text3)">Mindanao</td><td class="num">1,800 MT</td><td class="num" style="color:var(--red)">8.4%</td><td class="num" style="color:var(--red)">₱2,860</td><td class="num down">-7.2%</td><td class="num"><span class="badge b-red">2</span></td></tr>
+            <thead><tr><th>Plant</th><th class="num">Volume</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
+            <tbody id="margin-plant-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
           </table></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">Worst-Performing SKUs (Bottom 10)</div><div class="card-badge b-red">ALERT</div></div><div class="card-body" style="padding-top:8px"><table class="tbl">
-            <tr><th>SKU</th><th>Brand</th><th>Group</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr>
-            <tr><td style="font-weight:700;color:var(--red)">VP Hog Finisher 50kg</td><td style="font-size:11px">PowerBoost</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">1,840</td><td class="num" style="color:var(--red);font-weight:700">-2.4%</td><td class="num" style="color:var(--red)">-₱680</td></tr>
-            <tr><td style="font-weight:700;color:var(--red)">VP Hog Grower 50kg</td><td style="font-size:11px">PowerBoost</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">2,210</td><td class="num" style="color:var(--red);font-weight:700">-0.8%</td><td class="num" style="color:var(--red)">-₱240</td></tr>
-            <tr><td style="font-weight:700">VP Broiler Pre-Starter</td><td style="font-size:11px">VIEPro</td><td style="font-size:11px;color:var(--text3)">Poultry</td><td class="num">420</td><td class="num" style="color:var(--gold);font-weight:700">2.1%</td><td class="num" style="color:var(--gold)">₱620</td></tr>
-            <tr><td style="font-weight:700">VP Hog Pre-Starter 25kg</td><td style="font-size:11px">PowerBoost</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">680</td><td class="num" style="color:var(--gold);font-weight:700">3.4%</td><td class="num" style="color:var(--gold)">₱1,020</td></tr>
-            <tr><td style="font-weight:700">VP Hog Lactation 50kg</td><td style="font-size:11px">VIEPro</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">540</td><td class="num" style="color:var(--gold);font-weight:700">5.2%</td><td class="num" style="color:var(--gold)">₱1,580</td></tr>
-            <tr><td style="font-weight:700">VP Broiler Starter 50kg</td><td style="font-size:11px">PowerBoost</td><td style="font-size:11px;color:var(--text3)">Poultry</td><td class="num">1,120</td><td class="num" style="color:var(--gold);font-weight:700">6.8%</td><td class="num" style="color:var(--gold)">₱2,040</td></tr>
-            <tr><td style="font-weight:700">VP Hog Fattener 50kg</td><td style="font-size:11px">VIEPro</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">890</td><td class="num" style="color:var(--gold);font-weight:700">7.1%</td><td class="num" style="color:var(--gold)">₱2,180</td></tr>
-            <tr><td style="font-weight:700">VP Sow Gestation 50kg</td><td style="font-size:11px">VIEPro</td><td style="font-size:11px;color:var(--text3)">Hogs</td><td class="num">310</td><td class="num" style="color:var(--gold);font-weight:700">8.4%</td><td class="num" style="color:var(--gold)">₱2,620</td></tr>
-            <tr><td style="font-weight:700">VP Layer Grower 50kg</td><td style="font-size:11px">PowerBoost</td><td style="font-size:11px;color:var(--text3)">Poultry</td><td class="num">480</td><td class="num" style="color:var(--gold);font-weight:700">9.2%</td><td class="num" style="color:var(--gold)">₱2,840</td></tr>
-            <tr><td style="font-weight:700">VP Duck Grower 50kg</td><td style="font-size:11px">VIEPro</td><td style="font-size:11px;color:var(--text3)">Specialties</td><td class="num">140</td><td class="num" style="color:var(--gold);font-weight:700">9.6%</td><td class="num" style="color:var(--gold)">₱2,920</td></tr>
+            <thead><tr><th>SKU</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
+            <tbody id="margin-worst-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
           </table></div></div>
         </div>
 
@@ -2355,11 +2229,8 @@ body{
                 Of 710 active accounts: <b style="color:var(--text)">312 carry only 1 brand</b> (44%), <b style="color:var(--gold)">248 carry 2 brands</b> (35%), <b style="color:var(--green)">128 carry 3 brands</b> (18%), <b style="color:var(--cyan)">22 carry all 4</b> (3%).
               </div>
               <table class="tbl">
-                <tr><th>Brand</th><th class="num">Customers</th><th class="num">Penetration</th><th class="num">Vol/Cust</th><th class="num">Whitespace</th><th class="num">Est. Opp.</th></tr>
-                <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px"></span>VIEPro Premium</td><td class="num">482</td><td class="num">68%</td><td class="num">53 MT</td><td class="num" style="color:var(--gold)">228 accts</td><td class="num" style="color:var(--cyan)">₱38M</td></tr>
-                <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px"></span>VIEPro Layer</td><td class="num">318</td><td class="num">45%</td><td class="num">27 MT</td><td class="num" style="color:var(--gold)">392 accts</td><td class="num" style="color:var(--cyan)">₱42M</td></tr>
-                <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px"></span>VIEPro Prime</td><td class="num">214</td><td class="num">30%</td><td class="num">30 MT</td><td class="num" style="color:var(--gold)">496 accts</td><td class="num" style="color:var(--cyan)">₱48M</td></tr>
-                <tr><td style="font-weight:700"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-right:8px"></span>Keos Pet</td><td class="num">86</td><td class="num">12%</td><td class="num">4 MT</td><td class="num" style="color:var(--gold)">624 accts</td><td class="num" style="color:var(--cyan)">₱14M</td></tr>
+                <thead><tr><th>Brand</th><th class="num">Customers</th><th class="num">Penetration</th><th class="num">Vol/Cust</th><th class="num">Whitespace</th><th class="num">Est. Opp.</th></tr></thead>
+                <tbody id="intel-brand-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
               <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider);font-size:10px;color:var(--cyan);font-weight:700">
                 Total estimated whitespace: ₱142M — if each non-carrying account adopted at 50% of segment avg.
@@ -2386,14 +2257,8 @@ body{
                 </div>
               </div>
               <table class="tbl">
-                <tr><th>Top Vertical Targets</th><th class="num">Current</th><th class="num">Benchmark</th><th class="num">Gap</th><th class="num">Upside</th></tr>
-                <tr><td style="font-weight:600">Metro Feeds Corp.</td><td class="num">420 MT</td><td class="num">580 MT</td><td class="num" style="color:var(--gold)">-28%</td><td class="num" style="color:var(--cyan)">₱6.2M</td></tr>
-                <tr><td style="font-weight:600">Davao Livestock Inc.</td><td class="num">310 MT</td><td class="num">460 MT</td><td class="num" style="color:var(--gold)">-33%</td><td class="num" style="color:var(--cyan)">₱5.8M</td></tr>
-                <tr><td style="font-weight:600">Bukidnon Farms Trading</td><td class="num">180 MT</td><td class="num">320 MT</td><td class="num" style="color:var(--red)">-44%</td><td class="num" style="color:var(--cyan)">₱5.4M</td></tr>
-                <tr><th>Top Horizontal Targets</th><th class="num">SKUs</th><th class="num">Brands</th><th class="num">Missing</th><th class="num">Upside</th></tr>
-                <tr><td style="font-weight:600">Pampanga Agri Supply</td><td class="num">3</td><td class="num">1</td><td class="num" style="color:var(--gold)">Layer, Prime</td><td class="num" style="color:var(--cyan)">₱3.8M</td></tr>
-                <tr><td style="font-weight:600">Iloilo Feed Center</td><td class="num">4</td><td class="num">1</td><td class="num" style="color:var(--gold)">Premium, Pet</td><td class="num" style="color:var(--cyan)">₱2.9M</td></tr>
-                <tr><td style="font-weight:600">Laguna Premium Feeds</td><td class="num">5</td><td class="num">2</td><td class="num" style="color:var(--gold)">Prime</td><td class="num" style="color:var(--cyan)">₱2.4M</td></tr>
+                <thead><tr><th>Top Horizontal Targets</th><th class="num">SKUs</th><th class="num">Brands</th><th class="num">Volume</th></tr></thead>
+                <tbody id="intel-horiz-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -2406,12 +2271,8 @@ body{
             <div class="card-hdr"><div class="card-title">Buying Pattern Analysis</div></div>
             <div class="card-body" style="padding-top:8px">
               <table class="tbl">
-                <tr><th>Pattern</th><th class="num">Customers</th><th class="num">%</th><th class="num">Avg Vol</th><th class="num">Trend</th><th>Signal</th></tr>
-                <tr><td style="font-weight:700">🟢 Regular (weekly+)</td><td class="num">148</td><td class="num">21%</td><td class="num">68 MT/mo</td><td class="num up">+12%</td><td><span class="badge b-green">Loyal</span></td></tr>
-                <tr><td style="font-weight:700">🔵 Bi-weekly</td><td class="num">186</td><td class="num">26%</td><td class="num">42 MT/mo</td><td class="num up">+6%</td><td><span class="badge b-blue">Stable</span></td></tr>
-                <tr><td style="font-weight:700">🟡 Monthly</td><td class="num">224</td><td class="num">32%</td><td class="num">24 MT/mo</td><td class="num" style="color:var(--text3)">0%</td><td><span class="badge b-gold">Monitor</span></td></tr>
-                <tr><td style="font-weight:700">🟠 Sporadic (>30d gaps)</td><td class="num">98</td><td class="num">14%</td><td class="num">14 MT/mo</td><td class="num down">-18%</td><td><span class="badge b-gold">At Risk</span></td></tr>
-                <tr><td style="font-weight:700">🔴 Dormant (last order >60d)</td><td class="num">54</td><td class="num">8%</td><td class="num">0 MT</td><td class="num down">—</td><td><span class="badge b-red">Lost?</span></td></tr>
+                <thead><tr><th>Pattern</th><th class="num">Customers</th><th class="num">%</th><th class="num">Avg Vol</th><th>Signal</th></tr></thead>
+                <tbody id="intel-pattern-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
               <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--divider)">
                 <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Reorder Prediction</div>
@@ -2645,8 +2506,9 @@ body{
               .ach-bar{display:inline-flex;align-items:center;gap:4px}
               .ach-fill{height:6px;border-radius:3px;min-width:2px}
             </style>
-            <table class="team-tbl">
-              <tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>Avg Speed</th><th>Spd vs LM</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr>
+            <table class="team-tbl" id="team-tbl">
+              <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>Avg Speed</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
+              <tbody id="team-tbody">
 
               <!-- MART ESPLIGUEZ — Visayas RSM -->
               <tr class="rsm-row"><td>MART ESPLIGUEZ</td><td>Visayas</td><td>Dist + KA</td><td>14,820</td><td>16,089</td><td style="color:var(--green);font-weight:700">92%</td><td><div class="ach-bar"><div class="ach-fill" style="width:60px;background:var(--green)"></div></div></td><td class="up">+42.1%</td><td>6,365</td><td class="up">+40.6%</td><td>₱5,210</td><td><span class="badge b-gold">51d</span></td><td>186</td><td style="color:var(--red);font-weight:700">3</td><td style="color:var(--red);font-weight:700">4</td></tr>
@@ -2683,8 +2545,7 @@ body{
               <!-- MA LYNIE GASINGAN -->
               <tr class="rsm-row"><td>MA LYNIE GASINGAN</td><td>Visayas</td><td>Pet Care</td><td>160</td><td>139</td><td style="color:var(--green);font-weight:700">115%</td><td><div class="ach-bar"><div class="ach-fill" style="width:65px;background:var(--green)"></div></div></td><td class="up">+82%</td><td>6</td><td class="down">-21.5%</td><td>₱12,640</td><td><span class="badge b-green">22d</span></td><td>24</td><td>0</td><td>0</td></tr>
 
-              <!-- TOTAL -->
-              <tr class="total-row"><td style="font-weight:800;font-family:var(--font);font-size:12px">NATIONAL TOTAL</td><td></td><td></td><td style="font-weight:800">54,446</td><td style="font-weight:800">62,604</td><td style="font-weight:800;color:var(--gold)">87%</td><td></td><td class="up" style="font-weight:800">+92.0%</td><td style="font-weight:800">15,649</td><td class="down" style="font-weight:800">-0.2%</td><td style="font-weight:800">₱6,953</td><td style="font-weight:800">47d</td><td style="font-weight:800">710</td><td style="font-weight:800;color:var(--red)">12</td><td style="font-weight:800;color:var(--red)">13</td></tr>
+              </tbody>
             </table>
           </div>
         </div>
@@ -2693,16 +2554,9 @@ body{
         <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:16px;margin-bottom:16px">
           <!-- RSM Rankings -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">RSM Rankings — Budget Ach %</div></div>
-            <div class="card-body" style="padding:0">
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-1">1</div><div style="flex:1;font-size:12px"><b>MA LYNIE GASINGAN</b><br><span style="color:var(--text3);font-size:10px">Pet Care · Visayas</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green)">115%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-2">2</div><div style="flex:1;font-size:12px"><b>MATHIEU GUILLAUME</b><br><span style="color:var(--text3);font-size:10px">Direct KA · National</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green)">95%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-3">3</div><div style="flex:1;font-size:12px"><b>RICHARD LAGDAAN</b><br><span style="color:var(--text3);font-size:10px">Dist · Mindanao</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green)">95%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-n">4</div><div style="flex:1;font-size:12px"><b>MART ESPLIGUEZ</b><br><span style="color:var(--text3);font-size:10px">Dist+KA · Visayas</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gold)">92%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-n">5</div><div style="flex:1;font-size:12px"><b>JOE EYOY</b><br><span style="color:var(--text3);font-size:10px">Dist+KA · Mindanao</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gold)">88%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-n">6</div><div style="flex:1;font-size:12px"><b>EDFREY BUENAVENTURA</b><br><span style="color:var(--text3);font-size:10px">Dist · Mindanao</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">82%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-n">7</div><div style="flex:1;font-size:12px"><b>CARMINDA CALDERON</b><br><span style="color:var(--text3);font-size:10px">Dist · Visayas</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">77%</div></div>
-              <div class="list-row" style="padding:10px 16px"><div class="rank rank-n">8</div><div style="flex:1;font-size:12px"><b>ERIC SALAZAR</b><br><span style="color:var(--text3);font-size:10px">Dist+KA · Luzon</span></div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">75%</div></div>
+            <div class="card-hdr"><div class="card-title">RSM Rankings — YTD Volume</div></div>
+            <div class="card-body" style="padding:0" id="team-rank-list">
+              <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px">Loading…</div>
             </div>
           </div>
 
@@ -2750,16 +2604,8 @@ body{
           <div class="card-hdr"><div class="card-title">Account Health by RSM</div><div class="card-badge b-red">12 silent · 13 neg. margin</div></div>
           <div class="card-body" style="padding-top:8px">
             <table class="tbl">
-              <tr><th>RSM</th><th>Region</th><th class="num">Active Cust.</th><th class="num">Silent (≥30d)</th><th class="num">Vol. Drop (&gt;30%)</th><th class="num">Neg. Margin</th><th class="num">Credit Hold</th><th class="num">Growing (&gt;25%)</th><th class="num">At-Risk Rev.</th></tr>
-              <tr><td style="font-weight:700">MART ESPLIGUEZ</td><td>Visayas</td><td class="num">186</td><td class="num" style="color:var(--red);font-weight:700">3</td><td class="num" style="color:var(--gold)">4</td><td class="num" style="color:var(--red);font-weight:700">4</td><td class="num" style="color:var(--gold)">1</td><td class="num" style="color:var(--green)">8</td><td class="num" style="color:var(--red)">₱4.2M</td></tr>
-              <tr><td style="font-weight:700">JOE EYOY</td><td>Mindanao</td><td class="num">164</td><td class="num" style="color:var(--red);font-weight:700">4</td><td class="num" style="color:var(--gold)">3</td><td class="num" style="color:var(--red);font-weight:700">6</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--green)">5</td><td class="num" style="color:var(--red)">₱5.8M</td></tr>
-              <tr><td style="font-weight:700">ERIC SALAZAR</td><td>Luzon</td><td class="num">148</td><td class="num" style="color:var(--red)">1</td><td class="num" style="color:var(--gold)">2</td><td class="num">0</td><td class="num">0</td><td class="num" style="color:var(--green)">4</td><td class="num" style="color:var(--text3)">₱0.8M</td></tr>
-              <tr><td style="font-weight:700">EDFREY BUENAVENTURA</td><td>Mindanao</td><td class="num">72</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--gold)">2</td><td class="num" style="color:var(--red)">1</td><td class="num" style="color:var(--gold)">1</td><td class="num" style="color:var(--green)">2</td><td class="num" style="color:var(--red)">₱1.4M</td></tr>
-              <tr><td style="font-weight:700">CARMINDA CALDERON</td><td>Visayas</td><td class="num">68</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--gold)">3</td><td class="num" style="color:var(--red)">1</td><td class="num">0</td><td class="num" style="color:var(--green)">1</td><td class="num" style="color:var(--red)">₱1.2M</td></tr>
-              <tr><td style="font-weight:700">RICHARD LAGDAAN</td><td>Mindanao</td><td class="num">56</td><td class="num">0</td><td class="num">0</td><td class="num" style="color:var(--red)">1</td><td class="num">0</td><td class="num" style="color:var(--green)">3</td><td class="num" style="color:var(--text3)">—</td></tr>
-              <tr><td style="font-weight:700">MATHIEU GUILLAUME</td><td>National</td><td class="num">18</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num" style="color:var(--green)">4</td><td class="num" style="color:var(--text3)">—</td></tr>
-              <tr><td style="font-weight:700">MA LYNIE GASINGAN</td><td>Visayas</td><td class="num">24</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num" style="color:var(--green)">2</td><td class="num" style="color:var(--text3)">—</td></tr>
-              <tr class="total"><td style="font-weight:800">NATIONAL</td><td></td><td class="num" style="font-weight:800">710</td><td class="num" style="font-weight:800;color:var(--red)">12</td><td class="num" style="font-weight:800;color:var(--gold)">14</td><td class="num" style="font-weight:800;color:var(--red)">13</td><td class="num" style="font-weight:800;color:var(--gold)">4</td><td class="num" style="font-weight:800;color:var(--green)">29</td><td class="num" style="font-weight:800;color:var(--red)">₱13.4M</td></tr>
+              <thead><tr><th>RSM</th><th>Region</th><th class="num">Active Cust.</th><th class="num">Silent (≥30d)</th><th class="num">Neg. Margin</th></tr></thead>
+              <tbody id="team-health-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2778,11 +2624,11 @@ body{
               <div style="font-size:12px;color:var(--text2);margin-top:4px">FY Target: <b style="color:var(--text)">188,266 MT</b> · ₱5.97B Net Sales · +37.4% vs FY2025</div>
             </div>
             <div style="display:flex;gap:20px;flex-shrink:0">
-              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Actual</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)">54,446</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Actual</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)" id="bud-ytd-actual">—</div></div>
               <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
-              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Budget</div><div style="font-family:var(--mono);font-size:28px;font-weight:700">58,341</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Budget</div><div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bud-ytd-budget">—</div></div>
               <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
-              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">Achievement</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)">93%</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">Achievement</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)" id="bud-ytd-ach">—</div></div>
             </div>
           </div>
         </div>
@@ -2873,11 +2719,8 @@ body{
             <div class="card-hdr"><div class="card-title">Volume Achievement by Region</div></div>
             <div class="card-body" style="padding-top:8px">
               <table class="tbl">
-                <tr><th>Region</th><th class="num">YTD Actual</th><th class="num">YTD Budget</th><th class="num">Ach %</th><th class="num">FY Budget</th></tr>
-                <tr><td style="font-weight:700">VISAYAS</td><td class="num">23,480</td><td class="num">23,109</td><td class="num" style="color:var(--green);font-weight:700">102%</td><td class="num">76,271</td></tr>
-                <tr><td style="font-weight:700">MINDANAO</td><td class="num">18,912</td><td class="num">20,053</td><td class="num" style="color:var(--green);font-weight:700">94%</td><td class="num">65,110</td></tr>
-                <tr><td style="font-weight:700">LUZON</td><td class="num">11,894</td><td class="num">15,179</td><td class="num" style="color:var(--red);font-weight:700">78%</td><td class="num">46,886</td></tr>
-                <tr class="total"><td style="font-weight:800">TOTAL</td><td class="num" style="font-weight:800">54,446</td><td class="num" style="font-weight:800">58,341</td><td class="num" style="font-weight:800;color:var(--green)">93%</td><td class="num" style="font-weight:800">188,266</td></tr>
+                <thead><tr><th>Region</th><th class="num">YTD Actual</th><th class="num">YTD Budget</th><th class="num">Ach %</th><th class="num">FY Budget</th></tr></thead>
+                <tbody id="bud-region-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3447,26 +3290,42 @@ async function loadInv(){
   } catch(e) { console.error('Inv:', e); showError('pg-inv','Unable to load inventory data'); }
 }
 
-/* ===== SPEED — wired to /api/speed ===== */
+/* ===== SPEED — wired to /api/speed (ALWAYS MTD — speed is inherently monthly) ===== */
 async function loadSpeed(){
   clearError('pg-speed');
   try {
-    var d = await getSpeedData({period:PD});
+    var d = await getSpeedData({period:'MTD'});  // Force MTD — Speed page is monthly-only
     if(!d){showError('pg-speed','Unable to load speed data');return}
-    console.log('[SPEED] Rendering:', Object.keys(d));
-    // Hero banner
-    if(d.elapsed_days!=null) sett('sp-elapsed',d.elapsed_days.toString());
-    if(d.remaining_days!=null) sett('sp-remain',d.remaining_days.toString());
-    if(d.speed_per_day!=null) sett('sp-pullout',fcn(Math.round(d.speed_per_day)));
-    if(d.projected_mt!=null) sett('sp-avgspeed',fcn(Math.round(d.projected_mt)));
+    console.log('[SPEED] Rendering:', Object.keys(d), '| daily_pullout:', d.daily_pullout, 'days:', d.days_elapsed+'/'+d.days_total);
+    // Hero banner — canonical fields
+    var daysElapsed = d.days_elapsed!=null?d.days_elapsed:d.elapsed_days;
+    var daysTotal   = d.days_total!=null?d.days_total:d.total_days;
+    var daysRemain  = d.days_remaining!=null?d.days_remaining:(daysTotal-daysElapsed);
+    var dailyPull   = d.daily_pullout!=null?d.daily_pullout:d.speed_per_day;
+    var projMtd     = d.projected_mtd!=null?d.projected_mtd:d.projected_mt;
+    var mtdActual   = d.mtd_actual!=null?d.mtd_actual:d.actual_mt;
+    if(daysElapsed!=null) sett('sp-elapsed',daysElapsed.toString());
+    if(daysRemain!=null)  sett('sp-remain',daysRemain.toString());
+    if(dailyPull!=null)   sett('sp-pullout',fcn(Math.round(dailyPull)));
+    if(projMtd!=null)     sett('sp-avgspeed',fcn(Math.round(projMtd)));     // now = Projected end-of-month
+    // Update "Average Speed" label -> "Projected (End of Month)"
+    var avgSpeedLabel = sel('sp-avgspeed') && sel('sp-avgspeed').parentElement && sel('sp-avgspeed').parentElement.querySelector('div:first-child');
+    if(avgSpeedLabel && avgSpeedLabel.textContent.trim().toLowerCase()==='average speed') avgSpeedLabel.textContent='Projected (End of Month)';
+    // Remaining label should say "Days Remaining" for clarity — idempotent
     // KPI row
     if(d.daily && d.daily.length){
       var today=d.daily[d.daily.length-1];
       if(today) sett('spk-today',fcn(Math.round(today.daily_mt||0)));
     }
-    if(d.actual_mt!=null) sett('spk-mtd',fcn(Math.round(d.actual_mt)));
-    if(d.speed_per_day!=null) sett('spk-avg',fcn(Math.round(d.speed_per_day)));
-    if(d.projected_mt!=null) sett('spk-proj',fn(d.projected_mt));
+    if(mtdActual!=null) sett('spk-mtd',fcn(Math.round(mtdActual)));
+    if(dailyPull!=null) sett('spk-avg',fcn(Math.round(dailyPull)));
+    if(projMtd!=null)   sett('spk-proj',fn(projMtd));
+    // vs Last Month (volume comparison)
+    if(d.vs_last_month_pct!=null){
+      var pct = d.vs_last_month_pct;
+      var el = sel('spk-vslm');
+      if(el){ el.textContent=(pct>=0?'+':'')+pct.toFixed(1)+'%'; el.style.color = pct>=0 ? 'var(--green)' : 'var(--red)'; }
+    }
     // Chart update
     if(d.daily && d.daily.length && charts.speed){
       var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
@@ -3477,13 +3336,43 @@ async function loadSpeed(){
       charts.speed.data.datasets[0].hoverBackgroundColor=vals.map(function(v){return v===0?'rgba(255,255,255,0.04)':v>700?'rgba(151,215,0,0.7)':'rgba(0,174,239,0.6)'});
       charts.speed.update();
     }
-    // RSM speed table — update if data exists
+    // RSM speed table (3 cols: name / vol / delta-placeholder)
     if(d.rsm_speed && d.rsm_speed.length){
-      console.log('[SPEED] '+d.rsm_speed.length+' RSMs — prototype RSM table has matching structure');
+      var totalVol = d.rsm_speed.reduce(function(s,r){return s+(+r.current_vol||0)},0);
+      var rhtml='';
+      d.rsm_speed.forEach(function(r){
+        var pct = totalVol>0 ? (+r.current_vol||0)/totalVol*100 : 0;
+        rhtml+='<tr><td>'+esc((r.rsm||r.name||'—').toUpperCase())+'</td>';
+        rhtml+='<td class="sv">'+fcn(Math.round(r.current_vol||0))+'</td>';
+        rhtml+='<td class="sd" style="color:var(--text3)">'+pct.toFixed(1)+'%</td></tr>';
+      });
+      rhtml+='<tr><td style="font-weight:800;font-size:12px">Grand total</td><td class="sv" style="font-weight:700">'+fcn(Math.round(totalVol))+'</td><td class="sd" style="font-weight:700">100.0%</td></tr>';
+      var tgt = sel('speed-rsm-tbody');
+      if(tgt) seth('speed-rsm-tbody', rhtml);
     }
-    // Feed type speed
+    // Feed type speed table (3 cols: brand / vol / share%)
     if(d.feed_type_speed && d.feed_type_speed.length){
-      console.log('[SPEED] '+d.feed_type_speed.length+' feed types — prototype table has matching structure');
+      var totalBrand = d.feed_type_speed.reduce(function(s,f){return s+(+f.current_vol||0)},0);
+      var fhtml='';
+      d.feed_type_speed.forEach(function(f){
+        var pct = totalBrand>0 ? (+f.current_vol||0)/totalBrand*100 : 0;
+        fhtml+='<tr><td>'+esc((f.brand||f.name||'—').toUpperCase())+'</td>';
+        fhtml+='<td class="sv">'+fcn(Math.round(f.current_vol||0))+'</td>';
+        fhtml+='<td class="sd" style="color:var(--text3)">'+pct.toFixed(1)+'%</td></tr>';
+      });
+      fhtml+='<tr><td style="font-weight:800;font-size:12px">Grand total</td><td class="sv" style="font-weight:700">'+fcn(Math.round(totalBrand))+'</td><td class="sd" style="font-weight:700">100.0%</td></tr>';
+      var tgt2 = sel('speed-feed-tbody');
+      if(tgt2) seth('speed-feed-tbody', fhtml);
+    }
+    // Plant breakdown table
+    if(d.plant_breakdown && d.plant_breakdown.length){
+      var phtml='';
+      d.plant_breakdown.forEach(function(p){
+        phtml+='<tr><td style="font-weight:600">'+esc(p.plant||'—')+'</td>';
+        phtml+='<td class="num">'+fcn(Math.round(p.mtd||p.vol||0))+' MT</td></tr>';
+      });
+      var tgt3 = sel('speed-plant-tbody');
+      if(tgt3) seth('speed-plant-tbody', phtml);
     }
   } catch(e) { console.error('Speed:', e); showError('pg-speed','Unable to load speed data'); }
 }
@@ -3559,13 +3448,53 @@ async function openCust(code){
       charts.custVolBar.data.datasets[1].data=ly;
       charts.custVolBar.update();
     }
+    // Monthly breakdown table
+    if(d.monthly_table && d.monthly_table.length){
+      var mhtml='';
+      d.monthly_table.slice(0,12).forEach(function(m){
+        var delta = (m.vol_cy && m.vol_ly) ? ((m.vol_cy - m.vol_ly) / m.vol_ly * 100) : null;
+        var deltaCls = delta==null?'':(delta>=0?'up':'down');
+        mhtml+='<tr><td style="font-weight:600">'+esc(m.month_label||m.month||'')+'</td>';
+        mhtml+='<td class="num">'+fcn(Math.round(m.vol_cy||0))+'</td>';
+        mhtml+='<td class="num" style="color:var(--text3)">'+fcn(Math.round(m.vol_ly||0))+'</td>';
+        mhtml+='<td class="num '+deltaCls+'">'+(delta!=null?(delta>=0?'+':'')+delta.toFixed(1)+'%':'--')+'</td>';
+        mhtml+='<td class="num">'+fc(m.sales_cy||m.revenue_cy||0)+'</td></tr>';
+      });
+      seth('cust-monthly-tbody',mhtml);
+    } else {
+      seth('cust-monthly-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No monthly data</td></tr>');
+    }
+
     // Product breakdown
     if(d.product_breakdown && d.product_breakdown.length){
-      console.log('[CUSTDETAIL] '+d.product_breakdown.length+' products');
+      var maxVol = Math.max.apply(null, d.product_breakdown.map(function(p){return +p.vol||0}));
+      var phtml='';
+      d.product_breakdown.slice(0,6).forEach(function(p){
+        var widthPct = maxVol>0 ? (+p.vol||0)/maxVol*100 : 0;
+        phtml+='<div class="list-row"><div style="flex:1;font-size:12px"><b>'+esc(p.name||p.item_name||'')+'</b>';
+        phtml+='<div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">';
+        phtml+='<span>'+fcn(Math.round(p.vol||0))+' MT</span>';
+        phtml+='<span>'+fc(p.revenue||0)+'</span></div></div>';
+        phtml+='<div class="prog" style="width:100px"><div class="prog-fill" style="width:'+widthPct+'%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div></div>';
+      });
+      seth('cust-products-list',phtml);
+    } else {
+      seth('cust-products-list','<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">No product data</div>');
     }
+
     // Recent orders
     if(d.recent_orders && d.recent_orders.length){
-      console.log('[CUSTDETAIL] '+d.recent_orders.length+' recent orders');
+      var ohtml='';
+      d.recent_orders.slice(0,10).forEach(function(o){
+        ohtml+='<div class="list-row"><div style="flex:1;font-size:11px"><b>'+esc(o.doc_num||o.DocNum||'')+'</b>';
+        if(o.doc_date) ohtml+=' · '+esc(o.doc_date);
+        ohtml+='<div style="color:var(--text3);font-size:10px;margin-top:2px">'+esc(o.items||o.description||'')+'</div></div>';
+        ohtml+='<div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">'+fc(o.revenue||o.total||0)+'</div>';
+        ohtml+='<div style="font-size:9px;color:var(--text3)">'+fcn(Math.round(o.volume||0))+' MT</div></div></div>';
+      });
+      seth('cust-orders-list',ohtml);
+    } else {
+      seth('cust-orders-list','<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">No recent orders</div>');
     }
   } catch(e) { console.error('CustDetail:', e); showError('pg-custdetail','Unable to load customer profile'); }
 }
@@ -3626,6 +3555,79 @@ async function loadMargin(){
     // Margin sidebar badge count
     var sidebarBadge=document.querySelector('.nav-item [class*="b-red"]');
     if(sidebarBadge && d.kpis && d.kpis.critical!=null) sidebarBadge.textContent=d.kpis.critical.toString();
+
+    // WARNING accounts table
+    if(d.warning && d.warning.length){
+      var whtml='';
+      d.warning.forEach(function(w){
+        whtml+='<tr><td style="font-weight:700">'+esc(w.customer||'')+'</td>';
+        whtml+='<td style="color:var(--text3);font-size:11px">'+esc(w.code||'')+'</td>';
+        whtml+='<td style="font-size:11px;color:var(--text3)">'+esc(w.rep||'--')+'</td>';
+        whtml+='<td class="num">'+fc(w.sales||0)+'</td>';
+        whtml+='<td class="num">'+fcn(Math.round(w.vol||0))+' MT</td>';
+        whtml+='<td class="num" style="color:var(--gold);font-weight:700">'+(w.gp_pct!=null?w.gp_pct.toFixed(1)+'%':'--')+'</td>';
+        whtml+='<td class="num" style="color:var(--gold)">'+(w.gm_ton!=null?'₱'+fcn(Math.round(w.gm_ton)):'--')+'</td></tr>';
+      });
+      seth('margin-warn-tbody',whtml);
+      sett('margin-warn-count', d.warning.length+' accounts');
+    } else {
+      seth('margin-warn-tbody','<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px">No warning accounts</td></tr>');
+      sett('margin-warn-count','0 accounts');
+    }
+
+    // By REGION table
+    if(d.by_region && d.by_region.length){
+      var rhtml='';
+      d.by_region.forEach(function(r){
+        var col = r.gp_pct>=15?'var(--green)' : r.gp_pct>=10?'var(--gold)' : 'var(--red)';
+        rhtml+='<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
+        rhtml+='<td class="num">'+fc(r.sales||0)+'</td>';
+        rhtml+='<td class="num">'+fcn(Math.round(r.vol||0))+' MT</td>';
+        rhtml+='<td class="num" style="color:'+col+';font-weight:700">'+(r.gp_pct!=null?r.gp_pct.toFixed(1)+'%':'--')+'</td>';
+        rhtml+='<td class="num" style="color:'+col+'">'+(r.gm_ton!=null?'₱'+fcn(Math.round(r.gm_ton)):'--')+'</td></tr>';
+      });
+      seth('margin-region-tbody',rhtml);
+    }
+
+    // By BRAND table
+    if(d.by_brand && d.by_brand.length){
+      var bhtml='';
+      d.by_brand.slice(0,15).forEach(function(b){
+        var col = b.gp_pct>=15?'var(--green)' : b.gp_pct>=10?'var(--gold)' : 'var(--red)';
+        bhtml+='<tr><td style="font-weight:600">'+esc(b.brand||'')+'</td>';
+        bhtml+='<td class="num">'+fc(b.sales||0)+'</td>';
+        bhtml+='<td class="num">'+fcn(Math.round(b.vol||0))+' MT</td>';
+        bhtml+='<td class="num" style="color:'+col+';font-weight:700">'+(b.gp_pct!=null?b.gp_pct.toFixed(1)+'%':'--')+'</td>';
+        bhtml+='<td class="num" style="color:'+col+'">'+(b.gm_ton!=null?'₱'+fcn(Math.round(b.gm_ton)):'--')+'</td></tr>';
+      });
+      seth('margin-brand-tbody',bhtml);
+    }
+
+    // By PLANT table
+    if(d.by_plant && d.by_plant.length){
+      var phtml='';
+      d.by_plant.forEach(function(p){
+        var col = p.gp_pct>=15?'var(--green)' : p.gp_pct>=10?'var(--gold)' : 'var(--red)';
+        phtml+='<tr><td style="font-weight:700">'+esc(p.plant||'')+'</td>';
+        phtml+='<td class="num">'+fcn(Math.round(p.vol||0))+' MT</td>';
+        phtml+='<td class="num" style="color:'+col+';font-weight:700">'+(p.gp_pct!=null?p.gp_pct.toFixed(1)+'%':'--')+'</td>';
+        phtml+='<td class="num" style="color:'+col+'">'+(p.gm_ton!=null?'₱'+fcn(Math.round(p.gm_ton)):'--')+'</td></tr>';
+      });
+      seth('margin-plant-tbody',phtml);
+    }
+
+    // Worst SKUs
+    if(d.worst_skus && d.worst_skus.length){
+      var shtml='';
+      d.worst_skus.slice(0,10).forEach(function(s){
+        var col = (s.gp_pct!=null && s.gp_pct<0)?'var(--red)' : 'var(--gold)';
+        shtml+='<tr><td style="font-weight:700;color:'+col+'">'+esc(s.name||s.sku||'')+'</td>';
+        shtml+='<td class="num">'+fcn(Math.round(s.vol_bags||s.vol||0))+'</td>';
+        shtml+='<td class="num" style="color:'+col+';font-weight:700">'+(s.gp_pct!=null?s.gp_pct.toFixed(1)+'%':'--')+'</td>';
+        shtml+='<td class="num" style="color:'+col+'">'+(s.gm_ton!=null?(s.gm_ton<0?'-':'')+'₱'+fcn(Math.abs(Math.round(s.gm_ton))):'--')+'</td></tr>';
+      });
+      seth('margin-worst-tbody',shtml);
+    }
   } catch(e) { console.error('Margin:', e); showError('pg-margin','Unable to load margin data'); }
 }
 
@@ -3657,17 +3659,55 @@ async function loadIntelligence(){
       if(kpis[4] && d.kpis.avg_skus_per_cust!=null) kpis[4].textContent=d.kpis.avg_skus_per_cust.toFixed(1);
       if(kpis[5] && d.kpis.avg_brands_per_cust!=null) kpis[5].textContent=d.kpis.avg_brands_per_cust.toFixed(1);
     }
-    // Brand coverage table — keep prototype layout, data structure may vary
+    // BRAND COVERAGE table
     if(d.brand_coverage && d.brand_coverage.length){
-      console.log('[INTELLIGENCE] '+d.brand_coverage.length+' brands in coverage analysis');
+      var bhtml='';
+      d.brand_coverage.forEach(function(b){
+        bhtml+='<tr><td style="font-weight:700">'+esc(b.brand||'')+'</td>';
+        bhtml+='<td class="num">'+fcn(b.customers||0)+'</td>';
+        bhtml+='<td class="num">'+(b.penetration_pct!=null?b.penetration_pct+'%':'--')+'</td>';
+        bhtml+='<td class="num">'+fcn(Math.round(b.vol_per_cust||0))+' MT</td>';
+        bhtml+='<td class="num" style="color:var(--gold)">'+fcn(b.whitespace_count||0)+' accts</td>';
+        bhtml+='<td class="num" style="color:var(--cyan)">'+fc(b.est_opportunity||0)+'</td></tr>';
+      });
+      seth('intel-brand-tbody', bhtml);
+    } else {
+      seth('intel-brand-tbody','<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">No brand coverage data</td></tr>');
     }
-    // Buying patterns
+
+    // HORIZONTAL TARGETS table
+    if(d.horizontal_targets && d.horizontal_targets.length){
+      var hhtml='';
+      d.horizontal_targets.slice(0,10).forEach(function(h){
+        hhtml+='<tr><td style="font-weight:600">'+esc(h.customer||h.name||'')+'</td>';
+        hhtml+='<td class="num">'+(h.skus||0)+'</td>';
+        hhtml+='<td class="num">'+(h.brands||0)+'</td>';
+        hhtml+='<td class="num">'+fcn(Math.round(h.vol||0))+' MT</td></tr>';
+      });
+      seth('intel-horiz-tbody', hhtml);
+    } else {
+      seth('intel-horiz-tbody','<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">No horizontal targets</td></tr>');
+    }
+
+    // BUYING PATTERNS table
     if(d.buying_patterns && d.buying_patterns.length){
-      console.log('[INTELLIGENCE] '+d.buying_patterns.length+' buying pattern bands');
+      var phtml='';
+      d.buying_patterns.forEach(function(p){
+        var sigCls = p.signal==='Loyal'?'b-green' : p.signal==='Stable'?'b-blue' : p.signal==='At Risk'?'b-gold' : p.signal==='Lost?'?'b-red' : 'b-gold';
+        phtml+='<tr><td style="font-weight:700">'+esc(p.pattern||'')+'</td>';
+        phtml+='<td class="num">'+fcn(p.count||0)+'</td>';
+        phtml+='<td class="num">'+(p.pct!=null?p.pct+'%':'--')+'</td>';
+        phtml+='<td class="num">'+fcn(Math.round(p.avg_vol||0))+' MT/mo</td>';
+        phtml+='<td><span class="badge '+sigCls+'">'+esc(p.signal||'--')+'</span></td></tr>';
+      });
+      seth('intel-pattern-tbody', phtml);
+    } else {
+      seth('intel-pattern-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No pattern data</td></tr>');
     }
-    // Health distribution
+
+    // Health distribution — logged only (matrix inside prototype bar is complex)
     if(d.health_distribution && d.health_distribution.length){
-      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands');
+      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands available (prototype bar retained)');
     }
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
 }
@@ -3692,13 +3732,73 @@ async function loadTeam(){
       if(h1 && !h1.closest('.detail-hero')){}// skip non-hero
       console.log('[TEAM] EVP: '+d.evp.name+', YTD Vol: '+d.evp.ytd_vol+', RSMs: '+d.evp.rsm_count);
     }
-    // RSM scorecard — log available data
+    // RSM SCORECARD — main team table
     if(d.rsms && d.rsms.length){
-      console.log('[TEAM] '+d.rsms.length+' RSMs in scorecard');
+      var thtml='';
+      d.rsms.forEach(function(r){
+        var ach = r.ach_pct!=null ? r.ach_pct : 0;
+        var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
+        var dsoCol = r.dso!=null ? (r.dso<=45?'b-green' : r.dso<=60?'b-gold' : 'b-red') : 'b-gold';
+        thtml += '<tr class="rsm-row">';
+        thtml += '<td>'+esc((r.name||'').toUpperCase())+'</td>';
+        thtml += '<td>'+esc(r.region||'--')+'</td>';
+        thtml += '<td>'+esc(r.bu||'--')+'</td>';
+        thtml += '<td>'+fcn(Math.round(r.ytd_vol||0))+'</td>';
+        thtml += '<td>'+fcn(Math.round(r.ytd_target||0))+'</td>';
+        thtml += '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
+        thtml += '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>';
+        thtml += '<td class="'+((r.vs_ly||0)>=0?'up':'down')+'">'+(r.vs_ly!=null?(r.vs_ly>=0?'+':'')+r.vs_ly.toFixed(1)+'%':'--')+'</td>';
+        thtml += '<td>'+fcn(Math.round(r.speed||0))+'</td>';
+        thtml += '<td>₱'+fcn(Math.round(r.gm_ton||0))+'</td>';
+        thtml += '<td><span class="badge '+dsoCol+'">'+(r.dso!=null?Math.round(r.dso)+'d':'--')+'</span></td>';
+        thtml += '<td>'+fcn(r.customers||0)+'</td>';
+        thtml += '<td style="color:'+(r.silent>0?'var(--red)':'var(--text)')+';font-weight:'+(r.silent>0?'700':'400')+'">'+(r.silent||0)+'</td>';
+        thtml += '<td style="color:'+(r.neg_margin>0?'var(--red)':'var(--text)')+';font-weight:'+(r.neg_margin>0?'700':'400')+'">'+(r.neg_margin||0)+'</td>';
+        thtml += '</tr>';
+      });
+      // Totals row
+      var totals = d.rsms.reduce(function(a,r){
+        a.vol+=(r.ytd_vol||0); a.tgt+=(r.ytd_target||0);
+        a.cust+=(r.customers||0); a.sil+=(r.silent||0); a.neg+=(r.neg_margin||0);
+        return a;
+      }, {vol:0,tgt:0,cust:0,sil:0,neg:0});
+      var totAch = totals.tgt>0 ? totals.vol/totals.tgt*100 : 0;
+      thtml += '<tr class="total-row"><td style="font-weight:800">NATIONAL TOTAL</td><td></td><td></td>';
+      thtml += '<td style="font-weight:800">'+fcn(Math.round(totals.vol))+'</td>';
+      thtml += '<td style="font-weight:800">'+fcn(Math.round(totals.tgt))+'</td>';
+      thtml += '<td style="font-weight:800">'+totAch.toFixed(0)+'%</td>';
+      thtml += '<td></td><td></td><td></td><td></td><td></td>';
+      thtml += '<td style="font-weight:800">'+fcn(totals.cust)+'</td>';
+      thtml += '<td style="font-weight:800;color:var(--red)">'+totals.sil+'</td>';
+      thtml += '<td style="font-weight:800;color:var(--red)">'+totals.neg+'</td></tr>';
+      seth('team-tbody', thtml);
+
+      // RSM Rankings — sort by ytd_vol desc
+      var ranked = d.rsms.slice().sort(function(a,b){return (b.ytd_vol||0)-(a.ytd_vol||0)});
+      var rhtml='';
+      ranked.slice(0,8).forEach(function(r,i){
+        var achCol = (r.ach_pct||0)>=95?'var(--green)' : (r.ach_pct||0)>=80?'var(--gold)' : 'var(--red)';
+        rhtml += '<div class="list-row" style="padding:10px 16px"><div class="rank '+rc(i)+'">'+(i+1)+'</div>';
+        rhtml += '<div style="flex:1;font-size:12px"><b>'+esc((r.name||'').toUpperCase())+'</b><br><span style="color:var(--text3);font-size:10px">'+esc(r.bu||'')+(r.region?' · '+esc(r.region):'')+'</span></div>';
+        rhtml += '<div style="font-family:var(--mono);font-size:14px;font-weight:700;color:'+achCol+'">'+fcn(Math.round(r.ytd_vol||0))+' MT</div></div>';
+      });
+      seth('team-rank-list', rhtml);
     }
-    // L10 scorecard — keep hardcoded as noted in task spec
-    console.warn('[TEAM] L10 scorecard kept hardcoded — needs /api/l10 endpoint (Agent 4)');
-    // Performance matrix
+
+    // Account Health by RSM
+    if(d.account_health && d.account_health.length){
+      var hhtml='';
+      d.account_health.forEach(function(h){
+        hhtml += '<tr><td style="font-weight:700">'+esc((h.rsm||'').toUpperCase())+'</td>';
+        hhtml += '<td>'+esc(h.region||'--')+'</td>';
+        hhtml += '<td class="num">'+fcn(h.customers||0)+'</td>';
+        hhtml += '<td class="num" style="color:'+(h.silent>0?'var(--red)':'var(--text)')+';font-weight:'+(h.silent>0?'700':'400')+'">'+(h.silent||0)+'</td>';
+        hhtml += '<td class="num" style="color:'+(h.neg_margin>0?'var(--red)':'var(--text)')+';font-weight:'+(h.neg_margin>0?'700':'400')+'">'+(h.neg_margin||0)+'</td></tr>';
+      });
+      seth('team-health-tbody', hhtml);
+    }
+
+    // Performance matrix — logged, keep prototype
     if(d.performance_matrix){
       console.log('[TEAM] Performance matrix: '+((d.performance_matrix.months||[]).length)+' months × '+((d.performance_matrix.rsms||[]).length)+' RSMs');
     }
@@ -3719,11 +3819,15 @@ async function loadBudget(){
     var pg=sel('pg-budget');
     // Hero KPIs
     if(d.hero){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"], .kpi-val');
-      // The budget page has hero section with FY target, YTD actual, etc.
-      // Find and update them
       var h=d.hero;
-      console.log('[BUDGET] FY Target: '+h.fy_target_mt+'MT, YTD Actual: '+h.ytd_actual+', Achievement: '+h.achievement_pct+'%');
+      if(h.ytd_actual!=null)    sett('bud-ytd-actual', fcn(Math.round(h.ytd_actual)));
+      if(h.ytd_budget!=null)    sett('bud-ytd-budget', fcn(Math.round(h.ytd_budget)));
+      if(h.achievement_pct!=null){
+        var ach = Math.round(h.achievement_pct);
+        seth('bud-ytd-ach', ach+'%');
+        var achEl = sel('bud-ytd-ach');
+        if(achEl) achEl.style.color = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
+      }
     }
     // Monthly actual vs budget chart
     if(d.monthly_actual_vs_budget && charts.budgetMonthly){
@@ -3745,11 +3849,29 @@ async function loadBudget(){
     }
     // Achievement by region
     if(d.achievement_by_region && d.achievement_by_region.length){
-      console.log('[BUDGET] '+d.achievement_by_region.length+' regions in achievement table');
+      var rhtml='';
+      var totAct=0, totBud=0, totFy=0;
+      d.achievement_by_region.forEach(function(r){
+        var ach = r.ach_pct!=null?r.ach_pct:0;
+        var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
+        rhtml+='<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
+        rhtml+='<td class="num">'+fcn(Math.round(r.ytd_actual||0))+'</td>';
+        rhtml+='<td class="num">'+fcn(Math.round(r.ytd_budget||0))+'</td>';
+        rhtml+='<td class="num" style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
+        rhtml+='<td class="num">'+fcn(Math.round(r.fy_budget||0))+'</td></tr>';
+        totAct+=(+r.ytd_actual||0); totBud+=(+r.ytd_budget||0); totFy+=(+r.fy_budget||0);
+      });
+      var totAch = totBud>0 ? totAct/totBud*100 : 0;
+      rhtml+='<tr class="total"><td style="font-weight:800">TOTAL</td>';
+      rhtml+='<td class="num" style="font-weight:800">'+fcn(Math.round(totAct))+'</td>';
+      rhtml+='<td class="num" style="font-weight:800">'+fcn(Math.round(totBud))+'</td>';
+      rhtml+='<td class="num" style="font-weight:800;color:var(--green)">'+totAch.toFixed(0)+'%</td>';
+      rhtml+='<td class="num" style="font-weight:800">'+fcn(Math.round(totFy))+'</td></tr>';
+      seth('bud-region-tbody', rhtml);
     }
-    // P&L summary
+    // P&L summary — logged (table is complex prototype-bound)
     if(d.pl_summary){
-      console.log('[BUDGET] P&L summary: '+((d.pl_summary.months||[]).length)+' months');
+      console.log('[BUDGET] P&L summary: '+((d.pl_summary.months||[]).length)+' months — prototype table retained');
     }
   } catch(e) { console.error('Budget:', e); showError('pg-budget','Unable to load budget data'); }
 }
