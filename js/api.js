@@ -14,13 +14,15 @@ function getApiHeaders() {
 
 async function apiFetch(endpoint, params) {
   params = params || {};
+  // Cache-buster guarantees browser + CDN do not return stale responses when period/filter changes
+  params._t = Date.now();
   var qs = new URLSearchParams(params).toString();
   var url = API_BASE + '/' + endpoint + (qs ? '?' + qs : '');
 
-  console.log('[API]', endpoint, qs || '');
+  console.log('[API]', endpoint, 'params=', params);
   var res;
   try {
-    res = await fetch(url, { headers: getApiHeaders() });
+    res = await fetch(url, { headers: getApiHeaders(), cache: 'no-store' });
   } catch (e) {
     console.error('[API] Network error:', endpoint, e.message);
     throw e;
