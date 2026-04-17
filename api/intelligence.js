@@ -23,16 +23,27 @@ module.exports = async (req, res) => {
     const filteredWhere = applyRoleFilter(session, baseWhere)
 
     // --- Brand coverage per customer (last 12 months) ---
+    // Brand = first word of SKU description (e.g. "VIEPRO MUSCLY..." -> "VIEPRO")
     const brandCoverage = await query(`
-      SELECT
-        T1.Dscription                                                    AS brand,
+      SELECT TOP 20
+        CASE
+          WHEN CHARINDEX(' ', T1.Dscription) > 0
+          THEN LEFT(T1.Dscription, CHARINDEX(' ', T1.Dscription) - 1)
+          ELSE T1.Dscription
+        END                                                              AS brand,
         COUNT(DISTINCT T0.CardCode)                                      AS customers,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS total_vol
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-      GROUP BY T1.Dscription
+      GROUP BY
+        CASE
+          WHEN CHARINDEX(' ', T1.Dscription) > 0
+          THEN LEFT(T1.Dscription, CHARINDEX(' ', T1.Dscription) - 1)
+          ELSE T1.Dscription
+        END
+      HAVING SUM(T1.Quantity) > 50
       ORDER BY total_vol DESC
     `)
 
