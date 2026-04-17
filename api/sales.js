@@ -125,7 +125,76 @@ module.exports = async (req, res) => {
       top_customers: [...new Map(pendingPO.map(p => [p.customer_code, { customer: p.customer_name, code: p.customer_code }])).values()].slice(0, 10)
     }
 
-    const result = { by_brand, top_customers, monthly_trend, pending_po }
+    // --- Top-level summary KPIs for Sales hero strip ---
+    const kpiCurrent = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gross_margin,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                       AS gmt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      ${filteredWhere}
+    `, { dateFrom, dateTo })
+
+    // Previous-period (one period back, same length) for delta
+    const prevFrom = new Date(dateFrom); prevFrom.setTime(prevFrom.getTime() - (dateTo - dateFrom))
+    const prevTo   = new Date(dateFrom); prevTo.setDate(prevTo.getDate() - 1)
+    const kpiPrev = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                       AS gmt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'
+    `, { pFrom: prevFrom, pTo: prevTo })
+
+    // YTD (Jan 1 → today)
+    const ytdFrom = new Date(new Date().getFullYear(), 0, 1)
+    const kpiYtd = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= @ytdFrom AND T0.CANCELED='N'
+    `, { ytdFrom })
+
+    const cur = kpiCurrent[0] || {}, prv = kpiPrev[0] || {}, yt = kpiYtd[0] || {}
+    const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0
+
+    const kpis = {
+      volume_mt:     Math.round((cur.volume_mt || 0) * 10) / 10,
+      volume_bags:   Math.round(cur.volume_bags || 0),
+      revenue:       Math.round(cur.revenue || 0),
+      gross_margin:  Math.round(cur.gross_margin || 0),
+      gmt:           Math.round(cur.gmt || 0),
+      ytd_volume_mt: Math.round((yt.volume_mt || 0) * 10) / 10,
+      ytd_volume_bags: Math.round(yt.volume_bags || 0),
+      ytd_revenue:   Math.round(yt.revenue || 0),
+      pending_po_mt: Math.round((po_total_mt) * 10) / 10,
+      delta_pct: {
+        volume_mt: pct(cur.volume_mt, prv.volume_mt),
+        revenue:   pct(cur.revenue,   prv.revenue),
+        gmt:       pct(cur.gmt,       prv.gmt)
+      }
+    }
+
+    const result = { kpis, by_brand, top_customers, monthly_trend, pending_po,
+                     volume_mt: kpis.volume_mt, volume_bags: kpis.volume_bags,
+                     revenue: kpis.revenue, gmt: kpis.gmt,
+                     ytd_volume_mt: kpis.ytd_volume_mt, ytd_revenue: kpis.ytd_revenue }
 
     cache.set(cacheKey, result, 300)
     res.json(result)
