@@ -6,7 +6,6 @@
 <title>VieForce HQ — Desktop</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   /* Vienovo Brand — Dark Mode */
@@ -474,20 +473,6 @@ body{
 .kpi-sm{padding:14px 16px}
 .kpi-sm .kpi-val{font-size:20px;margin-top:4px}
 
-/* ===== ENRICHED KPI (Home hero strip) ===== */
-.kpi-enr{display:flex;flex-direction:column}
-.kpi-enr .kpi-enr-div{height:1px;background:var(--divider);margin:10px 0 8px}
-.kpi-enr-ytd{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
-.kpi-enr-ytd-lbl{font-size:9px;color:var(--text4);font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
-.kpi-enr-ytd-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text1)}
-.kpi-enr-ytd-budget{font-size:10px;color:var(--text3);font-family:var(--mono)}
-.kpi-enr-prog{margin-top:6px;height:4px}
-.kpi-enr-status{font-size:10px;font-weight:700;margin-top:4px}
-.kpi-enr-status.ok{color:var(--green)}
-.kpi-enr-status.warn{color:var(--gold)}
-.kpi-enr-status.bad{color:var(--red)}
-.kpi-enr-badge{font-size:9px;font-weight:700;color:var(--red);margin-top:2px}
-
 /* ===== CARD ===== */
 .card{
   background:var(--surface);
@@ -724,7 +709,41 @@ body{
 </head>
 <body>
 
-<!-- Login handled by index.html — auth gate in JS below -->
+<!-- ===== LOGIN ===== -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">VF</div>
+    <div class="login-title">VieForce HQ</div>
+    <div class="login-sub">Sales Intelligence · Vienovo Philippines · Desktop</div>
+    <div class="login-profiles">
+      <div class="login-profiles-title">Select Profile</div>
+      <div class="login-card" onclick="loginAs('ceo')">
+        <div class="avatar" style="background:linear-gradient(135deg,#004A64,#00AEEF)">MG</div>
+        <div><div class="name">Mathieu Guillaume</div><div class="role">CEO · All Regions</div></div>
+        <div class="chevron">›</div>
+      </div>
+      <div class="login-card" onclick="loginAs('evp')">
+        <div class="avatar" style="background:linear-gradient(135deg,var(--green),#5CB200);color:#000">JD</div>
+        <div><div class="name">Joel Durano</div><div class="role">EVP Sales · All Regions</div></div>
+        <div class="chevron">›</div>
+      </div>
+      <div class="login-card" onclick="loginAs('rsm')">
+        <div class="avatar" style="background:linear-gradient(135deg,var(--gold),#E0A800);color:#000">MT</div>
+        <div><div class="name">Mart Talion</div><div class="role">RSM · Luzon</div></div>
+        <div class="chevron">›</div>
+      </div>
+      <div class="login-card" onclick="loginAs('dsm')">
+        <div class="avatar" style="background:linear-gradient(135deg,var(--amber),#D48806);color:#000">JF</div>
+        <div><div class="name">Jefrey Florentino</div><div class="role">DSM · Metro Manila</div></div>
+        <div class="chevron">›</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:24px">
+      <div class="login-sap" style="margin:0"><span class="sap-dot"></span> SAP B1 Connected · v2.4.1</div>
+      <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0" title="Toggle theme">🌙</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== APP SHELL ===== -->
 <div class="shell">
@@ -829,7 +848,7 @@ body{
 
       <div class="tb-search">
         <span class="tb-search-icon">🔍</span>
-        <input placeholder="Search customers, SKUs..." id="global-search" type="text" onkeydown="if(event.key==='Enter')doSearch()">
+        <input placeholder="Search customers, SKUs..." id="global-search" type="text">
       </div>
       <div class="tb-clock" id="clock">14:32</div>
       <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
@@ -849,86 +868,118 @@ body{
           </span>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px" class="stagger" id="home-kpi-row">
-          <!-- 1. Net Sales -->
-          <div class="kpi kpi-sm kpi-enr">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px" class="stagger">
+          <div class="kpi kpi-sm">
             <div class="kpi-label">Net Sales</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-sales">₱482M</div>
-            <div class="kpi-delta up" id="hk-sales-d">▲ 8.3%</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-sales-ytd">₱1.73B</span><span class="kpi-enr-ytd-budget" id="hk-sales-ytd-bud">/ ₱1.85B</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-sales-bar" style="width:93%;background:var(--green)"></div></div>
-            <div class="kpi-enr-status ok" id="hk-sales-pct">93% YTD</div>
+            <div class="kpi-val" style="font-size:22px">₱482M</div>
+            <div class="kpi-delta up">▲ 8.3%</div>
+            <div class="kpi-src">OINV · MTD</div>
           </div>
-          <!-- 2. Volume -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm">
             <div class="kpi-label">Volume</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-vol">14.2K<span style="font-size:11px;color:var(--text3)"> MT</span></div>
-            <div class="kpi-delta up" id="hk-vol-d">▲ 12.1%</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-vol-ytd">54.4K</span><span class="kpi-enr-ytd-budget" id="hk-vol-ytd-bud">/ 58.3K MT</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-vol-bar" style="width:93%;background:var(--green)"></div></div>
-            <div class="kpi-enr-status ok" id="hk-vol-pct">93% YTD</div>
+            <div class="kpi-val" style="font-size:22px">14.2K</div>
+            <div class="kpi-delta up">▲ 12.1%</div>
+            <div class="kpi-src">MT · MTD</div>
           </div>
-          <!-- 3. Gross Margin -->
-          <div class="kpi kpi-sm kpi-enr" id="kpi-gm">
+          <div class="kpi kpi-sm" id="kpi-gm">
             <div class="kpi-label">Gross Margin</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-gm">₱78M</div>
-            <div class="kpi-delta up" id="hk-gm-d">▲ 5.6%</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-gm-ytd">₱373M</span><span class="kpi-enr-ytd-budget" id="hk-gm-ytd-bud">/ ₱382M</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-gm-bar" style="width:98%;background:var(--green)"></div></div>
-            <div class="kpi-enr-status ok" id="hk-gm-pct">98% YTD</div>
+            <div class="kpi-val" style="font-size:22px">₱78M</div>
+            <div class="kpi-delta up">▲ 5.6%</div>
+            <div class="kpi-src">MTD</div>
           </div>
-          <!-- 4. GM/Ton -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm">
             <div class="kpi-label">GM/Ton</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-gmt">₱5,493</div>
-            <div class="kpi-delta down" id="hk-gmt-d">▼ 1.2%</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-gmt-ytd">₱6,550</span><span class="kpi-enr-ytd-budget" id="hk-gmt-ytd-bud">/ ₱6,555 YTD avg</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-gmt-bar" style="width:100%;background:var(--green)"></div></div>
-            <div class="kpi-enr-status ok" id="hk-gmt-pct">100% YTD</div>
+            <div class="kpi-val" style="font-size:22px">₱5,493</div>
+            <div class="kpi-delta down">▼ 1.2%</div>
+            <div class="kpi-src">₱/MT</div>
           </div>
-          <!-- 5. DSO (active) -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm">
             <div class="kpi-label">DSO</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-dso">47<span style="font-size:13px;color:var(--text3)">d</span></div>
-            <div class="kpi-delta" style="color:var(--text2)" id="hk-dso-d">Active accounts</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-lbl">TARGET</span><span class="kpi-enr-ytd-val" id="hk-dso-tgt">≤45d</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-dso-bar" style="width:100%;background:var(--green)"></div></div>
-            <div class="kpi-enr-status ok" id="hk-dso-pct">On target</div>
-            <div class="kpi-enr-badge" id="hk-dso-badge" style="display:none">+0d from delinquent</div>
+            <div class="kpi-val" style="font-size:22px">47<span style="font-size:13px;color:var(--text3)">d</span></div>
+            <div class="kpi-delta up">▼ 3d</div>
+            <div class="kpi-src">vs 50d PP</div>
           </div>
-          <!-- 6. Daily Pullout (was Speed) -->
-          <div class="kpi kpi-sm kpi-enr">
-            <div class="kpi-label">Daily Pullout</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-speed">682<span style="font-size:11px;color:var(--text3)"> MT/d</span></div>
-            <div class="kpi-delta up" id="hk-speed-d">▲ 4.8%</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-speed-days">14 of 26</span><span class="kpi-enr-ytd-budget">shipping days</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-speed-bar" style="width:54%;background:var(--blue)"></div></div>
-            <div class="kpi-enr-status" style="color:var(--text3)" id="hk-speed-pct">12 days remaining</div>
+          <div class="kpi kpi-sm">
+            <div class="kpi-label">Speed</div>
+            <div class="kpi-val" style="font-size:22px">682</div>
+            <div class="kpi-delta up">▲ 4.8%</div>
+            <div class="kpi-src">MT/day avg</div>
           </div>
-          <!-- 7. Pending PO -->
-          <div class="kpi kpi-sm kpi-enr" style="border-left:3px solid var(--gold);cursor:pointer" onclick="navTo('pg-sales')">
+          <div class="kpi kpi-sm" style="border-left:3px solid var(--gold);cursor:pointer" onclick="navTo('pg-sales')">
             <div class="kpi-label" style="color:var(--gold)">Pending PO</div>
-            <div class="kpi-val" style="font-size:20px;color:var(--gold)" id="hk-pending">7,432<span style="font-size:11px;color:var(--text3)"> MT</span></div>
-            <div class="kpi-delta" style="color:var(--text2)" id="hk-pending-sub">₱256M · 42 orders</div>
-            <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-lbl">OLDEST</span><span class="kpi-enr-ytd-val" id="hk-pending-oldest">—</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-pending-bar" style="width:20%;background:var(--gold)"></div></div>
-            <div class="kpi-enr-status" style="color:var(--gold)" id="hk-pending-status">ORDR · Open</div>
+            <div class="kpi-val" style="font-size:22px;color:var(--gold)">7,432</div>
+            <div class="kpi-delta" style="color:var(--text2)">₱256M · 42 orders</div>
+            <div class="kpi-src">ORDR · Open</div>
           </div>
         </div>
 
         <!-- Margin alert strip -->
-        <div style="display:flex;gap:8px;margin-bottom:20px" id="home-margin-strip">
-          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-red);color:var(--red);cursor:pointer;border:1px solid rgba(239,68,68,0.1)" onclick="navTo('pg-margin')" id="hm-critical">● 3 Critical Margins</div>
-          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-gold);color:var(--gold);cursor:pointer;border:1px solid rgba(255,199,44,0.1)" onclick="navTo('pg-margin')" id="hm-warning">● 7 Warning</div>
-          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-blue);color:var(--blue);cursor:pointer;border:1px solid rgba(0,174,239,0.1)" id="hm-watch">● 12 Watch</div>
-          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-green);color:var(--green);cursor:pointer;border:1px solid rgba(151,215,0,0.1)" onclick="navTo('pg-insights')" id="hm-growing">● 22 Growing</div>
+        <div style="display:flex;gap:8px;margin-bottom:20px">
+          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-red);color:var(--red);cursor:pointer;border:1px solid rgba(239,68,68,0.1)" onclick="navTo('pg-margin')">● 3 Critical Margins</div>
+          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-gold);color:var(--gold);cursor:pointer;border:1px solid rgba(255,199,44,0.1)" onclick="navTo('pg-margin')">● 7 Warning</div>
+          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-blue);color:var(--blue);cursor:pointer;border:1px solid rgba(0,174,239,0.1)">● 12 Watch</div>
+          <div style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;background:var(--glow-green);color:var(--green);cursor:pointer;border:1px solid rgba(151,215,0,0.1)" onclick="navTo('pg-insights')">● 22 Growing</div>
+        </div>
+
+        <!-- Budget vs Actual strip -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
+          <div class="kpi kpi-sm" style="border-top:3px solid var(--blue)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="kpi-label">YTD Vol vs Budget</div>
+              <span class="badge b-green" style="font-size:10px">93%</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">
+              <span style="font-family:var(--mono);font-size:20px;font-weight:700">54.4K</span>
+              <span style="font-size:11px;color:var(--text3)">/ 58.3K MT</span>
+            </div>
+            <div class="prog" style="height:6px;margin-top:6px"><div class="prog-fill" style="width:93%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div>
+            <div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px">93% achieved · 4 months elapsed</div>
+          </div>
+          <div class="kpi kpi-sm" style="border-top:3px solid var(--green)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="kpi-label">YTD Sales vs Budget</div>
+              <span class="badge b-green" style="font-size:10px">93%</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">
+              <span style="font-family:var(--mono);font-size:20px;font-weight:700">₱1.73B</span>
+              <span style="font-size:11px;color:var(--text3)">/ ₱1.85B</span>
+            </div>
+            <div class="prog" style="height:6px;margin-top:6px"><div class="prog-fill" style="width:93%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
+            <div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px">93% · Net Sales/Ton ₱31,735</div>
+          </div>
+          <div class="kpi kpi-sm" style="border-top:3px solid var(--green)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="kpi-label">GM vs Budget</div>
+              <span class="badge b-green" style="font-size:10px">98%</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">
+              <span style="font-family:var(--mono);font-size:20px;font-weight:700">₱373M</span>
+              <span style="font-size:11px;color:var(--text3)">/ ₱382M</span>
+            </div>
+            <div class="prog" style="height:6px;margin-top:6px"><div class="prog-fill" style="width:98%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
+            <div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px">98% · GM/Ton ₱6,550</div>
+          </div>
+          <div class="kpi kpi-sm" style="border-top:3px solid var(--green)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="kpi-label">Net Profit vs Budget</div>
+              <span class="badge b-green" style="font-size:10px">AHEAD</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">
+              <span style="font-family:var(--mono);font-size:20px;font-weight:700">₱24.6M</span>
+              <span style="font-size:11px;color:var(--text3)">/ ₱20.8M</span>
+            </div>
+            <div class="prog" style="height:6px;margin-top:6px"><div class="prog-fill" style="width:100%;background:linear-gradient(90deg,var(--green),var(--cyan))"></div></div>
+            <div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px">118% · exceeding budget</div>
+          </div>
+          <div class="kpi kpi-sm" style="border-top:3px solid var(--blue);cursor:pointer" onclick="navTo('pg-budget')">
+            <div class="kpi-label">FY26 Budget Target</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">
+              <span style="font-family:var(--mono);font-size:20px;font-weight:700">188K</span>
+              <span style="font-size:11px;color:var(--text3)">MT</span>
+            </div>
+            <div style="font-size:10px;color:var(--text2);margin-top:6px">₱5.97B sales · +37% vs FY25</div>
+            <div style="font-size:10px;color:var(--blue);font-weight:700;margin-top:2px">View full P&L →</div>
+          </div>
         </div>
 
         <!-- TOP ROW: Region table + BU Split + Top Customers -->
@@ -940,9 +991,8 @@ body{
               <div class="card-badge b-green">SAP · Live</div>
             </div>
             <div class="card-body" style="padding-top:8px">
-              <table class="tbl" id="home-region-tbl">
+              <table class="tbl">
                 <tr><th>Region</th><th class="num">Volume (MT)</th><th class="num">Net Sales</th><th class="num">vs PP</th><th class="num">GM/Ton</th><th class="num">DSO</th></tr>
-                <tbody id="home-region-tbody">
                 <tr>
                   <td style="font-weight:700">LUZON</td>
                   <td class="num">8,420</td><td class="num">₱294M</td>
@@ -969,7 +1019,6 @@ body{
                   <td class="num" style="font-weight:800">₱5,493</td>
                   <td class="num" style="font-weight:800"><span class="badge b-green">47d</span></td>
                 </tr>
-                </tbody>
               </table>
               <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
                 <span style="font-size:10px;color:var(--text4)">Shipping days: 15 of 22 (68%)</span>
@@ -1009,7 +1058,7 @@ body{
           <!-- Top Customers -->
           <div class="card">
             <div class="card-hdr"><div class="card-title">Top Customers · MTD</div></div>
-            <div class="card-body" style="padding:0" id="home-topcust">
+            <div class="card-body" style="padding:0">
               <div class="list-row" onclick="navTo('pg-custdetail')" style="padding:10px 16px">
                 <div class="rank rank-1">1</div>
                 <div style="flex:1"><div style="font-size:12px;font-weight:700">Metro Feeds Corp.</div><div style="font-size:10px;color:var(--text3)">CA-001 · Luzon</div></div>
@@ -1072,13 +1121,13 @@ body{
       <!-- ===== SALES ===== -->
       <div class="page" id="pg-sales">
         <!-- KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger" id="sales-kpi-row">
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-vol">14.2K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-vol-d">▲ 12.1%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-ytdvol">54.4K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-ytdvol-d">▲ 92.0%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="sk-sales">₱482M</div><div class="kpi-delta up" id="sk-sales-d">▲ 8.3%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed</div><div class="kpi-val" style="font-size:18px" id="sk-speed">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up" id="sk-speed-d">▲ 4.8%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg GM/Ton</div><div class="kpi-val" style="font-size:18px" id="sk-gmt">₱6,953</div><div class="kpi-delta up" id="sk-gmt-d">▲ 3.2%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:18px;color:var(--gold)" id="sk-pending">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src" id="sk-pending-sub">42 orders</div></div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Volume</div><div class="kpi-val" style="font-size:18px">14.2K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up">▲ 12.1%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Volume</div><div class="kpi-val" style="font-size:18px">54.4K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up">▲ 92.0%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px">₱482M</div><div class="kpi-delta up">▲ 8.3%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed</div><div class="kpi-val" style="font-size:18px">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up">▲ 4.8%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg GM/Ton</div><div class="kpi-val" style="font-size:18px">₱6,953</div><div class="kpi-delta up">▲ 3.2%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:18px;color:var(--gold)">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src">42 orders</div></div>
         </div>
 
         <!-- TOP ROW: Customer Rankings + Trend Chart + BU Split -->
@@ -1086,15 +1135,13 @@ body{
           <div class="card">
             <div class="card-hdr"><div class="card-title">Customer Rankings · MTD</div></div>
             <div class="card-body" style="padding-top:8px">
-              <table class="tbl" id="sales-rankings-tbl">
+              <table class="tbl">
                 <tr><th style="width:28px">#</th><th>Customer</th><th>Region</th><th class="num">Volume</th><th class="num">Net Sales</th><th class="num">GM/Ton</th></tr>
-                <tbody id="sales-rankings-tbody">
                 <tr><td><div class="rank rank-1">1</div></td><td style="font-weight:600">Metro Feeds Corp.</td><td style="color:var(--text3);font-size:11px">Metro Manila</td><td class="num">420 MT</td><td class="num">₱18.2M</td><td class="num">₱6,240</td></tr>
                 <tr><td><div class="rank rank-2">2</div></td><td style="font-weight:600">Cebu Agri Partners</td><td style="color:var(--text3);font-size:11px">Cebu North</td><td class="num">380 MT</td><td class="num">₱14.8M</td><td class="num">₱5,680</td></tr>
                 <tr><td><div class="rank rank-3">3</div></td><td style="font-weight:600">Davao Livestock Inc.</td><td style="color:var(--text3);font-size:11px">Davao</td><td class="num">310 MT</td><td class="num">₱12.1M</td><td class="num">₱5,120</td></tr>
                 <tr><td><div class="rank rank-n">4</div></td><td style="font-weight:600">Laguna Premium Feeds</td><td style="color:var(--text3);font-size:11px">Laguna</td><td class="num">280 MT</td><td class="num">₱10.5M</td><td class="num">₱5,840</td></tr>
                 <tr><td><div class="rank rank-n">5</div></td><td style="font-weight:600">Pampanga Agri Supply</td><td style="color:var(--text3);font-size:11px">Pampanga</td><td class="num">260 MT</td><td class="num">₱9.8M</td><td class="num">₱5,560</td></tr>
-                </tbody>
               </table>
             </div>
           </div>
@@ -1371,21 +1418,10 @@ body{
       <div class="page" id="pg-ar">
         <div class="grid-sidebar">
           <div>
-            <!-- Delinquent filter toggle -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--divider);border-radius:var(--r)">
-              <div>
-                <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px">View Mode</div>
-                <div style="font-size:10px;color:var(--text3);margin-top:2px" id="ar-mode-desc">Showing active accounts only (excludes delinquent + inactive)</div>
-              </div>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-                <span style="font-size:11px;font-weight:700;color:var(--text2)">Show delinquent</span>
-                <input type="checkbox" id="ar-show-delinq" onchange="loadAR()" style="width:16px;height:16px;accent-color:var(--gold)">
-              </label>
-            </div>
             <div class="grid-3 stagger" style="margin-bottom:16px">
-              <div class="kpi" style="text-align:center"><div class="kpi-label">Active AR</div><div class="kpi-val" id="ar-total">₱764M</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="ar-total-sub">Active customers only</div></div>
-              <div class="kpi" style="text-align:center"><div class="kpi-label">Clients</div><div class="kpi-val" id="ar-clients">710</div></div>
-              <div class="kpi" style="text-align:center;border-left:3px solid var(--red)"><div class="kpi-label" style="color:var(--red)">Delinquent AR</div><div class="kpi-val" style="color:var(--red)" id="ar-delinq">₱0</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="ar-delinq-sub">0 customers frozen</div></div>
+              <div class="kpi" style="text-align:center"><div class="kpi-label">Total AR</div><div class="kpi-val">₱764M</div></div>
+              <div class="kpi" style="text-align:center"><div class="kpi-label">Clients</div><div class="kpi-val">710</div></div>
+              <div class="kpi" style="text-align:center"><div class="kpi-label">Over Limit</div><div class="kpi-val" style="color:var(--red)">25</div></div>
             </div>
             <div class="card" style="margin-bottom:16px">
               <div class="card-hdr"><div class="card-title">AR Aging</div></div>
@@ -1418,7 +1454,7 @@ body{
             </div>
           </div>
           <div>
-            <div class="dso-wrap"><div class="dso-gauge"><div class="dso-ring" id="ar-dso-ring"></div><div class="val" style="color:var(--green)" id="ar-dso-val">47</div><div class="lbl">DAYS DSO</div><div class="status" style="color:var(--green)" id="ar-dso-status">HEALTHY</div></div></div>
+            <div class="dso-wrap"><div class="dso-gauge"><div class="dso-ring"></div><div class="val" style="color:var(--green)">47</div><div class="lbl">DAYS DSO</div><div class="status" style="color:var(--green)">HEALTHY</div></div></div>
             <div style="text-align:center;font-size:10px;color:var(--text3);margin-bottom:16px">▼ 3 days vs prior month · Target: &lt;55 days</div>
             <div class="card">
               <div class="card-hdr"><div class="card-title">Collections · MTD</div><div class="card-badge b-green" style="font-family:var(--mono)">₱312M</div></div>
@@ -1585,8 +1621,8 @@ body{
               <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Days In Month</div><div style="font-family:var(--mono);font-size:24px;font-weight:700">26</div></div>
             </div>
             <div style="display:flex;gap:20px">
-              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Shipping Days</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue)" id="sp-elapsed">10</div></div>
-              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Remaining</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold)" id="sp-remain">16</div></div>
+              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Shipping Days</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue)">10</div></div>
+              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Remaining</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold)">16</div></div>
             </div>
           </div>
           <!-- As of -->
@@ -1597,13 +1633,13 @@ body{
           <!-- Avg Pullout -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
             <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Pullout</div>
-            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-pullout">602</div>
+            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px">602</div>
             <div style="font-size:11px;font-weight:700;color:var(--red)">↓ -0.2%</div>
           </div>
           <!-- Avg Speed -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
             <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Speed</div>
-            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">15,649</div>
+            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px">15,649</div>
             <div style="font-size:11px;font-weight:700;color:var(--red)">↓ -0.2%</div>
           </div>
           <!-- Mini speed sparkline area -->
@@ -1621,12 +1657,12 @@ body{
 
         <!-- KPI ROW -->
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Today</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="spk-today">712</div><div class="kpi-src">MT shipped</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Total</div><div class="kpi-val" style="font-size:20px" id="spk-mtd">6,019</div><div class="kpi-src">MT</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Avg</div><div class="kpi-val" style="font-size:20px" id="spk-avg">602</div><div class="kpi-src">MT/day</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Projected</div><div class="kpi-val" style="font-size:20px" id="spk-proj">15.6K</div><div class="kpi-src">MT this month</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">vs Last Month</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="spk-vslm">-16.8%</div><div class="kpi-src">volume</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Speed vs LM</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="spk-speedlm">-0.2%</div><div class="kpi-src">avg speed</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Today</div><div class="kpi-val" style="font-size:20px;color:var(--green)">712</div><div class="kpi-src">MT shipped</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Total</div><div class="kpi-val" style="font-size:20px">6,019</div><div class="kpi-src">MT</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Avg</div><div class="kpi-val" style="font-size:20px">602</div><div class="kpi-src">MT/day</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Projected</div><div class="kpi-val" style="font-size:20px">15.6K</div><div class="kpi-src">MT this month</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">vs Last Month</div><div class="kpi-val" style="font-size:20px;color:var(--red)">-16.8%</div><div class="kpi-src">volume</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Speed vs LM</div><div class="kpi-val" style="font-size:20px;color:var(--red)">-0.2%</div><div class="kpi-src">avg speed</div></div>
         </div>
 
         <!-- CHART + MATRICES ROW -->
@@ -1731,20 +1767,17 @@ body{
       <!-- ===== CUSTOMERS ===== -->
       <div class="page" id="pg-customers">
         <div class="filter-bar">
-          <button class="filter-chip active" onclick="fltCust('ALL',this)">All</button>
-          <button class="filter-chip" onclick="fltCust('Luzon',this)">Luzon</button>
-          <button class="filter-chip" onclick="fltCust('Visayas',this)">Visayas</button>
-          <button class="filter-chip" onclick="fltCust('Mindanao',this)">Mindanao</button>
+          <button class="filter-chip active">All (710)</button>
+          <button class="filter-chip">Luzon</button>
+          <button class="filter-chip">Visayas</button>
+          <button class="filter-chip">Mindanao</button>
           <div style="flex:1"></div>
           <span style="font-size:10px;color:var(--text4);display:flex;align-items:center">Sort: Sales ▼</span>
         </div>
         <div class="card">
           <div class="card-body" style="padding-top:8px">
             <table class="tbl" id="cust-tbl">
-              <thead>
               <tr><th>#</th><th>Customer</th><th>Code</th><th>Region</th><th>BU</th><th class="num">Volume</th><th class="num">Net Sales</th><th class="num">GM/Ton</th></tr>
-              </thead>
-              <tbody id="cust-tbody">
               <tr style="cursor:pointer" onclick="navTo('pg-custdetail')"><td><div class="rank rank-1">1</div></td><td style="font-weight:700">Metro Feeds Corp.</td><td style="color:var(--text3)">CA-001</td><td>Luzon</td><td style="font-size:11px;color:var(--text3)">Distribution</td><td class="num">420 MT</td><td class="num">₱18.2M</td><td class="num">₱6,240</td></tr>
               <tr><td><div class="rank rank-2">2</div></td><td style="font-weight:700">Cebu Agri Partners</td><td style="color:var(--text3)">CA-015</td><td>Visayas</td><td style="font-size:11px;color:var(--text3)">Distribution</td><td class="num">380 MT</td><td class="num">₱14.8M</td><td class="num">₱5,680</td></tr>
               <tr><td><div class="rank rank-3">3</div></td><td style="font-weight:700">Davao Livestock Inc.</td><td style="color:var(--text3)">CA-023</td><td>Mindanao</td><td style="font-size:11px;color:var(--text3)">Key Accounts</td><td class="num">310 MT</td><td class="num">₱12.1M</td><td class="num">₱5,120</td></tr>
@@ -1753,7 +1786,6 @@ body{
               <tr><td><div class="rank rank-n">6</div></td><td style="font-weight:700">Iloilo Feed Center</td><td style="color:var(--text3)">CA-028</td><td>Visayas</td><td style="font-size:11px;color:var(--text3)">Distribution</td><td class="num">195 MT</td><td class="num">₱7.4M</td><td class="num">₱5,420</td></tr>
               <tr><td><div class="rank rank-n">7</div></td><td style="font-weight:700">Bukidnon Farms Trading</td><td style="color:var(--text3)">CA-031</td><td>Mindanao</td><td style="font-size:11px;color:var(--text3)">Key Accounts</td><td class="num">180 MT</td><td class="num">₱6.8M</td><td class="num" style="color:var(--red)">-₱1,167</td></tr>
               <tr><td><div class="rank rank-n">8</div></td><td style="font-weight:700">Cavite Premium Store</td><td style="color:var(--text3)">CA-009</td><td>Luzon</td><td style="font-size:11px;color:var(--text3)">Pet Care</td><td class="num">140 MT</td><td class="num">₱5.2M</td><td class="num">₱7,280</td></tr>
-              </tbody>
             </table>
           </div>
         </div>
@@ -2052,7 +2084,6 @@ body{
       </div>
 
       <!-- ===== MARGIN ALERTS ===== -->
-      <!-- WIRED: /api/margin endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
       <div class="page" id="pg-margin">
 
         <!-- HERO ALERT BANNER -->
@@ -2256,7 +2287,6 @@ body{
 
 
       <!-- ===== INSIGHTS ===== -->
-      <!-- WIRED: /api/intelligence endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
       <div class="page" id="pg-insights">
 
         <!-- HERO -->
@@ -2476,7 +2506,6 @@ body{
       </div>
 
       <!-- ===== TEAM ===== -->
-      <!-- WIRED: /api/team endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
       <div class="page" id="pg-team">
 
         <!-- EVP HERO -->
@@ -2711,7 +2740,6 @@ body{
       </div>
 
       <!-- ===== BUDGET & P&L ===== -->
-      <!-- WIRED: /api/budget endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
       <div class="page" id="pg-budget">
         <!-- Hero -->
         <div style="background:linear-gradient(135deg,rgba(0,59,82,0.5),rgba(6,11,20,0.9));border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:24px 28px;margin-bottom:16px;position:relative;overflow:hidden">
@@ -2849,716 +2877,78 @@ body{
   </div><!-- /main -->
 </div><!-- /shell -->
 
-<script src="js/supabase.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/api.js"></script>
 <script>
-/* ===== AUTH GATE ===== */
-var S = requireAuth();
-if (S) { console.log('VieForce HQ session:', S.name, S.role, S.id); initApp(S); }
-else { console.error('No valid session — redirecting to login'); }
-
-/* ===== STATE ===== */
-var PD = 'MTD', RG = 'ALL', PG = 'pg-home', CX = {}, CH = {}, UT = 'MT', DC = {};
-
-/* ===== INIT ===== */
-function initApp(s) {
-  var ini = s.name ? s.name.split(' ').map(function(w){return w[0]}).join('').substring(0,2).toUpperCase() : '--';
-  document.getElementById('sidebar-name').textContent = s.name || 'Unknown';
-  document.getElementById('sidebar-role').textContent = (s.role || '').toUpperCase() + (s.region ? ' · ' + s.region : ' · National');
-  document.getElementById('sidebar-avatar').textContent = ini;
-  // Restore theme
-  var saved = localStorage.getItem('vf_theme');
-  if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
-  loadPage('pg-home');
-  // Auto-refresh every 60s
-  setInterval(function(){ DC = {}; loadPage(PG); }, 60000);
-}
-
-/* ===== FMT ===== */
-function fc(n){if(n==null||isNaN(n))return'₱0';n=+n;if(Math.abs(n)>=1e6)return'₱'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return'₱'+(n/1e3).toFixed(0)+'K';return'₱'+n.toFixed(0)}
-function fn(n){if(n==null||isNaN(n))return'0';n=+n;if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString('en-US',{maximumFractionDigits:0})}
-function fp(n){return n==null?'--':(+n).toFixed(1)+'%'}
-function rc(i){return i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-n'}
-function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
-function fdt(d){if(!d)return'--';return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}
-function fv(mt,bags){return UT==='MT'?fn(mt)+' MT':fn(bags)+' bags'}
-function fvu(mt,bags){return UT==='MT'?fn(mt):fn(bags)}
-function fvl(){return UT==='MT'?'MT':'bags'}
-
-/* ===== DOM HELPERS ===== */
-function fd(pct){if(pct==null||isNaN(pct))return'';var s=fp(Math.abs(pct));return pct>=0?'▲ '+s:'▼ '+s}
-function dc(pct){return pct>=0?'up':'down'}
-function fcn(n){if(n==null||isNaN(n))return'0';n=+n;return n.toLocaleString('en-US',{maximumFractionDigits:0})}
-function sel(id){return document.getElementById(id)}
-function sett(id,v){var el=sel(id);if(el)el.textContent=v;else console.warn('[DOM] Missing #'+id)}
-function seth(id,v){var el=sel(id);if(el)el.innerHTML=v;else console.warn('[DOM] Missing #'+id)}
-function showError(pgId,msg){
-  var pg=sel(pgId);if(!pg)return;
-  var existing=pg.querySelector('.api-error-banner');if(existing)existing.remove();
-  var banner=document.createElement('div');
-  banner.className='api-error-banner';
-  banner.style.cssText='padding:8px 16px;margin-bottom:12px;border-radius:8px;font-size:11px;font-weight:600;background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.12)';
-  banner.textContent='⚠ '+msg+' — showing cached values';
-  pg.insertBefore(banner,pg.firstChild);
-}
-function clearError(pgId){var pg=sel(pgId);if(!pg)return;var b=pg.querySelector('.api-error-banner');if(b)b.remove()}
-
-/* ===== NAV ===== */
-var pageTitles = {
+// ===== NAV =====
+const pageTitles = {
   'pg-home':['Dashboard','National Overview'],
   'pg-sales':['Sales','Rankings & Trends'],
   'pg-ar':['Accounts Receivable','National · Live'],
   'pg-inv':['Inventory','OITW · All Plants'],
   'pg-speed':['Speed Monitor','ODLN · Daily Pullout'],
-  'pg-customers':['Customers','OCRD'],
-  'pg-custdetail':['Customer Detail',''],
-  'pg-margin':['Margin Alerts','YTD'],
+  'pg-customers':['Customers','710 accounts · OCRD'],
+  'pg-custdetail':['Customer Detail','Metro Feeds Corp.'],
+  'pg-margin':['Margin Alerts','YTD · 22 accounts flagged'],
   'pg-insights':['Customer Intelligence','Buying Patterns · Whitespace · Growth Vectors'],
   'pg-team':['Sales Team','Org Scorecard · YTD vs Budget'],
   'pg-budget':['Budget & P&L','FY 2026 · vs Actual'],
 };
 
 function navTo(id, navItem){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(navItem){
-    document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     navItem.classList.add('active');
   } else {
-    document.querySelectorAll('.nav-item').forEach(function(n){
-      var onclick = n.getAttribute('onclick');
+    document.querySelectorAll('.nav-item').forEach(n=>{
+      // match by checking onclick
+      const onclick = n.getAttribute('onclick');
       if(onclick && onclick.includes(id)){
-        document.querySelectorAll('.nav-item').forEach(function(x){x.classList.remove('active')});
+        document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
         n.classList.add('active');
       }
     });
   }
-  var titles = pageTitles[id] || ['',''];
+  const titles = pageTitles[id] || ['',''];
   document.getElementById('topbar-title').textContent = titles[0];
   document.getElementById('topbar-sub').textContent = titles[1];
   document.querySelector('.content').scrollTop = 0;
-  PG = id;
-  loadPage(id);
+  initCharts(id);
 }
 
+function loginAs(role){
+  document.getElementById('login-overlay').classList.add('hidden');
+  const map = {
+    ceo:{name:'Mathieu Guillaume',role:'CEO · National',initials:'MG'},
+    evp:{name:'Joel Durano',role:'EVP Sales · National',initials:'JD'},
+    rsm:{name:'Mart Talion',role:'RSM · Luzon',initials:'MT'},
+    dsm:{name:'Jefrey Florentino',role:'DSM · Metro Manila',initials:'JF'}
+  };
+  const u = map[role];
+  document.getElementById('sidebar-name').textContent = u.name;
+  document.getElementById('sidebar-role').textContent = u.role;
+  document.getElementById('sidebar-avatar').textContent = u.initials;
+  if(role === 'dsm'){
+    const gm = document.getElementById('kpi-gm');
+    gm.style.opacity = '0.3';
+    gm.innerHTML = '<div class="kpi-label">Gross Margin</div><div class="kpi-val" style="font-size:18px;color:var(--text3)">—</div><div class="kpi-src">Hidden for DSM</div>';
+  }
+  navTo('pg-home');
+}
+
+function logout(){document.getElementById('login-overlay').classList.remove('hidden')}
+
 function toggleSidebar(){
-  var sb = document.getElementById('sidebar');
-  var btn = document.getElementById('collapse-btn');
+  const sb = document.getElementById('sidebar');
+  const btn = document.getElementById('collapse-btn');
   sb.classList.toggle('collapsed');
   btn.textContent = sb.classList.contains('collapsed') ? '›' : '‹';
 }
 
-function setPd(el){
-  el.parentElement.querySelectorAll('.tb-chip').forEach(function(c){c.classList.remove('active')});
-  el.classList.add('active');
-  PD = el.textContent.trim();
-  DC = {};
-  loadPage(PG);
-}
-function setCmp(el){el.parentElement.querySelectorAll('.tb-compare-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
-function setU(el){el.parentElement.querySelectorAll('.tb-toggle-btn').forEach(function(c){c.classList.remove('active')});el.classList.add('active');UT=el.textContent.trim()}
-function setF(el){el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
-function doSearch(){var q=document.getElementById('global-search').value.trim();if(q){navTo('pg-customers');loadCust(q)}}
-
-/* ===== LOAD ROUTER ===== */
-function loadPage(id){
-  switch(id){
-    case 'pg-home': loadHome(); break;
-    case 'pg-sales': loadSales(); break;
-    case 'pg-ar': loadAR(); break;
-    case 'pg-inv': loadInv(); break;
-    case 'pg-speed': loadSpeed(); break;
-    case 'pg-customers': loadCust(); break;
-    case 'pg-margin': loadMargin(); break;
-    case 'pg-insights': loadIntelligence(); break;
-    case 'pg-team': loadTeam(); break;
-    case 'pg-budget': loadBudget(); break;
-  }
-  initCharts(id);
-}
-
-/* ===== HOME — wired to /api/dashboard + /api/sales + /api/ar + /api/speed ===== */
-async function loadHome(){
-  clearError('pg-home');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-home']){
-      var results = await Promise.all([
-        getDashboardData({period:PD,region:RG}).catch(function(e){console.error('dashboard:',e);return null}),
-        getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null}),
-        getARData().catch(function(e){console.error('ar:',e);return null}),
-        getSpeedData({period:PD}).catch(function(e){console.error('speed:',e);return null})
-      ]);
-      DC['pg-home'] = {d:results[0], sl:results[1], ar:results[2], sp:results[3]};
-    }
-    var c=DC['pg-home']||{};
-    var d=c.d||null, sl=c.sl||null, ar=c.ar||null, sp=c.sp||null;
-    if(!d && !sl && !ar && !sp){showError('pg-home','Unable to load live data');return}
-    console.log('[HOME] Rendering:', {d:!!d, sl:!!sl, ar:!!ar, sp:!!sp});
-    // KPI row — enriched cards (MTD value + delta + divider + YTD/Budget + progress)
-    function statusClass(pct){ return pct>=95?'ok' : pct>=80?'warn' : 'bad'; }
-    function barColor(pct){ return pct>=95?'var(--green)' : pct>=80?'var(--gold)' : 'var(--red)'; }
-    function setCard(prefix, mtd, deltaPct, ytdActual, ytdBudget, formatFn){
-      var pct = ytdBudget>0 ? Math.round((ytdActual/ytdBudget)*100) : 0;
-      if(mtd!=null) seth('hk-'+prefix, formatFn(mtd));
-      if(deltaPct!=null){
-        var arrow = deltaPct>=0 ? '▲' : '▼';
-        var cls   = deltaPct>=0 ? 'up' : 'down';
-        var el = sel('hk-'+prefix+'-d');
-        if(el){ el.className='kpi-delta '+cls; el.textContent=arrow+' '+Math.abs(deltaPct).toFixed(1)+'%'; }
-      }
-      if(ytdActual!=null) sett('hk-'+prefix+'-ytd', formatFn(ytdActual));
-      if(ytdBudget!=null) sett('hk-'+prefix+'-ytd-bud','/ '+formatFn(ytdBudget));
-      var bar = sel('hk-'+prefix+'-bar');
-      if(bar){ bar.style.width = Math.min(pct,100)+'%'; bar.style.background = barColor(pct); }
-      var st = sel('hk-'+prefix+'-pct');
-      if(st){ st.className='kpi-enr-status '+statusClass(pct); st.textContent=pct+'% YTD'; }
-    }
-    if(d){
-      var dp = d.delta_pct || {};
-      var ytd = d.ytd || {};
-      var bud = d.budget || {};
-      // 1-4: Sales / Volume / GM / GM-per-Ton
-      setCard('sales', d.revenue,      dp.revenue,      ytd.revenue,      bud.ytd_sales,  fc);
-      setCard('vol',   d.volume_mt,    dp.volume_mt,    ytd.volume_mt,    bud.ytd_mt,     fn);
-      setCard('gm',    d.gross_margin, dp.gross_margin, ytd.gross_margin, bud.ytd_gm,     fc);
-      // GM/Ton: no YTD budget — compare to YTD actual (show 100%)
-      var gmtFmt = function(n){ return '₱'+fcn(Math.round(n)); };
-      setCard('gmt',   d.gmt,          dp.gmt,          ytd.gmt,          ytd.gmt,        gmtFmt);
-      sett('hk-gmt-ytd-bud','YTD avg');
-
-      // Pending PO
-      if(d.pending_po){
-        var pp=d.pending_po;
-        if(pp.total_mt!=null) seth('hk-pending',fcn(Math.round(pp.total_mt))+'<span style="font-size:11px;color:var(--text3)"> MT</span>');
-        sett('hk-pending-sub',(pp.total_value?fc(pp.total_value):'')+(pp.total_orders?' · '+pp.total_orders+' orders':''));
-        if(pp.oldest_days!=null){
-          sett('hk-pending-oldest', pp.oldest_days+'d ago');
-          // Health bar: >14d is concerning — invert fill (bigger = worse)
-          var pbar = sel('hk-pending-bar');
-          if(pbar){
-            var pct = Math.min(100, pp.oldest_days*5); // 20d = 100%
-            pbar.style.width = pct+'%';
-            pbar.style.background = pp.oldest_days>14 ? 'var(--red)' : pp.oldest_days>7 ? 'var(--gold)' : 'var(--green)';
-          }
-          var pstatus = sel('hk-pending-status');
-          if(pstatus){
-            pstatus.textContent = pp.oldest_days>14 ? 'Review stale POs' : pp.oldest_days>7 ? 'Watching' : 'Fresh pipeline';
-            pstatus.style.color = pp.oldest_days>14 ? 'var(--red)' : pp.oldest_days>7 ? 'var(--gold)' : 'var(--green)';
-          }
-        }
-      }
-      // Margin alert strip
-      if(d.margin_alerts){
-        var ma=d.margin_alerts;
-        if(ma.critical!=null) sett('hm-critical','● '+ma.critical+' Critical Margins');
-        if(ma.warning!=null) sett('hm-warning','● '+ma.warning+' Warning');
-        if(ma.watch!=null) sett('hm-watch','● '+ma.watch+' Watch');
-        if(ma.growing!=null) sett('hm-growing','● '+ma.growing+' Growing');
-        else if(ma.healthy!=null) sett('hm-growing','● '+ma.healthy+' Healthy');
-      }
-      // Region performance table
-      if(d.region_performance && d.region_performance.length){
-        var rhtml='';var totV=0,totS=0;
-        d.region_performance.forEach(function(r){
-          var dsoBadge=r.dso<50?'b-green':r.dso<55?'b-gold':'b-red';
-          rhtml+='<tr><td style="font-weight:700">'+esc(r.region||r.name||'').toUpperCase()+'</td>';
-          rhtml+='<td class="num">'+fcn(Math.round(r.vol||r.volume_mt||0))+'</td>';
-          rhtml+='<td class="num">'+fc(r.sales||r.revenue||0)+'</td>';
-          rhtml+='<td class="num '+(r.vs_pp>=0?'up':'down')+'">'+(r.vs_pp!=null?(r.vs_pp>=0?'+':'')+r.vs_pp.toFixed(1)+'%':'--')+'</td>';
-          rhtml+='<td class="num">₱'+fcn(Math.round(r.gm_ton||r.gmt||0))+'</td>';
-          rhtml+='<td class="num"><span class="badge '+dsoBadge+'">'+(r.dso?Math.round(r.dso)+'d':'--')+'</span></td></tr>';
-          totV+=(r.vol||r.volume_mt||0);totS+=(r.sales||r.revenue||0);
-        });
-        rhtml+='<tr class="total"><td style="font-weight:800">NATIONAL</td><td class="num" style="font-weight:800">'+fcn(Math.round(totV))+'</td>';
-        rhtml+='<td class="num" style="font-weight:800">'+fc(totS)+'</td><td class="num"></td>';
-        rhtml+='<td class="num" style="font-weight:800">₱'+fcn(Math.round(d.gmt||0))+'</td>';
-        rhtml+='<td class="num" style="font-weight:800"><span class="badge b-green">'+(d.dso?Math.round(d.dso)+'d':'47d')+'</span></td></tr>';
-        seth('home-region-tbody',rhtml);
-      }
-      // Top customers
-      if(d.top_customers && d.top_customers.length){
-        var tchtml='';
-        d.top_customers.slice(0,5).forEach(function(c,i){
-          tchtml+='<div class="list-row" onclick="openCust(\''+esc(c.code||c.customer_code||'')+'\')" style="padding:10px 16px;cursor:pointer">';
-          tchtml+='<div class="rank '+rc(i)+'">'+(i+1)+'</div>';
-          tchtml+='<div style="flex:1"><div style="font-size:12px;font-weight:700">'+esc(c.name||c.customer_name||'')+'</div>';
-          tchtml+='<div style="font-size:10px;color:var(--text3)">'+esc(c.code||c.customer_code||'')+'</div></div>';
-          tchtml+='<div style="text-align:right"><div style="font-family:var(--mono);font-size:13px;font-weight:700">'+fc(c.revenue||c.sales||0)+'</div>';
-          tchtml+='<div style="font-size:9px;color:var(--text3)">'+fcn(Math.round(c.vol||c.volume_mt||0))+' MT</div></div></div>';
-        });
-        seth('home-topcust',tchtml);
-      }
-    }
-    // DSO card — prefer dashboard's dso_active, fall back to /api/ar
-    var dsoActive = (d && d.dso_active!=null) ? d.dso_active : (ar && ar.dso_active!=null ? ar.dso_active : (ar && ar.dso!=null ? ar.dso : null));
-    var dsoTotal  = (d && d.dso_total!=null)  ? d.dso_total  : (ar && ar.dso_total!=null  ? ar.dso_total  : null);
-    if(dsoActive!=null){
-      seth('hk-dso', Math.round(dsoActive)+'<span style="font-size:13px;color:var(--text3)">d</span>');
-      var under = dsoActive <= 45;
-      var dsoBar = sel('hk-dso-bar');
-      if(dsoBar){
-        // Target ≤45d. Fill: 100% if ≤target, scaled down as DSO grows above
-        var fillPct = under ? 100 : Math.max(20, Math.round(45/dsoActive*100));
-        dsoBar.style.width = fillPct+'%';
-        dsoBar.style.background = under ? 'var(--green)' : 'var(--red)';
-      }
-      var dsoStatus = sel('hk-dso-pct');
-      if(dsoStatus){
-        dsoStatus.className = 'kpi-enr-status '+(under?'ok':'bad');
-        dsoStatus.textContent = under ? 'On target' : (Math.round(dsoActive-45)+'d over target');
-      }
-    }
-    // Delinquent gap badge
-    if(dsoActive!=null && dsoTotal!=null && (dsoTotal - dsoActive) >= 10){
-      var badge = sel('hk-dso-badge');
-      if(badge){ badge.style.display=''; badge.textContent = '+'+Math.round(dsoTotal-dsoActive)+'d from delinquent accounts'; }
-    }
-
-    // Daily Pullout — shipping days context
-    if(sp){
-      var dpVal = sp.daily_pullout!=null ? sp.daily_pullout : sp.speed_per_day;
-      if(dpVal!=null) seth('hk-speed', fcn(Math.round(dpVal))+'<span style="font-size:11px;color:var(--text3)"> MT/d</span>');
-      var elapsed = sp.days_elapsed!=null ? sp.days_elapsed : sp.elapsed_days;
-      var total   = sp.days_total!=null   ? sp.days_total   : sp.total_days;
-      var remain  = sp.days_remaining!=null ? sp.days_remaining : sp.remaining_days;
-      if(elapsed!=null && total!=null){
-        sett('hk-speed-days', elapsed+' of '+total);
-        var dayPct = total>0 ? Math.round((elapsed/total)*100) : 0;
-        var spBar = sel('hk-speed-bar');
-        if(spBar){ spBar.style.width = dayPct+'%'; spBar.style.background='var(--blue)'; }
-        var spStatus = sel('hk-speed-pct');
-        if(spStatus){
-          spStatus.textContent = (remain!=null?remain:(total-elapsed))+' days remaining';
-          spStatus.style.color = 'var(--text3)';
-        }
-      }
-    }
-  } catch(e) { console.error('Home:', e); showError('pg-home','Unable to load live data'); }
-}
-
-/* ===== SALES — wired to /api/sales ===== */
-async function loadSales(){
-  clearError('pg-sales');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-sales']){
-      DC['pg-sales'] = await getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null});
-    }
-    var d = DC['pg-sales'];
-    if(!d){showError('pg-sales','Unable to load sales data');return}
-    console.log('[SALES] Rendering:', Object.keys(d));
-    // KPIs
-    if(d.volume_mt!=null) seth('sk-vol',fn(d.volume_mt)+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-    if(d.ytd_volume_mt!=null) seth('sk-ytdvol',fn(d.ytd_volume_mt)+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-    if(d.revenue!=null) sett('sk-sales',fc(d.revenue));
-    if(d.gmt!=null) sett('sk-gmt','₱'+fcn(Math.round(d.gmt)));
-    // Pending PO
-    if(d.pending_po && d.pending_po.summary){
-      var ps=d.pending_po.summary;
-      if(ps.total_mt!=null) seth('sk-pending',fcn(Math.round(ps.total_mt))+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-      if(ps.total_orders!=null) sett('sk-pending-sub',ps.total_orders+' orders');
-    }
-    // Customer rankings
-    if(d.top_customers && d.top_customers.length){
-      var html='';
-      d.top_customers.slice(0,10).forEach(function(c,i){
-        html+='<tr style="cursor:pointer" onclick="openCust(\''+esc(c.customer_code||'')+'\')">';
-        html+='<td><div class="rank '+rc(i)+'">'+(i+1)+'</div></td>';
-        html+='<td style="font-weight:600">'+esc(c.customer_name||'')+'</td>';
-        html+='<td style="color:var(--text3);font-size:11px">'+esc(c.region||c.City||'')+'</td>';
-        html+='<td class="num">'+fcn(Math.round(c.volume_mt||0))+' MT</td>';
-        html+='<td class="num">'+fc(c.revenue||0)+'</td>';
-        html+='<td class="num">'+(c.gmt?'₱'+fcn(Math.round(c.gmt)):'--')+'</td></tr>';
-      });
-      seth('sales-rankings-tbody',html);
-    }
-    // Monthly trend chart update
-    if(d.monthly_trend && d.monthly_trend.length && charts.salesTrendChart){
-      // Not available directly — chart uses hardcoded region split. Log for Agent 4.
-      console.warn('[SALES] monthly_trend available but chart expects region-split data. Keeping prototype chart.');
-    }
-  } catch(e) { console.error('Sales:', e); showError('pg-sales','Unable to load sales data'); }
-}
-
-/* ===== AR — wired to /api/ar ===== */
-async function loadAR(){
-  clearError('pg-ar');
-  try {
-    var d = await getARData();
-    if(!d){showError('pg-ar','Unable to load AR data');return}
-    console.log('[AR] Rendering:', Object.keys(d));
-    var showDelinq = !!(sel('ar-show-delinq') && sel('ar-show-delinq').checked);
-    var modeDesc = sel('ar-mode-desc');
-    if(modeDesc) modeDesc.textContent = showDelinq
-      ? 'Showing ALL accounts (active + delinquent + inactive)'
-      : 'Showing active accounts only (excludes delinquent + inactive)';
-
-    // Active vs Total AR
-    var activeBal = d.active_balance!=null ? d.active_balance : d.total_balance;
-    var totalBal  = d.total_balance!=null  ? d.total_balance  : activeBal;
-    var delinqBal = d.delinquent_balance!=null ? d.delinquent_balance : 0;
-    var delinqCust = d.delinquent_customer_count || 0;
-    var activeCust = d.active_customer_count || 0;
-
-    sett('ar-total', fc(showDelinq ? totalBal : activeBal));
-    sett('ar-total-sub', showDelinq ? 'All accounts' : 'Active customers only');
-    sett('ar-clients', (showDelinq ? (activeCust+delinqCust) : activeCust).toString());
-    sett('ar-delinq', fc(delinqBal));
-    sett('ar-delinq-sub', delinqCust+' customer'+(delinqCust===1?'':'s')+' frozen');
-
-    // DSO — prefer active; if toggle ON show total
-    var dsoVal = showDelinq ? (d.dso_total!=null?d.dso_total:d.dso) : (d.dso_active!=null?d.dso_active:d.dso);
-    if(dsoVal!=null){
-      var dv=Math.round(dsoVal);
-      sett('ar-dso-val',dv.toString());
-      var el=sel('ar-dso-val');
-      var st=sel('ar-dso-status');
-      if(dv<=50){if(el)el.style.color='var(--green)';if(st){st.textContent='HEALTHY';st.style.color='var(--green)'}}
-      else if(dv<=65){if(el)el.style.color='var(--gold)';if(st){st.textContent='CAUTION';st.style.color='var(--gold)'}}
-      else{if(el)el.style.color='var(--red)';if(st){st.textContent='HIGH';st.style.color='var(--red)'}}
-      var ring=sel('ar-dso-ring');
-      if(ring){var deg=Math.min(dv/90*360,360);ring.style.background='conic-gradient(var(--green) 0deg, var(--green) '+deg+'deg, var(--divider) '+deg+'deg)'}
-    }
-  } catch(e) { console.error('AR:', e); showError('pg-ar','Unable to load AR data'); }
-}
-
-/* ===== INVENTORY — wired to /api/inventory ===== */
-async function loadInv(){
-  clearError('pg-inv');
-  try {
-    var d = await getInventoryData({plant:'ALL'});
-    if(!d){showError('pg-inv','Unable to load inventory data');return}
-    console.log('[INV] Rendering:', Object.keys(d));
-    // INV KPIs — look for summary fields
-    if(d.summary){
-      var s=d.summary;
-      var kpis=document.querySelectorAll('#pg-inv .kpi-val');
-      if(kpis[0] && s.on_floor!=null) kpis[0].textContent=fcn(Math.round(s.on_floor));
-      if(kpis[1] && s.pending_po!=null) kpis[1].textContent=fcn(Math.round(s.pending_po));
-      if(kpis[2] && s.on_production!=null) kpis[2].textContent=fcn(Math.round(s.on_production));
-      if(kpis[3] && s.available!=null) kpis[3].textContent=fcn(Math.round(s.available));
-      if(kpis[4] && s.cover_days!=null) kpis[4].innerHTML=s.cover_days.toFixed(1)+'<span style="font-size:10px;color:var(--text3)"> d</span>';
-      if(kpis[5] && s.negative_avail_count!=null) kpis[5].textContent=s.negative_avail_count.toString();
-    }
-    // If plants array returned, update the By Plant table
-    if(d.plants && d.plants.length){
-      console.log('[INV] '+d.plants.length+' plants received — prototype tables show detailed data, keeping layout');
-    }
-    // By Region
-    if(d.by_region && d.by_region.length){
-      console.log('[INV] '+d.by_region.length+' regions received');
-    }
-  } catch(e) { console.error('Inv:', e); showError('pg-inv','Unable to load inventory data'); }
-}
-
-/* ===== SPEED — wired to /api/speed ===== */
-async function loadSpeed(){
-  clearError('pg-speed');
-  try {
-    var d = await getSpeedData({period:PD});
-    if(!d){showError('pg-speed','Unable to load speed data');return}
-    console.log('[SPEED] Rendering:', Object.keys(d));
-    // Hero banner
-    if(d.elapsed_days!=null) sett('sp-elapsed',d.elapsed_days.toString());
-    if(d.remaining_days!=null) sett('sp-remain',d.remaining_days.toString());
-    if(d.speed_per_day!=null) sett('sp-pullout',fcn(Math.round(d.speed_per_day)));
-    if(d.projected_mt!=null) sett('sp-avgspeed',fcn(Math.round(d.projected_mt)));
-    // KPI row
-    if(d.daily && d.daily.length){
-      var today=d.daily[d.daily.length-1];
-      if(today) sett('spk-today',fcn(Math.round(today.daily_mt||0)));
-    }
-    if(d.actual_mt!=null) sett('spk-mtd',fcn(Math.round(d.actual_mt)));
-    if(d.speed_per_day!=null) sett('spk-avg',fcn(Math.round(d.speed_per_day)));
-    if(d.projected_mt!=null) sett('spk-proj',fn(d.projected_mt));
-    // Chart update
-    if(d.daily && d.daily.length && charts.speed){
-      var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
-      var vals=d.daily.map(function(x){return Math.round(x.daily_mt||0)});
-      charts.speed.data.labels=labels;
-      charts.speed.data.datasets[0].data=vals;
-      charts.speed.data.datasets[0].backgroundColor=vals.map(function(v){return v===0?'rgba(255,255,255,0.02)':v>700?'rgba(151,215,0,0.45)':'rgba(0,174,239,0.35)'});
-      charts.speed.data.datasets[0].hoverBackgroundColor=vals.map(function(v){return v===0?'rgba(255,255,255,0.04)':v>700?'rgba(151,215,0,0.7)':'rgba(0,174,239,0.6)'});
-      charts.speed.update();
-    }
-    // RSM speed table — update if data exists
-    if(d.rsm_speed && d.rsm_speed.length){
-      console.log('[SPEED] '+d.rsm_speed.length+' RSMs — prototype RSM table has matching structure');
-    }
-    // Feed type speed
-    if(d.feed_type_speed && d.feed_type_speed.length){
-      console.log('[SPEED] '+d.feed_type_speed.length+' feed types — prototype table has matching structure');
-    }
-  } catch(e) { console.error('Speed:', e); showError('pg-speed','Unable to load speed data'); }
-}
-
-/* ===== CUSTOMERS — wired to /api/customers ===== */
-var CF = 'ALL';
-function fltCust(r, el){
-  if(el){el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
-  CF = r;
-  DC['pg-customers']=null;
-  loadCust();
-}
-async function loadCust(search){
-  clearError('pg-customers');
-  try {
-    var p = {limit:'50'};
-    if(CF !== 'ALL') p.region = CF;
-    if(search) p.search = search;
-    var d = await getCustomersData(p);
-    if(!d){showError('pg-customers','Unable to load customer data');return}
-    console.log('[CUSTOMERS] Rendering:', d.total||'?', 'customers');
-    if(d.customers && d.customers.length){
-      var html='';
-      d.customers.forEach(function(c,i){
-        html+='<tr style="cursor:pointer" onclick="openCust(\''+esc(c.CardCode||'')+'\')">';
-        html+='<td><div class="rank '+rc(i)+'">'+(i+1)+'</div></td>';
-        html+='<td style="font-weight:700">'+esc(c.CardName||'')+'</td>';
-        html+='<td style="color:var(--text3)">'+esc(c.CardCode||'')+'</td>';
-        html+='<td>'+esc(c.City||c.region||'')+'</td>';
-        html+='<td style="font-size:11px;color:var(--text3)">'+esc(c.bu||'')+'</td>';
-        html+='<td class="num">'+(c.ytd_volume?fcn(Math.round(c.ytd_volume))+' MT':c.ytd_bags?fcn(c.ytd_bags)+' bags':'--')+'</td>';
-        html+='<td class="num">'+fc(c.ytd_revenue||0)+'</td>';
-        html+='<td class="num">'+(c.gmt?'₱'+fcn(Math.round(c.gmt)):'--')+'</td></tr>';
-      });
-      seth('cust-tbody',html);
-    }
-  } catch(e) { console.error('Cust:', e); showError('pg-customers','Unable to load customer data'); }
-}
-
-/* ===== CUSTOMER DETAIL — wired to /api/customer?id= ===== */
-async function openCust(code){
-  navTo('pg-custdetail');
-  clearError('pg-custdetail');
-  try {
-    var d = await getCustomerProfile({id:code});
-    if(!d){showError('pg-custdetail','Unable to load customer profile');return}
-    console.log('[CUSTDETAIL] Rendering:', code, Object.keys(d));
-    var pg=sel('pg-custdetail');
-    // Hero
-    if(d.info){
-      var h1=pg.querySelector('.detail-hero h1');if(h1)h1.textContent=d.info.CardName||code;
-      var meta=pg.querySelector('.detail-meta');if(meta)meta.textContent=(d.info.CardCode||'')+' · '+(d.info.City||'')+' · '+(d.info.rsm||'');
-    }
-    // KPI row (8 KPIs)
-    var kpis=pg.querySelectorAll('.kpi-val');
-    if(d.ytd_sales){
-      if(kpis[0] && d.ytd_sales.volume!=null) kpis[0].innerHTML=fn(d.ytd_sales.volume)+'<span style="font-size:10px;color:var(--text3)"> MT</span>';
-      if(kpis[1] && d.ytd_sales.revenue!=null) kpis[1].textContent=fc(d.ytd_sales.revenue);
-    }
-    if(d.mtd_sales!=null && kpis[2]) kpis[2].innerHTML=fn(d.mtd_sales)+'<span style="font-size:10px;color:var(--text3)"> MT</span>';
-    if(d.gmt!=null && kpis[4]) kpis[4].textContent='₱'+fcn(Math.round(d.gmt));
-    if(d.dso!=null && kpis[5]) kpis[5].innerHTML=Math.round(d.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>';
-    // Breadcrumb
-    var bc=pg.querySelectorAll('.breadcrumb span');
-    if(bc.length>=3 && d.info) bc[2].textContent=d.info.CardName||code;
-    // CY vs LY chart
-    if(d.cy_vs_ly && d.cy_vs_ly.length && charts.custVolBar){
-      var months=d.cy_vs_ly.map(function(m){return m.month_label||m.month||''});
-      var cy=d.cy_vs_ly.map(function(m){return m.cy_volume||0});
-      var ly=d.cy_vs_ly.map(function(m){return m.ly_volume||0});
-      charts.custVolBar.data.labels=months;
-      charts.custVolBar.data.datasets[0].data=cy;
-      charts.custVolBar.data.datasets[1].data=ly;
-      charts.custVolBar.update();
-    }
-    // Product breakdown
-    if(d.product_breakdown && d.product_breakdown.length){
-      console.log('[CUSTDETAIL] '+d.product_breakdown.length+' products');
-    }
-    // Recent orders
-    if(d.recent_orders && d.recent_orders.length){
-      console.log('[CUSTDETAIL] '+d.recent_orders.length+' recent orders');
-    }
-  } catch(e) { console.error('CustDetail:', e); showError('pg-custdetail','Unable to load customer profile'); }
-}
-
-/* ===== MARGIN — wired to /api/margin ===== */
-async function loadMargin(){
-  clearError('pg-margin');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-margin']){
-      DC['pg-margin'] = await getMarginData({period:PD}).catch(function(e){console.error('margin:',e);return null});
-    }
-    var d = DC['pg-margin'];
-    if(!d){showError('pg-margin','Unable to load margin data');return}
-    console.log('[MARGIN] Rendering:', d.hero);
-    var pg=sel('pg-margin');
-    // Hero
-    if(d.hero){
-      var heroNeg=pg.querySelector('.detail-hero .val, [style*="font-size:28px"]');
-      // Update the hero numbers directly
-      var heroNums=pg.querySelectorAll('[style*="font-size:28px"]');
-      if(heroNums[0] && d.hero.negative_gp_total!=null) heroNums[0].textContent='-₱'+fcn(Math.abs(Math.round(d.hero.negative_gp_total/1000)))+'K';
-      if(heroNums[1] && d.hero.revenue_at_risk!=null) heroNums[1].textContent=fc(d.hero.revenue_at_risk);
-      // Hero badges
-      var badges=pg.querySelectorAll('.badge.b-red, .badge.b-gold');
-      if(badges[0] && d.hero.critical_count!=null) badges[0].textContent=d.hero.critical_count+' CRITICAL';
-      if(badges[1] && d.hero.warning_count!=null) badges[1].textContent=d.hero.warning_count+' WARNING';
-    }
-    // KPI row (8 KPIs)
-    if(d.kpis){
-      var kpis=pg.querySelectorAll('#pg-margin .kpi-val');
-      if(kpis[0] && d.kpis.critical!=null) kpis[0].textContent=d.kpis.critical.toString();
-      if(kpis[1] && d.kpis.warning!=null) kpis[1].textContent=d.kpis.warning.toString();
-      if(kpis[2] && d.kpis.watch!=null) kpis[2].textContent=d.kpis.watch.toString();
-      if(kpis[3] && d.kpis.healthy!=null) kpis[3].textContent=d.kpis.healthy.toString();
-      if(kpis[4] && d.kpis.natl_gm_ton!=null) kpis[4].textContent='₱'+fcn(Math.round(d.kpis.natl_gm_ton));
-      if(kpis[5] && d.kpis.natl_gp_pct!=null) kpis[5].textContent=d.kpis.natl_gp_pct.toFixed(1)+'%';
-      if(kpis[6] && d.kpis.best_region) kpis[6].textContent=d.kpis.best_region.name||d.kpis.best_region;
-      if(kpis[7] && d.kpis.worst_region) kpis[7].textContent=d.kpis.worst_region.name||d.kpis.worst_region;
-    }
-    // Critical accounts cards
-    if(d.critical && d.critical.length){
-      var cards=pg.querySelectorAll('.margin-card.critical');
-      d.critical.slice(0,3).forEach(function(c,i){
-        if(!cards[i])return;
-        var nameEl=cards[i].querySelector('[style*="font-size:15px"]');
-        if(nameEl)nameEl.textContent=c.customer||'';
-        var codeEl=cards[i].querySelector('[style*="font-size:10px"]');
-        if(codeEl)codeEl.textContent=(c.code||'')+' · '+(c.rep||'');
-        var badge=cards[i].querySelector('.badge');
-        if(badge && c.gp_pct!=null) badge.textContent='GP% '+c.gp_pct.toFixed(1)+'%';
-        var nums=cards[i].querySelectorAll('[style*="font-size:14px"]');
-        if(nums[0] && c.sales!=null) nums[0].textContent=fc(c.sales);
-        if(nums[1] && c.vol!=null) nums[1].textContent=Math.round(c.vol)+' MT';
-        if(nums[2] && c.gp!=null) nums[2].textContent=(c.gp<0?'-':'')+'₱'+fcn(Math.abs(Math.round(c.gp/1000)))+'K';
-      });
-    }
-    // Margin sidebar badge count
-    var sidebarBadge=document.querySelector('.nav-item [class*="b-red"]');
-    if(sidebarBadge && d.kpis && d.kpis.critical!=null) sidebarBadge.textContent=d.kpis.critical.toString();
-  } catch(e) { console.error('Margin:', e); showError('pg-margin','Unable to load margin data'); }
-}
-
-/* ===== INTELLIGENCE — wired to /api/intelligence ===== */
-async function loadIntelligence(){
-  clearError('pg-insights');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-insights']){
-      DC['pg-insights'] = await getIntelligenceData().catch(function(e){console.error('intelligence:',e);return null});
-    }
-    var d = DC['pg-insights'];
-    if(!d){showError('pg-insights','Unable to load intelligence data');return}
-    console.log('[INTELLIGENCE] Rendering:', d.hero);
-    var pg=sel('pg-insights');
-    // Hero numbers
-    if(d.hero){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"]');
-      if(heroNums[0] && d.hero.whitespace_total!=null) heroNums[0].textContent=fc(d.hero.whitespace_total);
-      if(heroNums[1] && d.hero.at_risk_total!=null) heroNums[1].textContent=fc(d.hero.at_risk_total);
-      if(heroNums[2] && d.hero.avg_health_score!=null) heroNums[2].textContent=d.hero.avg_health_score+'/100';
-    }
-    // KPI row (8 KPIs)
-    if(d.kpis){
-      var kpis=pg.querySelectorAll('#pg-insights .kpi-val');
-      if(kpis[0] && d.kpis.silent_30d!=null) kpis[0].textContent=d.kpis.silent_30d.toString();
-      if(kpis[1] && d.kpis.vol_drop!=null) kpis[1].textContent=d.kpis.vol_drop.toString();
-      if(kpis[2] && d.kpis.growing!=null) kpis[2].textContent=d.kpis.growing.toString();
-      if(kpis[4] && d.kpis.avg_skus_per_cust!=null) kpis[4].textContent=d.kpis.avg_skus_per_cust.toFixed(1);
-      if(kpis[5] && d.kpis.avg_brands_per_cust!=null) kpis[5].textContent=d.kpis.avg_brands_per_cust.toFixed(1);
-    }
-    // Brand coverage table — keep prototype layout, data structure may vary
-    if(d.brand_coverage && d.brand_coverage.length){
-      console.log('[INTELLIGENCE] '+d.brand_coverage.length+' brands in coverage analysis');
-    }
-    // Buying patterns
-    if(d.buying_patterns && d.buying_patterns.length){
-      console.log('[INTELLIGENCE] '+d.buying_patterns.length+' buying pattern bands');
-    }
-    // Health distribution
-    if(d.health_distribution && d.health_distribution.length){
-      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands');
-    }
-  } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
-}
-
-/* ===== TEAM — wired to /api/team ===== */
-async function loadTeam(){
-  clearError('pg-team');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-team']){
-      DC['pg-team'] = await getTeamData({period:PD}).catch(function(e){console.error('team:',e);return null});
-    }
-    var d = DC['pg-team'];
-    if(!d){showError('pg-team','Unable to load team data');return}
-    console.log('[TEAM] Rendering:', d.evp);
-    var pg=sel('pg-team');
-    // EVP Hero — update hero numbers
-    if(d.evp){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"], [style*="font-size:24px"]');
-      // Try to find EVP name and stats
-      var h1=pg.querySelector('.detail-hero h1, [style*="font-size:24px"]');
-      if(h1 && !h1.closest('.detail-hero')){}// skip non-hero
-      console.log('[TEAM] EVP: '+d.evp.name+', YTD Vol: '+d.evp.ytd_vol+', RSMs: '+d.evp.rsm_count);
-    }
-    // RSM scorecard — log available data
-    if(d.rsms && d.rsms.length){
-      console.log('[TEAM] '+d.rsms.length+' RSMs in scorecard');
-    }
-    // L10 scorecard — keep hardcoded as noted in task spec
-    console.warn('[TEAM] L10 scorecard kept hardcoded — needs /api/l10 endpoint (Agent 4)');
-    // Performance matrix
-    if(d.performance_matrix){
-      console.log('[TEAM] Performance matrix: '+((d.performance_matrix.months||[]).length)+' months × '+((d.performance_matrix.rsms||[]).length)+' RSMs');
-    }
-  } catch(e) { console.error('Team:', e); showError('pg-team','Unable to load team data'); }
-}
-
-/* ===== BUDGET — wired to /api/budget ===== */
-async function loadBudget(){
-  clearError('pg-budget');
-  try {
-    if(!DC) DC={};
-    if(!DC['pg-budget']){
-      DC['pg-budget'] = await getBudgetData().catch(function(e){console.error('budget:',e);return null});
-    }
-    var d = DC['pg-budget'];
-    if(!d){showError('pg-budget','Unable to load budget data');return}
-    console.log('[BUDGET] Rendering:', d.hero);
-    var pg=sel('pg-budget');
-    // Hero KPIs
-    if(d.hero){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"], .kpi-val');
-      // The budget page has hero section with FY target, YTD actual, etc.
-      // Find and update them
-      var h=d.hero;
-      console.log('[BUDGET] FY Target: '+h.fy_target_mt+'MT, YTD Actual: '+h.ytd_actual+', Achievement: '+h.achievement_pct+'%');
-    }
-    // Monthly actual vs budget chart
-    if(d.monthly_actual_vs_budget && charts.budgetMonthly){
-      var mab=d.monthly_actual_vs_budget;
-      if(mab.actual && mab.budget){
-        charts.budgetMonthly.data.datasets[0].data=mab.actual;
-        charts.budgetMonthly.data.datasets[1].data=mab.budget;
-        if(mab.months) charts.budgetMonthly.data.labels=mab.months;
-        charts.budgetMonthly.update();
-      }
-    }
-    // Volume history chart
-    if(d.volume_history && d.volume_history.length && charts.budgetHistory){
-      var labels=d.volume_history.map(function(h){return h.year.toString()});
-      var vols=d.volume_history.map(function(h){return h.volume_k||0});
-      charts.budgetHistory.data.labels=labels;
-      charts.budgetHistory.data.datasets[0].data=vols;
-      charts.budgetHistory.update();
-    }
-    // Achievement by region
-    if(d.achievement_by_region && d.achievement_by_region.length){
-      console.log('[BUDGET] '+d.achievement_by_region.length+' regions in achievement table');
-    }
-    // P&L summary
-    if(d.pl_summary){
-      console.log('[BUDGET] P&L summary: '+((d.pl_summary.months||[]).length)+' months');
-    }
-  } catch(e) { console.error('Budget:', e); showError('pg-budget','Unable to load budget data'); }
-}
+function setPd(el){el.parentElement.querySelectorAll('.tb-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active')}
+function setCmp(el){el.parentElement.querySelectorAll('.tb-compare-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active')}
+function setU(el){el.parentElement.querySelectorAll('.tb-toggle-btn').forEach(c=>c.classList.remove('active'));el.classList.add('active')}
+function setF(el){el.parentElement.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active')}
 
 // ===== CHARTS =====
 Chart.defaults.font.family = 'Montserrat';
@@ -3860,38 +3250,38 @@ function initCharts(pageId){
 }
 
 // ===== THEME =====
-var currentTheme = 'dark';
+let currentTheme = 'dark';
 function toggleTheme(){
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', currentTheme === 'dark' ? '' : 'light');
-  document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent = currentTheme === 'dark' ? '🌙' : '☀️'});
-  localStorage.setItem('vf_theme', currentTheme);
+  document.querySelectorAll('.theme-btn').forEach(b=>b.textContent = currentTheme === 'dark' ? '🌙' : '☀️');
   // Re-theme charts
-  var isLight = currentTheme === 'light';
-  var gridC = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
-  var tickC = isLight ? 'rgba(15,29,47,0.4)' : 'rgba(240,244,250,0.25)';
-  var legendC = isLight ? 'rgba(15,29,47,0.5)' : 'rgba(240,244,250,0.35)';
-  Object.values(charts).forEach(function(chart){
+  const isLight = currentTheme === 'light';
+  const gridC = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+  const tickC = isLight ? 'rgba(15,29,47,0.4)' : 'rgba(240,244,250,0.25)';
+  const legendC = isLight ? 'rgba(15,29,47,0.5)' : 'rgba(240,244,250,0.35)';
+  Object.values(charts).forEach(chart=>{
     if(!chart||!chart.options) return;
-    var s = chart.options.scales||{};
-    ['y','y1','x'].forEach(function(axis){
+    const s = chart.options.scales||{};
+    ['y','y1','x'].forEach(axis=>{
       if(s[axis]){
         if(s[axis].grid) s[axis].grid.color = axis==='x' ? 'transparent' : gridC;
         if(s[axis].ticks) s[axis].ticks.color = tickC;
         if(s[axis].title) s[axis].title.color = isLight ? 'rgba(15,29,47,0.3)' : 'rgba(240,244,250,0.2)';
       }
     });
-    if(chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) chart.options.plugins.legend.labels.color = legendC;
+    const leg = chart.options.plugins?.legend;
+    if(leg?.labels) leg.labels.color = legendC;
     chart.update('none');
   });
 }
 
 // Clock
-function tick(){var el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}
+function tick(){const el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}
 setInterval(tick,1000);tick();
 
-// Init home charts on page load
-setTimeout(function(){initCharts('pg-home')},300);
+// Init home charts
+setTimeout(()=>initCharts('pg-home'),300);
 </script>
 </body>
 </html>

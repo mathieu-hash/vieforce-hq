@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gcloud --version)",
+      "Bash(gcloud run *)",
+      "Bash(gcloud config get-value project *)",
+      "Bash(gcloud config get-value *)"
+    ]
+  }
+}

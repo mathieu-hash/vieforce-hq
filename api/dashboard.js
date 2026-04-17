@@ -2,19 +2,34 @@ const { query } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
+// 2026 Budget targets (mirrors api/speed.js + api/budget.js)
+const BUDGET_2026 = {
+  annual_mt:      188266,
+  annual_sales:   5975000000,
+  annual_gm:      1233000000,
+  monthly_mt: [
+    13933, 13933, 13934,   // Q1 Jan, Feb, Mar
+    15061, 15061, 15062,   // Q2 Apr, May, Jun
+    16463, 16463, 16463,   // Q3 Jul, Aug, Sep
+    17298, 17298, 17297    // Q4 Oct, Nov, Dec
+  ]
+}
+const ACTIVE_PREDICATE = `(ISNULL(C.frozenFor,'N') <> 'Y' AND C.U_BpStatus = 'Active')`
+
+function monthRange(year, monthIdx) {
+  return { from: new Date(year, monthIdx, 1), to: new Date(year, monthIdx + 1, 0) }
+}
+
 module.exports = async (req, res) => {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Cache check
-  const cacheKey = `dashboard_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `dashboard_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -22,11 +37,22 @@ module.exports = async (req, res) => {
     const { period = 'MTD', region = 'ALL' } = req.query
     const { dateFrom, dateTo } = getPeriodDates(period)
 
-    // --- Revenue, Volume, GM/T ---
+    const now = new Date()
+    const year = now.getFullYear()
+    const monthIdx = now.getMonth()
+    const ytdFrom = new Date(year, 0, 1)
+    const prev = monthRange(year, monthIdx - 1)
+
+    // YTD budget = sum of monthly budgets Jan through current month (inclusive)
+    const ytd_budget_mt = BUDGET_2026.monthly_mt.slice(0, monthIdx + 1).reduce((a, b) => a + b, 0)
+    const ytd_budget_sales = Math.round((ytd_budget_mt / BUDGET_2026.annual_mt) * BUDGET_2026.annual_sales)
+    const ytd_budget_gm = Math.round((ytd_budget_mt / BUDGET_2026.annual_mt) * BUDGET_2026.annual_gm)
+    const mtd_budget_mt = BUDGET_2026.monthly_mt[monthIdx]
+
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
     const filteredWhere = applyRoleFilter(session, baseWhere)
 
+    // --- Current period KPIs ---
     const kpis = await query(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
@@ -45,21 +71,73 @@ module.exports = async (req, res) => {
       ${filteredWhere}
     `, { dateFrom, dateTo })
 
-    // --- AR Balance (all unpaid invoices, same role filter) ---
-    const arWhere = `WHERE T0.CANCELED = 'N' AND T0.DocTotal > T0.PaidToDate`
-    // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
-    const arFilteredWhere = applyRoleFilter(session, arWhere)
-
-    const arBalance = await query(`
-      SELECT ISNULL(SUM(T0.DocTotal - T0.PaidToDate), 0) AS ar_balance
+    // --- Previous period KPIs (for MoM delta) ---
+    const prevKpis = await query(`
+      SELECT
+        ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                                AS gmt
       FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
+    `, { prevFrom: prev.from, prevTo: prev.to })
+
+    // --- YTD actuals ---
+    const ytdKpis = await query(`
+      SELECT
+        ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                                AS gmt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'
+    `, { ytdFrom, today: now })
+
+    // --- AR Balance (total + active) ---
+    const arWhere = `WHERE T0.CANCELED = 'N' AND T0.DocTotal > T0.PaidToDate`
+    const arFilteredWhere = applyRoleFilter(session, arWhere)
+    const arBalance = await query(`
+      SELECT
+        ISNULL(SUM(T0.DocTotal - T0.PaidToDate), 0) AS total_balance,
+        ISNULL(SUM(CASE WHEN ${ACTIVE_PREDICATE} THEN T0.DocTotal - T0.PaidToDate ELSE 0 END), 0) AS active_balance,
+        ISNULL(SUM(CASE WHEN NOT ${ACTIVE_PREDICATE} THEN T0.DocTotal - T0.PaidToDate ELSE 0 END), 0) AS delinquent_balance
+      FROM OINV T0
+      INNER JOIN OCRD C ON T0.CardCode = C.CardCode
       ${arFilteredWhere}
     `)
 
-    // --- Pending PO (open sales orders from ORDR + RDR1) ---
+    // --- DSO (active + total) ---
+    const dsoWhere = `WHERE T0.CANCELED = 'N' AND T0.DocDate >= DATEADD(YEAR, -1, GETDATE())`
+    const dsoFiltered = applyRoleFilter(session, dsoWhere)
+    const dsoRow = await query(`
+      SELECT
+        ISNULL(
+          (SELECT SUM(T0.DocTotal - T0.PaidToDate) FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${arFilteredWhere}) /
+          NULLIF((SELECT SUM(T0.DocTotal)/365.0 FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${dsoFiltered}),0),
+        0) AS dso_total,
+        ISNULL(
+          (SELECT SUM(T0.DocTotal - T0.PaidToDate) FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${arFilteredWhere} AND ${ACTIVE_PREDICATE}) /
+          NULLIF(
+            (SELECT SUM(T0.DocTotal)/365.0 FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${dsoFiltered} AND ${ACTIVE_PREDICATE}),
+          0),
+        0) AS dso_active
+    `)
+
+    // --- Pending PO (open sales orders) + oldest age ---
     const pendingPO = await query(`
       SELECT
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS total_mt
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS total_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                   AS total_value,
+        COUNT(DISTINCT T0.DocEntry)                                    AS total_orders,
+        ISNULL(MAX(DATEDIFF(DAY, T0.DocDate, GETDATE())), 0)           AS oldest_days
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
@@ -126,15 +204,60 @@ module.exports = async (req, res) => {
       ) sub
     `, { dateFrom, dateTo })
 
+    const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}
+
+    // Delta vs previous period (pct)
+    const delta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : 0)
+
     const result = {
-      revenue:      kpis[0]?.revenue || 0,
-      volume_bags:  kpis[0]?.volume_bags || 0,
-      volume_mt:    kpis[0]?.volume_mt || 0,
-      gross_margin: kpis[0]?.gross_margin || 0,
-      gm_per_bag:   kpis[0]?.gm_per_bag || 0,
-      gmt:          kpis[0]?.gmt || 0,
-      ar_balance: arBalance[0]?.ar_balance || 0,
-      pending_po: { total_mt: Math.round((pendingPO[0]?.total_mt || 0) * 10) / 10 },
+      revenue:      d.revenue || 0,
+      volume_bags:  d.volume_bags || 0,
+      volume_mt:    d.volume_mt || 0,
+      gross_margin: d.gross_margin || 0,
+      gm_per_bag:   d.gm_per_bag || 0,
+      gmt:          d.gmt || 0,
+
+      previous_period: {
+        revenue:      p.revenue || 0,
+        volume_mt:    p.volume_mt || 0,
+        gross_margin: p.gross_margin || 0,
+        gmt:          p.gmt || 0
+      },
+      delta_pct: {
+        revenue:      delta(d.revenue, p.revenue),
+        volume_mt:    delta(d.volume_mt, p.volume_mt),
+        gross_margin: delta(d.gross_margin, p.gross_margin),
+        gmt:          delta(d.gmt, p.gmt)
+      },
+      ytd: {
+        revenue:      y.revenue || 0,
+        volume_mt:    y.volume_mt || 0,
+        gross_margin: y.gross_margin || 0,
+        gmt:          y.gmt || 0
+      },
+      budget: {
+        fy_mt:         BUDGET_2026.annual_mt,
+        fy_sales:      BUDGET_2026.annual_sales,
+        fy_gm:         BUDGET_2026.annual_gm,
+        mtd_mt:        mtd_budget_mt,
+        ytd_mt:        ytd_budget_mt,
+        ytd_sales:     ytd_budget_sales,
+        ytd_gm:        ytd_budget_gm,
+        months_elapsed: monthIdx + 1
+      },
+
+      ar_balance:           arBalance[0]?.total_balance || 0,
+      ar_active_balance:    arBalance[0]?.active_balance || 0,
+      ar_delinquent_balance: arBalance[0]?.delinquent_balance || 0,
+      dso_total:            Math.round(dsoRow[0]?.dso_total || 0),
+      dso_active:           Math.round(dsoRow[0]?.dso_active || 0),
+
+      pending_po: {
+        total_mt:     Math.round((pendingPO[0]?.total_mt || 0) * 10) / 10,
+        total_value:  pendingPO[0]?.total_value || 0,
+        total_orders: pendingPO[0]?.total_orders || 0,
+        oldest_days:  pendingPO[0]?.oldest_days || 0
+      },
       region_performance: regionPerf,
       top_customers: topCust,
       margin_alerts: {
