@@ -215,9 +215,15 @@ module.exports = async (req, res) => {
     const elapsed_days = dateFrom > cutoff ? 0 : countShippingDays(dateFrom, cutoff)
     const total_days = countShippingDays(dateFrom, periodEnd)
 
-    // Daily pullout divisor = days that actually had shipments (matches Ops tool).
-    // Mon-Sat calendar days with zero shipments (holidays, plant-down) are excluded from the rate.
-    const days_with_shipments = (daily || []).filter(r => (r.daily_mt || 0) > 0).length
+    // Daily pullout divisor:
+    //   - 7D/MTD: daily[] is per-day, so use count of days with shipments (matches Ops tool;
+    //     excludes Mon-Sat days that had zero shipments — holidays, plant-down)
+    //   - QTD: daily[] is per-week (aggregated) → fall back to Mon-Sat elapsed_days
+    //   - YTD: daily[] is per-month (aggregated) → fall back to Mon-Sat elapsed_days
+    const dailyIsPerDay = period === '7D' || period === 'MTD'
+    const days_with_shipments = dailyIsPerDay
+      ? (daily || []).filter(r => (r.daily_mt || 0) > 0).length
+      : 0
     const divisor = days_with_shipments > 0 ? days_with_shipments : elapsed_days
     const speed_per_day = divisor > 0 ? actual_mt / divisor : 0
     const projected_mt = divisor > 0
