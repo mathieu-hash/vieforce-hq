@@ -6,6 +6,8 @@
 <title>VieForce HQ — Desktop</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
@@ -513,17 +515,34 @@ body{
 .card-body{padding:14px 20px 20px}
 
 /* ===== TABLE ===== */
-.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th{
-  text-align:left;padding:10px 10px;font-size:10px;font-weight:700;
-  color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;
+  text-align:left;padding:10px 10px;font-size:11px;font-weight:700;
+  color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;
   border-bottom:1px solid var(--divider);
+  cursor:default;user-select:none;
 }
-.tbl td{padding:10px 10px;border-bottom:1px solid var(--divider);transition:background 0.15s}
+.tbl th.sortable{cursor:pointer;transition:color 0.15s}
+.tbl th.sortable:hover{color:var(--text)}
+.tbl th.sortable .sort-arrow{font-size:9px;color:var(--blue);margin-left:4px}
+.tbl td{padding:10px 10px;border-bottom:1px solid var(--divider);transition:background 0.15s;line-height:1.6}
 .tbl tr:last-child td{border-bottom:none}
 .tbl tr:hover td{background:rgba(255,255,255,0.015)}
-.tbl .num{text-align:right;font-family:var(--mono);font-size:12px;font-weight:400}
+.tbl .num{text-align:right;font-family:var(--mono);font-size:14px;font-weight:400;font-variant-numeric:tabular-nums}
+.tbl .big-num{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
 .tbl .total{font-weight:700;background:rgba(0,174,239,0.03)}
+
+/* ===== EXPORT BUTTON ===== */
+.export-btn{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 10px;border-radius:20px;
+  background:transparent;border:1px solid rgba(151,215,0,0.3);
+  color:var(--green);font-size:10px;font-weight:700;
+  font-family:var(--font);cursor:pointer;letter-spacing:0.3px;
+  transition:all 0.15s;
+}
+.export-btn:hover{background:rgba(151,215,0,0.1);border-color:var(--green)}
+.export-btn:active{transform:scale(0.97)}
 
 /* ===== BADGES ===== */
 .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:0.2px}
@@ -1432,18 +1451,34 @@ body{
             </div>
             <!-- Top clients detail -->
             <div class="card">
-              <div class="card-hdr"><div class="card-title">Top 20 Clients · Active</div></div>
+              <div class="card-hdr" style="flex-wrap:wrap;gap:8px">
+                <div class="card-title">Clients · AR</div>
+                <div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end">
+                  <div style="position:relative">
+                    <input id="ar-client-search" type="text" placeholder="Search customer by name or code…" oninput="renderARClients()" style="padding:6px 28px 6px 12px;border-radius:20px;background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:11px;font-weight:500;min-width:240px;outline:none">
+                    <span id="ar-client-search-clear" onclick="document.getElementById('ar-client-search').value='';renderARClients()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;font-weight:700;user-select:none" title="Clear">×</span>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:8px 16px 0;display:flex;gap:6px;flex-wrap:wrap">
+                <button class="filter-chip active" data-ar-filter="ALL"    onclick="setARFilter(this,'ALL')">All</button>
+                <button class="filter-chip"        data-ar-filter="ACTIVE" onclick="setARFilter(this,'ACTIVE')">Active only</button>
+                <button class="filter-chip"        data-ar-filter="DELINQ" onclick="setARFilter(this,'DELINQ')">Delinquent only</button>
+                <button class="filter-chip"        data-ar-filter="OVERDUE" onclick="setARFilter(this,'OVERDUE')">Overdue &gt; 0</button>
+                <span style="flex:1"></span>
+                <span style="font-size:10px;color:var(--text4);align-self:center" id="ar-client-count">— clients</span>
+              </div>
               <div class="card-body" style="padding-top:8px;overflow-x:auto">
-                <table class="tbl" style="min-width:900px">
+                <table class="tbl" id="ar-clients-tbl" style="min-width:900px">
                   <thead><tr>
-                    <th style="min-width:180px">Client</th>
-                    <th class="num">AR</th>
-                    <th class="num">Current</th>
-                    <th class="num">Overdue</th>
-                    <th class="num">Falling Due</th>
-                    <th class="num">New Overdue</th>
+                    <th style="min-width:180px" class="sortable" onclick="sortARClients('name')">Client <span class="sort-arrow" data-key="name"></span></th>
+                    <th class="num sortable"  onclick="sortARClients('balance')">AR <span class="sort-arrow" data-key="balance">▼</span></th>
+                    <th class="num sortable"  onclick="sortARClients('current_amt')">Current <span class="sort-arrow" data-key="current_amt"></span></th>
+                    <th class="num sortable"  onclick="sortARClients('overdue')">Overdue <span class="sort-arrow" data-key="overdue"></span></th>
+                    <th class="num sortable"  onclick="sortARClients('falling_due')">Falling Due <span class="sort-arrow" data-key="falling_due"></span></th>
+                    <th class="num sortable"  onclick="sortARClients('new_overdue')">New Overdue <span class="sort-arrow" data-key="new_overdue"></span></th>
                     <th>Terms</th>
-                    <th class="num">Aging</th>
+                    <th class="num sortable"  onclick="sortARClients('days_overdue')">Aging <span class="sort-arrow" data-key="days_overdue"></span></th>
                   </tr></thead>
                   <tbody id="ar-clients-tbody">
                     <tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
@@ -2400,9 +2435,9 @@ body{
         <div style="background:linear-gradient(135deg,rgba(0,59,82,0.5),rgba(6,11,20,0.9));border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:20px 28px;margin-bottom:16px;position:relative;overflow:hidden">
           <div style="position:absolute;top:0;right:0;width:300px;height:180px;background:radial-gradient(ellipse at 80% 20%,rgba(0,174,239,0.06),transparent 70%)"></div>
           <div style="display:flex;align-items:center;gap:20px;position:relative">
-            <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--green2));color:#000;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0">JD</div>
+            <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--green2));color:#000;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;letter-spacing:0.5px">EVP</div>
             <div style="flex:1">
-              <div style="font-size:18px;font-weight:800">Joel Durano — EVP Sales & Marketing</div>
+              <div style="font-size:18px;font-weight:800">EVP Sales & Marketing — National Overview</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">National · All Regions · All BU · 8 RSMs · 24 DSMs · 710 Active Accounts</div>
             </div>
             <div style="display:flex;gap:16px;flex-shrink:0">
@@ -2419,7 +2454,7 @@ body{
         <!-- L10 SCORECARD -->
         <div class="card" style="margin-bottom:16px">
           <div class="card-hdr">
-            <div class="card-title">📊 L10 Scorecard — Joel Durano, EVP Sales</div>
+            <div class="card-title">📊 L10 Scorecard — EVP Sales & Marketing</div>
             <div style="display:flex;gap:8px;align-items:center">
               <span style="font-size:9px;color:var(--text3);font-weight:600">EOS Level 10</span>
               <span class="badge b-green" style="font-size:9px">Meeting Score: 10.0</span>
@@ -2469,10 +2504,6 @@ body{
               <tr>
                 <td>Joel</td><td>Gross Margin</td><td>Php/Kg</td><td>&gt;₱6.20</td>
                 <td class="l10-g">6.70</td><td class="l10-y">N/A</td><td class="l10-g">6.56</td><td class="l10-g">6.58</td><td class="l10-g">6.51</td><td class="l10-g">6.89</td><td class="l10-g">6.22</td><td class="l10-r">6.15</td><td class="l10-g">6.40</td><td class="l10-r">6.05</td><td class="l10-r">6.19</td><td class="l10-r">6.15</td><td class="l10-r">6.18</td><td class="l10-g">6.30</td><td class="l10-g">6.88</td>
-              </tr>
-              <tr>
-                <td>Rachel</td><td>No Shortage (RM)</td><td>number</td><td>0</td>
-                <td class="l10-r">8</td><td class="l10-r">4</td><td class="l10-r">3</td><td class="l10-r">6</td><td class="l10-r">6</td><td class="l10-r">6</td><td class="l10-r">3</td><td class="l10-r">3</td><td class="l10-r">2</td><td class="l10-r">2</td><td class="l10-r">2</td><td class="l10-r">1</td><td class="l10-r">2</td><td class="l10-g">0</td><td class="l10-r">1</td>
               </tr>
             </table>
           </div>
@@ -2774,8 +2805,20 @@ function initApp(s) {
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
   syncFilterUI();
   loadPage('pg-home');
+  setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
   // Auto-refresh every 60s
   setInterval(function(){ DC = {}; loadPage(PG); }, 60000);
+  // Re-inject whenever a page's tables refresh (debounced)
+  var exportInjectTimer;
+  var origNavTo = window.navTo;
+  // Fallback: MutationObserver to catch dynamically-rendered tables
+  if(window.MutationObserver){
+    var mo = new MutationObserver(function(){
+      clearTimeout(exportInjectTimer);
+      exportInjectTimer = setTimeout(injectExportButtons, 150);
+    });
+    mo.observe(document.body, {childList:true, subtree:true});
+  }
 }
 
 /* ===== FMT ===== */
@@ -2806,6 +2849,45 @@ function showError(pgId,msg){
   pg.insertBefore(banner,pg.firstChild);
 }
 function clearError(pgId){var pg=sel(pgId);if(!pg)return;var b=pg.querySelector('.api-error-banner');if(b)b.remove()}
+
+/* ===== XLSX EXPORT ===== */
+function exportTableToXlsx(table, filename){
+  if(typeof XLSX === 'undefined'){ alert('Export library not loaded — please refresh.'); return; }
+  if(!table){ alert('No table to export.'); return; }
+  try{
+    var wb = XLSX.utils.table_to_book(table, {sheet: filename.slice(0,30) || 'Data'});
+    var date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    XLSX.writeFile(wb, 'VieForce_HQ_' + filename.replace(/[^a-zA-Z0-9_-]/g,'_') + '_' + date + '.xlsx');
+  } catch(e){ console.error('[Export]', e); alert('Export failed: ' + e.message); }
+}
+function exportNearestTable(btn){
+  var card = btn.closest('.card');
+  if(!card){ alert('Export: no card found'); return; }
+  var table = card.querySelector('table');
+  if(!table){ alert('Export: no table in this card'); return; }
+  var title = card.querySelector('.card-title');
+  var pageId = (card.closest('.page')||{}).id || 'Page';
+  var pageName = (pageId.replace(/^pg-/,'')).replace(/^\w/, function(c){return c.toUpperCase()});
+  var tblName = title ? title.textContent.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_').slice(0,40) : 'Table';
+  exportTableToXlsx(table, pageName + '_' + tblName);
+}
+// Auto-inject Export buttons on any .card that has a .card-hdr AND a <table> inside .card-body
+function injectExportButtons(){
+  document.querySelectorAll('.card').forEach(function(card){
+    if(card.querySelector('.export-btn')) return;        // already has one
+    var hdr = card.querySelector('.card-hdr');
+    var body = card.querySelector('.card-body');
+    if(!hdr || !body) return;
+    if(!body.querySelector('table')) return;             // no table = no button
+    var btn = document.createElement('button');
+    btn.className = 'export-btn';
+    btn.type = 'button';
+    btn.setAttribute('onclick','exportNearestTable(this)');
+    btn.innerHTML = '⬇ Export';
+    btn.title = 'Download as .xlsx';
+    hdr.appendChild(btn);
+  });
+}
 
 /* ===== NAV ===== */
 var pageTitles = {
@@ -3127,6 +3209,75 @@ async function loadSales(){
 }
 
 /* ===== AR — wired to /api/ar ===== */
+var AR_CLIENTS_CACHE = [];
+var AR_SORT = { key:'balance', dir:'desc' };
+var AR_FILTER = 'ALL';  // ALL | ACTIVE | DELINQ | OVERDUE
+
+function setARFilter(el, mode){
+  document.querySelectorAll('[data-ar-filter]').forEach(function(b){b.classList.remove('active')});
+  if(el) el.classList.add('active');
+  AR_FILTER = mode;
+  renderARClients();
+}
+function sortARClients(key){
+  if(AR_SORT.key === key){ AR_SORT.dir = (AR_SORT.dir==='desc'?'asc':'desc'); }
+  else { AR_SORT.key = key; AR_SORT.dir = 'desc'; }
+  renderARClients();
+}
+function renderARClients(){
+  var search = (sel('ar-client-search') || {}).value || '';
+  var q = search.trim().toLowerCase();
+  var clearBtn = sel('ar-client-search-clear'); if(clearBtn) clearBtn.style.display = q ? '' : 'none';
+
+  var rows = AR_CLIENTS_CACHE.slice();
+  // Filter
+  rows = rows.filter(function(c){
+    if(AR_FILTER === 'ACTIVE'   && c.is_delinquent)           return false;
+    if(AR_FILTER === 'DELINQ'   && !c.is_delinquent)          return false;
+    if(AR_FILTER === 'OVERDUE'  && !((c.overdue||0) > 0))     return false;
+    if(q){
+      var hay = ((c.CardName||'') + ' ' + (c.CardCode||'')).toLowerCase();
+      if(hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  // Sort
+  var k = AR_SORT.key, dir = AR_SORT.dir==='asc' ? 1 : -1;
+  rows.sort(function(a,b){
+    var av = a[k], bv = b[k];
+    if(typeof av === 'string' || typeof bv === 'string'){
+      return (''+av).localeCompare(''+bv) * dir;
+    }
+    return ((+av||0) - (+bv||0)) * dir;
+  });
+  // Cap at 100 for performance
+  rows = rows.slice(0, 100);
+
+  // Render
+  var chtml = '';
+  rows.forEach(function(c){
+    var badgeCls = c.days_overdue<=0?'b-green':c.days_overdue<=30?'b-blue':c.days_overdue<=60?'b-gold':'b-red';
+    var statusTag = c.is_delinquent ? ' <span class="badge b-red" style="font-size:8px">DELINQ</span>' : '';
+    chtml += '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.CardCode||'')+'\')">';
+    chtml += '<td><div style="font-weight:600;font-size:12px">'+esc(c.CardName||'')+statusTag+'</div><div style="font-size:10px;color:var(--text3)">'+esc(c.CardCode||'')+'</div></td>';
+    chtml += '<td class="big-num">'+fc(c.balance||0)+'</td>';
+    chtml += '<td class="num" style="color:var(--green)">'+fc(c.current_amt||0)+'</td>';
+    chtml += '<td class="num" style="color:var(--red)">'+fc(c.overdue||0)+'</td>';
+    chtml += '<td class="num" style="color:var(--gold)">'+fc(c.falling_due||0)+'</td>';
+    chtml += '<td class="num">'+fc(c.new_overdue||0)+'</td>';
+    chtml += '<td style="font-size:11px;color:var(--text3)">'+esc(c.terms||'—')+'</td>';
+    chtml += '<td class="num"><span class="badge '+badgeCls+'">'+(c.days_overdue>0?('+'+c.days_overdue+'d'):(c.days_overdue===0?'due':Math.abs(c.days_overdue)+'d left'))+'</span></td></tr>';
+  });
+  if(!chtml) chtml = '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">No clients match filter</td></tr>';
+  seth('ar-clients-tbody', chtml);
+  sett('ar-client-count', rows.length + ' of ' + AR_CLIENTS_CACHE.length + ' clients');
+
+  // Update sort arrows
+  document.querySelectorAll('#ar-clients-tbl .sort-arrow').forEach(function(el){
+    el.textContent = (el.getAttribute('data-key') === AR_SORT.key) ? (AR_SORT.dir==='asc'?'▲':'▼') : '';
+  });
+}
+
 async function loadAR(){
   clearError('pg-ar');
   try {
@@ -3211,26 +3362,14 @@ async function loadAR(){
       seth('ar-region-tbody',rhtml);
     }
 
-    // Top 20 clients
+    // Top clients table — cache + render via renderARClients()
     if(d.clients && d.clients.length){
-      var chtml='';
-      var rows = d.clients.filter(function(c){
-        return showDelinq ? true : !c.is_delinquent;
-      }).slice(0,20);
-      rows.forEach(function(c){
-        var badgeCls = c.days_overdue<=0?'b-green':c.days_overdue<=30?'b-blue':c.days_overdue<=60?'b-gold':'b-red';
-        var statusTag = c.is_delinquent ? ' <span class="badge b-red" style="font-size:8px">DELINQ</span>' : '';
-        chtml += '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.CardCode||'')+'\')">';
-        chtml += '<td><div style="font-weight:600;font-size:11px">'+esc(c.CardName||'')+statusTag+'</div><div style="font-size:9px;color:var(--text3)">'+esc(c.CardCode||'')+'</div></td>';
-        chtml += '<td class="num">'+fc(c.balance||0)+'</td>';
-        chtml += '<td class="num" style="color:var(--green)">'+fc(c.current_amt||0)+'</td>';
-        chtml += '<td class="num" style="color:var(--red)">'+fc(c.overdue||0)+'</td>';
-        chtml += '<td class="num" style="color:var(--gold)">'+fc(c.falling_due||0)+'</td>';
-        chtml += '<td class="num">'+fc(c.new_overdue||0)+'</td>';
-        chtml += '<td style="font-size:10px;color:var(--text3)">'+esc(c.terms||'—')+'</td>';
-        chtml += '<td class="num"><span class="badge '+badgeCls+'">'+(c.days_overdue>0?('+'+c.days_overdue+'d'):(c.days_overdue===0?'due':Math.abs(c.days_overdue)+'d left'))+'</span></td></tr>';
-      });
-      seth('ar-clients-tbody',chtml);
+      AR_CLIENTS_CACHE = d.clients.slice();
+      renderARClients();
+    } else {
+      AR_CLIENTS_CACHE = [];
+      seth('ar-clients-tbody','<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">No client data</td></tr>');
+      sett('ar-client-count','0 clients');
     }
 
     // DSO + AR variation (7-day)
@@ -3878,7 +4017,35 @@ async function loadBudget(){
 
 // ===== CHARTS =====
 Chart.defaults.font.family = 'Montserrat';
+// Datalabels plugin — register globally, disabled by default (enable per-dataset)
+if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.defaults.plugins.datalabels = { display:false }; }
 let charts = {};
+
+// Theme-aware chart colors for Home
+function homeChartColors(){
+  var light = document.documentElement.getAttribute('data-theme')==='light';
+  return {
+    cyVol:       light ? 'rgba(0,74,100,0.9)'   : 'rgba(0,174,239,0.9)',
+    cyVolHover:  light ? 'rgba(0,74,100,1)'     : 'rgba(0,174,239,1)',
+    lyVol:       light ? 'rgba(0,74,100,0.2)'   : 'rgba(0,174,239,0.25)',
+    lyVolHover:  light ? 'rgba(0,74,100,0.35)'  : 'rgba(0,174,239,0.4)',
+    gmLine:      light ? '#7AB800' : '#97D700',
+    gmPill:      light ? '#ffffff' : 'rgba(0,42,58,0.92)',
+    gmPillText:  light ? '#005F33' : '#97D700',
+    gmPillBorder:light ? '#97D700' : 'rgba(151,215,0,0.4)'
+  };
+}
+function gmDataLabels(){
+  var c = homeChartColors();
+  return {
+    display:true, anchor:'end', align:'top', offset:8,
+    backgroundColor: c.gmPill, borderColor: c.gmPillBorder, borderWidth: 1,
+    color: c.gmPillText, borderRadius: 4,
+    padding: {top:2,bottom:2,left:6,right:6},
+    font: {weight:'700', size:11, family:'Montserrat'},
+    formatter: function(v){ return v==null?'':'₱'+v+'M'; }
+  };
+}
 function initCharts(pageId){
   setTimeout(()=>{
     const mkBar = (id,labels,datasets,opts)=>{
@@ -3895,57 +4062,32 @@ function initCharts(pageId){
       }});
     };
     if(pageId==='pg-home'){
-      // Custom plugin for data labels on lines
-      const labelPlugin = {
-        id:'lineLabels',
-        afterDatasetsDraw(chart){
-          const ctx = chart.ctx;
-          chart.data.datasets.forEach((ds,di)=>{
-            if(ds.type !== 'line') return;
-            const meta = chart.getDatasetMeta(di);
-            if(!meta.hidden){
-              meta.data.forEach((pt,i)=>{
-                const val = ds.data[i];
-                if(val == null) return;
-                ctx.save();
-                ctx.font = 'bold 10px Montserrat';
-                ctx.fillStyle = ds.borderColor || '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                let label = '';
-                if(ds.yAxisID === 'y1') label = '₱' + val + 'M';
-                else label = (val/1000).toFixed(1) + 'K';
-                ctx.fillText(label, pt.x, pt.y - 6);
-                ctx.restore();
-              });
-            }
-          });
-        }
-      };
+      var HC = homeChartColors();
 
       // MONTHLY chart
       if(!charts.homeMonthly){
         const ctx = document.getElementById('homeMonthlyChart');
         if(ctx){
-          const mCY = [9100,10100,10400,10200,11400,12500,14200]; // monthly volume CY
-          const mLY = [7800,8400,8600,8900,9200,10100,11800]; // monthly volume LY
-          const mGM = [60,66,68,67,75,82,93]; // monthly gross margin ₱M CY
+          const mCY = [9100,10100,10400,10200,11400,12500,14200];
+          const mLY = [7800,8400,8600,8900,9200,10100,11800];
+          const mGM = [60,66,68,67,75,82,93];
           charts.homeMonthly = new Chart(ctx,{type:'bar',data:{
             labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr'],
             datasets:[
-              {label:'CY Volume',data:mCY,backgroundColor:'rgba(0,74,100,0.8)',hoverBackgroundColor:'rgba(0,74,100,0.95)',borderRadius:3,borderSkipped:false,order:2,barPercentage:0.7,categoryPercentage:0.7},
-              {label:'LY Volume',data:mLY,backgroundColor:'rgba(0,74,100,0.2)',hoverBackgroundColor:'rgba(0,74,100,0.35)',borderRadius:3,borderSkipped:false,order:3,barPercentage:0.7,categoryPercentage:0.7},
-              {label:'CY Gross Margin (₱M)',data:mGM,type:'line',borderColor:'#97D700',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#97D700',pointBorderColor:'#97D700',pointHoverRadius:6,tension:0.35,yAxisID:'y1',order:1}
+              {label:'CY Volume',data:mCY,backgroundColor:HC.cyVol,hoverBackgroundColor:HC.cyVolHover,borderRadius:3,borderSkipped:false,order:2,barPercentage:0.7,categoryPercentage:0.7},
+              {label:'LY Volume',data:mLY,backgroundColor:HC.lyVol,hoverBackgroundColor:HC.lyVolHover,borderRadius:3,borderSkipped:false,order:3,barPercentage:0.7,categoryPercentage:0.7},
+              {label:'CY Gross Margin (₱M)',data:mGM,type:'line',borderColor:HC.gmLine,backgroundColor:'transparent',borderWidth:3,pointRadius:4,pointBackgroundColor:HC.gmLine,pointBorderColor:HC.gmLine,pointHoverRadius:6,tension:0.35,yAxisID:'y1',order:1,datalabels:gmDataLabels()}
             ]
           },options:{
             responsive:true,maintainAspectRatio:false,
+            layout:{padding:{top:24}},
             plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
             scales:{
               y:{beginAtZero:true,position:'left',grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.3)',font:{family:'Montserrat',size:10},callback:v=>(v/1000).toFixed(0)+'K'},title:{display:true,text:'Volume (MT)',color:'rgba(240,244,250,0.2)',font:{size:9}}},
               y1:{beginAtZero:true,position:'right',grid:{display:false},ticks:{color:'rgba(151,215,0,0.5)',font:{family:'Montserrat',size:10},callback:v=>'₱'+v+'M'},title:{display:true,text:'Gross Margin (₱M)',color:'rgba(151,215,0,0.3)',font:{size:9}}},
               x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.4)',font:{family:'Montserrat',size:11,weight:600}}}
             }
-          },plugins:[labelPlugin]});
+          }});
         }
       }
 
@@ -3953,28 +4095,26 @@ function initCharts(pageId){
       if(!charts.homeQuarterly){
         const ctx2 = document.getElementById('homeQuarterlyChart');
         if(ctx2){
-          const qCY = [40200,13000,34800,14200];
-          const qLY = [24800,26200,29500,33400];
-          // Quarterly Gross Margin ₱M (vol × ~₱6,550 GM/ton)
-          const qCYv = [29600,24800,33400,40200]; // FY quarters
+          const qCYv = [29600,24800,33400,40200];
           const qLYv = [24800,21200,26200,29500];
-          const qGM = [194,162,219,263]; // ₱M gross margin
+          const qGM = [194,162,219,263];
           charts.homeQuarterly = new Chart(ctx2,{type:'bar',data:{
             labels:['Q1','Q2','Q3','Q4'],
             datasets:[
-              {label:'CY Volume',data:qCYv,backgroundColor:'rgba(0,74,100,0.8)',hoverBackgroundColor:'rgba(0,74,100,0.95)',borderRadius:3,borderSkipped:false,order:2,barPercentage:0.65,categoryPercentage:0.65},
-              {label:'LY Volume',data:qLYv,backgroundColor:'rgba(0,74,100,0.2)',hoverBackgroundColor:'rgba(0,74,100,0.35)',borderRadius:3,borderSkipped:false,order:3,barPercentage:0.65,categoryPercentage:0.65},
-              {label:'CY Gross Margin (₱M)',data:qGM,type:'line',borderColor:'#97D700',backgroundColor:'transparent',borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#97D700',pointBorderColor:'#97D700',pointHoverRadius:7,tension:0.3,yAxisID:'y1',order:1}
+              {label:'CY Volume',data:qCYv,backgroundColor:HC.cyVol,hoverBackgroundColor:HC.cyVolHover,borderRadius:3,borderSkipped:false,order:2,barPercentage:0.65,categoryPercentage:0.65},
+              {label:'LY Volume',data:qLYv,backgroundColor:HC.lyVol,hoverBackgroundColor:HC.lyVolHover,borderRadius:3,borderSkipped:false,order:3,barPercentage:0.65,categoryPercentage:0.65},
+              {label:'CY Gross Margin (₱M)',data:qGM,type:'line',borderColor:HC.gmLine,backgroundColor:'transparent',borderWidth:3,pointRadius:5,pointBackgroundColor:HC.gmLine,pointBorderColor:HC.gmLine,pointHoverRadius:7,tension:0.3,yAxisID:'y1',order:1,datalabels:gmDataLabels()}
             ]
           },options:{
             responsive:true,maintainAspectRatio:false,
+            layout:{padding:{top:24}},
             plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
             scales:{
               y:{beginAtZero:true,position:'left',grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.3)',font:{family:'Montserrat',size:10},callback:v=>(v/1000).toFixed(0)+'K'},title:{display:true,text:'Volume (MT)',color:'rgba(240,244,250,0.2)',font:{size:9}}},
               y1:{beginAtZero:true,position:'right',grid:{display:false},ticks:{color:'rgba(151,215,0,0.5)',font:{family:'Montserrat',size:10},callback:v=>'₱'+v+'M'},title:{display:true,text:'Gross Margin (₱M)',color:'rgba(151,215,0,0.3)',font:{size:9}}},
               x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.4)',font:{family:'Montserrat',size:12,weight:700}}}
             }
-          },plugins:[labelPlugin]});
+          }});
         }
       }
     }
