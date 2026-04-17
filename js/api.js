@@ -1,8 +1,6 @@
 // VieForce HQ — Frontend API Client
-// TEMP: Pointing to Cloud Run preview for testing. Revert to production URL before merging to main.
-// Production URL: https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api
 
-var API_BASE = 'https://preview---vieforce-hq-api-qca5cbpcqq-as.a.run.app/api';
+var API_BASE = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api';
 
 function getApiHeaders() {
   var session = getSession();
