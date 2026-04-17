@@ -169,6 +169,70 @@ module.exports = async (req, res) => {
       ORDER BY gm_ton ASC
     `, { dateFrom, dateTo })
 
+    // --- By Sales Group (feed classifier from ItemName keywords) ---
+    const by_sales_group = await query(`
+      SELECT
+        CASE
+          WHEN UPPER(I.ItemName) LIKE '%HOG%' OR UPPER(I.ItemName) LIKE '%PIGLET%' OR UPPER(I.ItemName) LIKE '%SOW%' OR UPPER(I.ItemName) LIKE '%BOAR%' THEN 'HOGS'
+          WHEN UPPER(I.ItemName) LIKE '%LAYER%' OR UPPER(I.ItemName) LIKE '%BROILER%' OR UPPER(I.ItemName) LIKE '%CHICK%' OR UPPER(I.ItemName) LIKE '%POULTRY%' OR UPPER(I.ItemName) LIKE '%DUCK%' THEN 'POULTRY'
+          WHEN UPPER(I.ItemName) LIKE '%GAMEFOWL%' OR UPPER(I.ItemName) LIKE '%MUSCLY%' THEN 'GAMEFOWL'
+          WHEN UPPER(I.ItemName) LIKE '%KEOS%' OR UPPER(I.ItemName) LIKE '%PLAISIR%' OR UPPER(I.ItemName) LIKE '%NOVOPET%' THEN 'PET'
+          WHEN UPPER(I.ItemName) LIKE '%VANA%' OR UPPER(I.ItemName) LIKE '%SHRIMP%' THEN 'AQUA'
+          ELSE 'OTHERS'
+        END                                                                AS sales_group,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS sales,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol,
+        CASE WHEN SUM(T1.LineTotal) > 0
+          THEN SUM(T1.GrssProfit) / SUM(T1.LineTotal) * 100
+          ELSE 0 END                                                       AS gp_pct,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                       AS gm_ton
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      ${filteredWhere}
+      GROUP BY
+        CASE
+          WHEN UPPER(I.ItemName) LIKE '%HOG%' OR UPPER(I.ItemName) LIKE '%PIGLET%' OR UPPER(I.ItemName) LIKE '%SOW%' OR UPPER(I.ItemName) LIKE '%BOAR%' THEN 'HOGS'
+          WHEN UPPER(I.ItemName) LIKE '%LAYER%' OR UPPER(I.ItemName) LIKE '%BROILER%' OR UPPER(I.ItemName) LIKE '%CHICK%' OR UPPER(I.ItemName) LIKE '%POULTRY%' OR UPPER(I.ItemName) LIKE '%DUCK%' THEN 'POULTRY'
+          WHEN UPPER(I.ItemName) LIKE '%GAMEFOWL%' OR UPPER(I.ItemName) LIKE '%MUSCLY%' THEN 'GAMEFOWL'
+          WHEN UPPER(I.ItemName) LIKE '%KEOS%' OR UPPER(I.ItemName) LIKE '%PLAISIR%' OR UPPER(I.ItemName) LIKE '%NOVOPET%' THEN 'PET'
+          WHEN UPPER(I.ItemName) LIKE '%VANA%' OR UPPER(I.ItemName) LIKE '%SHRIMP%' THEN 'AQUA'
+          ELSE 'OTHERS'
+        END
+      HAVING SUM(T1.LineTotal) > 0
+      ORDER BY sales DESC
+    `, { dateFrom, dateTo })
+
+    // --- By BU (customer-level classifier) ---
+    const by_bu = await query(`
+      SELECT
+        CASE
+          WHEN UPPER(T0.CardName) LIKE '%PET%' OR UPPER(T0.CardName) LIKE '%KEOS%' THEN 'PET'
+          ELSE 'DIST'
+        END                                                                AS bu,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS sales,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol,
+        CASE WHEN SUM(T1.LineTotal) > 0
+          THEN SUM(T1.GrssProfit) / SUM(T1.LineTotal) * 100
+          ELSE 0 END                                                       AS gp_pct,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                       AS gm_ton
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      ${filteredWhere}
+      GROUP BY
+        CASE
+          WHEN UPPER(T0.CardName) LIKE '%PET%' OR UPPER(T0.CardName) LIKE '%KEOS%' THEN 'PET'
+          ELSE 'DIST'
+        END
+      HAVING SUM(T1.LineTotal) > 0
+      ORDER BY sales DESC
+    `, { dateFrom, dateTo })
+
     // --- Worst SKUs (bottom 10) ---
     const worst_skus = await query(`
       SELECT TOP 10
@@ -218,6 +282,8 @@ module.exports = async (req, res) => {
       by_region,
       by_brand,
       by_plant,
+      by_sales_group,
+      by_bu,
       worst_skus
     }
 
