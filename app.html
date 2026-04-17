@@ -517,6 +517,78 @@ body{
   }
 }
 
+/* ===== ITEMIZED SALES TABLE ===== */
+.itm-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;font-family:var(--font)}
+.itm-tbl thead th{
+  position:sticky;top:0;z-index:3;
+  background:var(--surface-solid,#0F1621);
+  padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.08em;
+  border-bottom:2px solid var(--divider);
+  white-space:nowrap;text-align:right;
+}
+[data-theme="light"] .itm-tbl thead th{background:#F2F4F7}
+.itm-tbl thead th:nth-child(1),
+.itm-tbl thead th:nth-child(2),
+.itm-tbl thead th:nth-child(3){text-align:left}
+.itm-tbl thead th.sticky-col-1{position:sticky;left:0;z-index:4;min-width:110px}
+.itm-tbl thead th.sticky-col-2{position:sticky;left:110px;z-index:4;min-width:280px;max-width:300px}
+.itm-tbl thead th.sticky-col-3{position:sticky;left:390px;z-index:4;min-width:50px}
+.itm-tbl tbody td{
+  padding:7px 10px;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  text-align:right;border-bottom:1px solid var(--divider);white-space:nowrap;
+}
+.itm-tbl tbody td:nth-child(1),
+.itm-tbl tbody td:nth-child(2),
+.itm-tbl tbody td:nth-child(3){text-align:left;font-family:var(--font)}
+.itm-tbl tbody td.sticky-col-1{position:sticky;left:0;z-index:2;background:var(--bg1,#0A0F18);font-size:11px;color:var(--text3)}
+.itm-tbl tbody td.sticky-col-2{position:sticky;left:110px;z-index:2;background:var(--bg1,#0A0F18);font-weight:600}
+.itm-tbl tbody td.sticky-col-3{position:sticky;left:390px;z-index:2;background:var(--bg1,#0A0F18);color:var(--text3);font-size:11px}
+[data-theme="light"] .itm-tbl tbody td.sticky-col-1,
+[data-theme="light"] .itm-tbl tbody td.sticky-col-2,
+[data-theme="light"] .itm-tbl tbody td.sticky-col-3{background:#fff}
+.itm-tbl tbody tr.itm-group-row td{
+  position:sticky;left:0;z-index:2;
+  background:#004A64;color:#fff;font-family:var(--font);font-weight:800;
+  font-size:13px;padding:10px 14px;text-align:left;
+  text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;
+  border-top:1px solid rgba(255,255,255,0.05);
+}
+.itm-tbl tbody tr.itm-subgroup-row td{
+  position:sticky;left:0;z-index:2;
+  background:rgba(0,74,100,0.55);color:#fff;font-weight:700;font-size:12px;
+  padding:7px 18px;letter-spacing:0.04em;cursor:pointer;text-align:left;font-family:var(--font);
+}
+[data-theme="light"] .itm-tbl tbody tr.itm-subgroup-row td{background:rgba(0,74,100,0.85);color:#fff}
+.itm-tbl tbody tr.itm-subtotal-row td{background:rgba(151,215,0,0.06);font-weight:700}
+.itm-tbl tbody tr.itm-subtotal-row td.sticky-col-1,
+.itm-tbl tbody tr.itm-subtotal-row td.sticky-col-2,
+.itm-tbl tbody tr.itm-subtotal-row td.sticky-col-3{background:rgba(151,215,0,0.06);color:var(--text);font-weight:700}
+.itm-tbl tbody tr.itm-collapsed + tr,
+.itm-tbl tbody tr.itm-hidden{display:none}
+.itm-tbl tfoot{position:sticky;bottom:0;z-index:3}
+.itm-tbl tfoot td{
+  background:#97D700;color:#0A0F18;font-weight:800;font-size:14px;
+  padding:10px 10px;border-top:2px solid var(--divider);text-align:right;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+}
+.itm-tbl tfoot td:first-child,
+.itm-tbl tfoot td:nth-child(2),
+.itm-tbl tfoot td:nth-child(3){text-align:left;font-family:var(--font)}
+.itm-tbl tfoot td.sticky-col-1{position:sticky;left:0;z-index:4}
+.itm-tbl tfoot td.sticky-col-2{position:sticky;left:110px;z-index:4}
+.itm-tbl tfoot td.sticky-col-3{position:sticky;left:390px;z-index:4}
+.itm-tbl td.itm-ly{color:var(--text3);font-style:italic;font-size:12px;background:rgba(120,135,155,0.06)}
+.itm-tbl td.itm-zero{color:var(--text4)}
+.itm-tbl-sm thead th{font-size:9px}
+.itm-tbl-sm tbody td{padding:6px 10px;font-size:12px}
+@media print{
+  .sidebar, .topbar, .card-hdr, .export-btn, #itm-mapping-flag { display:none !important; }
+  .itm-tbl { font-size:9px }
+  .itm-tbl thead th { background:#004A64 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact }
+  .itm-tbl tbody tr.itm-group-row td { background:#004A64 !important; color:#fff !important }
+}
+
 /* ===== ENRICHED KPI (Home hero strip) ===== */
 .kpi-enr{display:flex;flex-direction:column}
 .kpi-enr .kpi-enr-div{height:1px;background:var(--divider);margin:10px 0 8px}
@@ -860,7 +932,7 @@ body{
       <div class="nav-item">
         <span class="nav-icon">📈</span><span class="nav-label">Customer Plotting</span>
       </div>
-      <div class="nav-item">
+      <div class="nav-item" onclick="navTo('pg-itemized',this)">
         <span class="nav-icon">🗂</span><span class="nav-label">Itemized Sales</span>
       </div>
     </nav>
@@ -2837,6 +2909,90 @@ body{
         </div>
       </div>
 
+      <!-- ===== ITEMIZED SALES ===== -->
+      <div class="page" id="pg-itemized">
+
+        <!-- Controls bar -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-body" style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+            <div>
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px">District</div>
+              <select id="itm-district" onchange="loadItemized()" style="margin-top:4px;padding:7px 14px;border-radius:6px;background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:12px;font-weight:600;min-width:260px;cursor:pointer">
+                <option value="TOTAL NATIONAL 2026">Loading…</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px">District Manager</div>
+              <div id="itm-manager" style="margin-top:8px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--gold);min-width:140px">—</div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px">Year</div>
+              <select id="itm-year" onchange="loadItemized()" style="margin-top:4px;padding:7px 14px;border-radius:6px;background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">
+                <option value="2026" selected>2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px">Unit</div>
+              <div class="tb-toggle" style="margin-top:4px" id="itm-unit-toggle">
+                <button class="tb-toggle-btn" onclick="setItemizedUnit(this,'BAGS')">BAGS</button>
+                <button class="tb-toggle-btn active" onclick="setItemizedUnit(this,'MT')">MT</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px">Compare</div>
+              <label style="display:flex;align-items:center;gap:6px;margin-top:7px;cursor:pointer;user-select:none">
+                <input type="checkbox" id="itm-show-ly" checked onchange="renderItemized()" style="width:14px;height:14px;accent-color:var(--blue)">
+                <span style="font-size:11px;font-weight:600;color:var(--text2)">vs LY</span>
+              </label>
+            </div>
+            <div style="flex:1"></div>
+            <div>
+              <input id="itm-search" type="text" placeholder="Filter SKUs by name or code…" oninput="renderItemized()" style="padding:7px 14px;border-radius:6px;background:var(--bg3);border:1px solid var(--divider);color:var(--text);font-family:var(--font);font-size:12px;min-width:220px">
+            </div>
+            <button class="export-btn" onclick="exportItemizedXlsx()" title="Download branded Excel">⬇ Export Excel</button>
+            <button class="export-btn" onclick="window.print()" style="border-color:var(--text4);color:var(--text2)">🖨 Print</button>
+          </div>
+        </div>
+
+        <!-- KPI strip -->
+        <div class="grid-4 stagger" style="margin-bottom:12px" id="itm-kpi-strip">
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">District Volume YTD</div><div class="kpi-val" style="font-size:20px" id="itm-kpi-mt">—</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="itm-kpi-vs">vs LY</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">District Volume YTD (Bags)</div><div class="kpi-val" style="font-size:20px" id="itm-kpi-bags">—</div><div class="kpi-delta" style="color:var(--text3);font-size:10px">total bags</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Active SKUs</div><div class="kpi-val" style="font-size:20px" id="itm-kpi-skus">—</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="itm-kpi-skus-sub">of — total SKUs</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Top Brand</div><div class="kpi-val" style="font-size:18px;color:var(--blue)" id="itm-kpi-topbrand">—</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="itm-kpi-topbrand-sub">share</div></div>
+        </div>
+
+        <!-- Mapping flag (PHASE 1) -->
+        <div id="itm-mapping-flag" style="display:none;padding:10px 16px;margin-bottom:12px;border-radius:6px;background:var(--glow-gold);color:var(--gold);border:1px solid rgba(255,199,44,0.2);font-size:11px;font-weight:600">
+          ⚠ Phase 1: District-level SAP mapping not yet wired. Structure is shown with zero volumes. TOTAL NATIONAL is fully live.
+        </div>
+
+        <!-- Main itemized table -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-body" style="padding:0;overflow:auto;max-height:72vh">
+            <table class="itm-tbl" id="itm-tbl">
+              <thead id="itm-thead"></thead>
+              <tbody id="itm-tbody"><tr><td style="text-align:center;color:var(--text3);padding:40px">Loading…</td></tr></tbody>
+              <tfoot id="itm-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Form summary -->
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">Form Summary</div></div>
+          <div class="card-body" style="padding:0 20px 20px;overflow-x:auto">
+            <table class="itm-tbl itm-tbl-sm">
+              <thead id="itm-form-thead"></thead>
+              <tbody id="itm-form-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
@@ -3020,6 +3176,7 @@ var pageTitles = {
   'pg-insights':['Customer Intelligence','Buying Patterns · Whitespace · Growth Vectors'],
   'pg-team':['Sales Team','Org Scorecard · YTD vs Budget'],
   'pg-budget':['Budget & P&L','FY 2026 · vs Actual'],
+  'pg-itemized':['Itemized Sales','OINV · INV1 · OITM — VPI products by district'],
 };
 
 function navTo(id, navItem){
@@ -3118,6 +3275,7 @@ function loadPage(id){
     case 'pg-insights': loadIntelligence(); break;
     case 'pg-team': loadTeam(); break;
     case 'pg-budget': loadBudget(); break;
+    case 'pg-itemized': loadItemized(); break;
   }
   initCharts(id);
 }
@@ -4171,6 +4329,358 @@ async function loadBudget(){
     }
     pulseRefresh('pg-budget');
   } catch(e) { console.error('Budget:', e); showError('pg-budget','Unable to load budget data'); }
+}
+
+/* ===== ITEMIZED SALES — page logic ===== */
+var ITM_STATE = {
+  data: null,
+  unit: 'MT',              // 'MT' or 'BAGS'
+  showLY: true,
+  collapsed: {},           // { groupName: true/false }
+  districtsLoaded: false
+};
+var MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function itmFmt(v){
+  if (v == null || v === 0) return '—';
+  if (ITM_STATE.unit === 'BAGS'){
+    return Math.round(v).toLocaleString('en-US');
+  }
+  return Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : v.toFixed(1);
+}
+function itmFmtTotal(v){
+  if (v == null) return '—';
+  if (ITM_STATE.unit === 'BAGS') return Math.round(v).toLocaleString('en-US');
+  return Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'K' : (Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : v.toFixed(1));
+}
+
+function setItemizedUnit(el, unit){
+  if (el) addClickAnimation(el);
+  document.querySelectorAll('#itm-unit-toggle .tb-toggle-btn').forEach(function(b){ b.classList.remove('active') });
+  if (el) el.classList.add('active');
+  ITM_STATE.unit = unit;
+  renderItemized();
+}
+
+function toggleItemizedGroup(name){
+  ITM_STATE.collapsed[name] = !ITM_STATE.collapsed[name];
+  try { localStorage.setItem('itm_collapse', JSON.stringify(ITM_STATE.collapsed)); } catch(e){}
+  renderItemized();
+}
+
+async function populateItemizedDropdown(){
+  if (ITM_STATE.districtsLoaded) return;
+  try {
+    var meta = await apiFetch('itemized/meta');
+    if (!meta) return;
+    var sel = document.getElementById('itm-district');
+    if (!sel) return;
+    var html = '';
+    var sections = meta.districts || {};
+    var map = {
+      TOTAL: 'REGIONAL TOTALS',
+      DISTRICT: 'DISTRICTS',
+      KEY_ACCOUNTS: 'KEY ACCOUNTS',
+      PET: 'PET',
+      OTHER: 'OTHER'
+    };
+    // Put TOTAL NATIONAL first — default selection
+    html += '<optgroup label="▸ DEFAULT">';
+    html += '<option value="TOTAL NATIONAL 2026" selected>TOTAL NATIONAL 2026</option>';
+    html += '</optgroup>';
+    ['TOTAL','DISTRICT','KEY_ACCOUNTS','PET','OTHER'].forEach(function(k){
+      var list = sections[k] || [];
+      if (!list.length) return;
+      html += '<optgroup label="── '+map[k]+' ──">';
+      list.forEach(function(name){
+        if (name === 'TOTAL NATIONAL 2026') return;  // already added
+        html += '<option value="'+esc(name)+'">'+esc(name)+'</option>';
+      });
+      html += '</optgroup>';
+    });
+    sel.innerHTML = html;
+    ITM_STATE.districtsLoaded = true;
+  } catch(err){ console.error('[ITM] dropdown load:', err); }
+}
+
+async function loadItemized(){
+  clearError('pg-itemized');
+  try {
+    await populateItemizedDropdown();
+    var district = (document.getElementById('itm-district') || {}).value || 'TOTAL NATIONAL 2026';
+    var year     = parseInt((document.getElementById('itm-year') || {}).value) || 2026;
+    // Restore persisted collapse state
+    try { ITM_STATE.collapsed = JSON.parse(localStorage.getItem('itm-collapse') || '{}'); } catch(e){ ITM_STATE.collapsed = {}; }
+    var tbody = document.getElementById('itm-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td style="text-align:center;color:var(--text3);padding:40px" colspan="30">Loading SAP data…</td></tr>';
+    var d = await apiFetch('itemized', { district: district, year: year, compare_year: year - 1 });
+    if (!d){ showError('pg-itemized','Unable to load itemized data'); return; }
+    console.log('[ITM] loaded', d.district, d.active_sku_count+'/'+d.total_sku_count+' SKUs', d.query_ms+'ms SQL');
+    ITM_STATE.data = d;
+    // Manager line
+    sett('itm-manager', d.district_manager || '—');
+    // KPIs
+    animateNumber(sel('itm-kpi-mt'), d.district_total.total_mt_cy, function(v){ return fcn(Math.round(v))+'<span style="font-size:11px;color:var(--text3)"> MT</span>'; });
+    animateNumber(sel('itm-kpi-bags'), d.district_total.total_bags_cy, function(v){ return fcn(Math.round(v)); });
+    sett('itm-kpi-skus', d.active_sku_count);
+    sett('itm-kpi-skus-sub', 'of ' + d.total_sku_count + ' total SKUs');
+    // Top brand
+    var topGroup = (d.groups || []).slice().sort(function(a,b){
+      var sa = (a.skus||[]).reduce(function(s,x){return s+x.total_mt_cy},0) + (a.sub_groups||[]).reduce(function(s,sg){return s+(sg.skus||[]).reduce(function(ss,x){return ss+x.total_mt_cy},0)},0);
+      var sb = (b.skus||[]).reduce(function(s,x){return s+x.total_mt_cy},0) + (b.sub_groups||[]).reduce(function(s,sg){return s+(sg.skus||[]).reduce(function(ss,x){return ss+x.total_mt_cy},0)},0);
+      return sb - sa;
+    })[0];
+    if (topGroup && d.district_total.total_mt_cy > 0){
+      var topVol = (topGroup.skus||[]).reduce(function(s,x){return s+x.total_mt_cy},0) + (topGroup.sub_groups||[]).reduce(function(s,sg){return s+(sg.skus||[]).reduce(function(ss,x){return ss+x.total_mt_cy},0)},0);
+      sett('itm-kpi-topbrand', topGroup.name);
+      sett('itm-kpi-topbrand-sub', Math.round(topVol / d.district_total.total_mt_cy * 100) + '% share');
+    } else {
+      sett('itm-kpi-topbrand','—'); sett('itm-kpi-topbrand-sub','no volume');
+    }
+    // vs LY delta
+    if (d.district_total.vs_ly_pct != null){
+      var vs = d.district_total.vs_ly_pct;
+      var el = sel('itm-kpi-vs');
+      if (el){
+        el.textContent = (vs >= 0 ? '▲ ' : '▼ ') + Math.abs(vs).toFixed(1) + '% vs LY';
+        el.style.color = vs >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+    }
+    // Mapping flag (Phase 1)
+    document.getElementById('itm-mapping-flag').style.display = d.district_mapping_pending ? '' : 'none';
+    // Render table
+    renderItemized();
+    pulseRefresh('pg-itemized');
+  } catch(err){
+    console.error('[ITM] load error:', err);
+    showError('pg-itemized','Unable to load itemized data');
+  }
+}
+
+function renderItemized(){
+  var d = ITM_STATE.data;
+  if (!d) return;
+  var showLY = document.getElementById('itm-show-ly').checked;
+  ITM_STATE.showLY = showLY;
+  var q = ((document.getElementById('itm-search') || {}).value || '').trim().toLowerCase();
+  var unitLabel = ITM_STATE.unit;  // 'MT' or 'BAGS'
+
+  // Build thead
+  var thead = '<tr>';
+  thead += '<th class="sticky-col-1">Code</th>';
+  thead += '<th class="sticky-col-2">Product</th>';
+  thead += '<th class="sticky-col-3">kg</th>';
+  MONTH_LABELS.forEach(function(m){
+    thead += '<th>'+m+'</th>';
+    if (showLY) thead += '<th class="itm-ly">'+m+' LY</th>';
+  });
+  thead += '<th>Total</th>';
+  if (showLY){
+    thead += '<th class="itm-ly">Total LY</th>';
+    thead += '<th>vs LY %</th>';
+  }
+  thead += '</tr>';
+  document.getElementById('itm-thead').innerHTML = thead;
+
+  function skuRow(s){
+    if (q && !(s.name||'').toLowerCase().includes(q) && !(s.item_code||'').toLowerCase().includes(q)) return '';
+    var monCy = unitLabel === 'BAGS' ? s.monthly_bags_cy : s.monthly_mt_cy;
+    var monLy = unitLabel === 'BAGS' ? s.monthly_bags_ly : s.monthly_mt_ly;
+    var totCy = unitLabel === 'BAGS' ? s.total_bags_cy : s.total_mt_cy;
+    var totLy = unitLabel === 'BAGS' ? s.total_bags_ly : s.total_mt_ly;
+    var row = '<tr>';
+    row += '<td class="sticky-col-1">'+esc(s.item_code)+'</td>';
+    row += '<td class="sticky-col-2">'+esc(s.name||'')+'</td>';
+    row += '<td class="sticky-col-3">'+(s.bag_size_kg!=null?s.bag_size_kg:'—')+'</td>';
+    for (var i=0; i<12; i++){
+      row += '<td class="'+(monCy[i]?'':'itm-zero')+'">'+itmFmt(monCy[i])+'</td>';
+      if (showLY) row += '<td class="itm-ly">'+itmFmt(monLy[i])+'</td>';
+    }
+    row += '<td><b>'+itmFmtTotal(totCy)+'</b></td>';
+    if (showLY){
+      row += '<td class="itm-ly">'+itmFmtTotal(totLy)+'</td>';
+      var vsCls = s.vs_ly_pct>=0?'up':'down';
+      row += '<td class="'+(s.vs_ly_pct!=null?vsCls:'')+'">'+(s.vs_ly_pct!=null?((s.vs_ly_pct>=0?'+':'')+s.vs_ly_pct.toFixed(1)+'%'):'—')+'</td>';
+    }
+    row += '</tr>';
+    return row;
+  }
+  function subtotalRow(label, skus){
+    if (!skus.length) return '';
+    var monCy = new Array(12).fill(0), monLy = new Array(12).fill(0);
+    var totCy = 0, totLy = 0;
+    skus.forEach(function(s){
+      var mCy = unitLabel==='BAGS'?s.monthly_bags_cy:s.monthly_mt_cy;
+      var mLy = unitLabel==='BAGS'?s.monthly_bags_ly:s.monthly_mt_ly;
+      mCy.forEach(function(v,i){ monCy[i]+=v });
+      mLy.forEach(function(v,i){ monLy[i]+=v });
+      totCy += unitLabel==='BAGS'?s.total_bags_cy:s.total_mt_cy;
+      totLy += unitLabel==='BAGS'?s.total_bags_ly:s.total_mt_ly;
+    });
+    var vsLy = totLy>0?((totCy-totLy)/totLy*100):null;
+    var row = '<tr class="itm-subtotal-row">';
+    row += '<td class="sticky-col-1">—</td>';
+    row += '<td class="sticky-col-2">'+esc(label)+' subtotal</td>';
+    row += '<td class="sticky-col-3"></td>';
+    for (var i=0; i<12; i++){
+      row += '<td>'+itmFmt(monCy[i])+'</td>';
+      if (showLY) row += '<td class="itm-ly">'+itmFmt(monLy[i])+'</td>';
+    }
+    row += '<td><b>'+itmFmtTotal(totCy)+'</b></td>';
+    if (showLY){
+      row += '<td class="itm-ly">'+itmFmtTotal(totLy)+'</td>';
+      row += '<td>'+(vsLy!=null?((vsLy>=0?'+':'')+vsLy.toFixed(1)+'%'):'—')+'</td>';
+    }
+    row += '</tr>';
+    return row;
+  }
+
+  var colCount = 3 + 12*(showLY?2:1) + (showLY?3:1);
+  var tbody = '';
+  (d.groups || []).forEach(function(g){
+    var collapsed = !!ITM_STATE.collapsed[g.name];
+    var triangle = collapsed ? '▶' : '▼';
+    tbody += '<tr class="itm-group-row"><td colspan="'+colCount+'" onclick="toggleItemizedGroup(\''+g.name.replace(/\\'/g,"\\\\'")+'\')">'+triangle+' '+esc(g.name)+'</td></tr>';
+    if (!collapsed){
+      // Direct SKUs under this group
+      (g.skus || []).forEach(function(s){ tbody += skuRow(s); });
+      // Sub-groups
+      (g.sub_groups || []).forEach(function(sg){
+        tbody += '<tr class="itm-subgroup-row"><td colspan="'+colCount+'">'+esc(sg.name)+'</td></tr>';
+        (sg.skus || []).forEach(function(s){ tbody += skuRow(s); });
+        tbody += subtotalRow(sg.name, sg.skus || []);
+      });
+      // Group subtotal if it has direct SKUs
+      if ((g.skus||[]).length) tbody += subtotalRow(g.name, g.skus);
+    }
+  });
+  if (!tbody) tbody = '<tr><td colspan="'+colCount+'" style="text-align:center;color:var(--text3);padding:30px">No SKUs match filter</td></tr>';
+  document.getElementById('itm-tbody').innerHTML = tbody;
+
+  // Grand total footer
+  var dt = d.district_total;
+  var monCy = unitLabel==='BAGS'?dt.monthly_bags_cy:dt.monthly_mt_cy;
+  var monLy = unitLabel==='BAGS'?dt.monthly_bags_ly:dt.monthly_mt_ly;
+  var totCy = unitLabel==='BAGS'?dt.total_bags_cy:dt.total_mt_cy;
+  var totLy = unitLabel==='BAGS'?dt.total_bags_ly:dt.total_mt_ly;
+  var tfoot = '<tr><td class="sticky-col-1">TOTAL</td><td class="sticky-col-2">'+d.district+'</td><td class="sticky-col-3"></td>';
+  for (var i=0; i<12; i++){
+    tfoot += '<td>'+itmFmt(monCy[i])+'</td>';
+    if (showLY) tfoot += '<td>'+itmFmt(monLy[i])+'</td>';
+  }
+  tfoot += '<td>'+itmFmtTotal(totCy)+'</td>';
+  if (showLY){
+    tfoot += '<td>'+itmFmtTotal(totLy)+'</td>';
+    tfoot += '<td>'+(dt.vs_ly_pct!=null?((dt.vs_ly_pct>=0?'+':'')+dt.vs_ly_pct.toFixed(1)+'%'):'—')+'</td>';
+  }
+  tfoot += '</tr>';
+  document.getElementById('itm-tfoot').innerHTML = tfoot;
+
+  // Form summary table
+  var fhead = '<tr><th style="min-width:180px">Form</th>';
+  MONTH_LABELS.forEach(function(m){ fhead += '<th>'+m+'</th>'; });
+  fhead += '<th>Total</th></tr>';
+  document.getElementById('itm-form-thead').innerHTML = fhead;
+  var fbody = '';
+  (d.form_summary || []).forEach(function(f){
+    var mon = unitLabel==='BAGS'?f.monthly_bags_cy:f.monthly_mt_cy;
+    var tot = unitLabel==='BAGS'?f.total_bags_cy:f.total_mt_cy;
+    fbody += '<tr><td style="font-weight:700">'+esc(f.form)+'</td>';
+    for (var i=0; i<12; i++) fbody += '<td>'+itmFmt(mon[i])+'</td>';
+    fbody += '<td><b>'+itmFmtTotal(tot)+'</b></td></tr>';
+  });
+  document.getElementById('itm-form-tbody').innerHTML = fbody;
+}
+
+// Excel export — builds a workbook with the current rendered data, Vienovo-branded
+function exportItemizedXlsx(){
+  if (typeof XLSX === 'undefined'){ alert('Export library not loaded'); return; }
+  var d = ITM_STATE.data;
+  if (!d){ alert('No data to export'); return; }
+  // Build an AOA (array of arrays) matching the reference structure
+  var aoa = [];
+  // R1: manager
+  aoa.push([d.district_manager || '', '', '', 'VIENOVO PHILIPPINES INC.']);
+  // R2: section headers
+  var hdrs2 = ['', '', '', ''];
+  hdrs2[4] = 'IN BAGS ('+d.year+')';
+  for (var i=0; i<11; i++) hdrs2.push('');   // pad months
+  hdrs2.push('');                              // col Q total label
+  hdrs2.push('');                              // col R spacer
+  hdrs2.push('IN METRIC TONS ('+d.year+')');
+  for (var j=0; j<11; j++) hdrs2.push('');
+  hdrs2.push('');
+  aoa.push(hdrs2);
+  // R3: column headers
+  var hdrs3 = ['Code','ItemCode','Product','kg'];
+  MONTH_LABELS.forEach(function(m){ hdrs3.push(m); });
+  hdrs3.push('Total');
+  hdrs3.push('');  // spacer
+  MONTH_LABELS.forEach(function(m){ hdrs3.push(m); });
+  hdrs3.push('Total');
+  aoa.push(hdrs3);
+  // Groups
+  (d.groups || []).forEach(function(g){
+    aoa.push(['', '', g.name]);   // group row
+    (g.skus || []).forEach(function(s){
+      var r = ['', s.item_code, s.name, s.bag_size_kg];
+      s.monthly_bags_cy.forEach(function(v){ r.push(v || 0); });
+      r.push(s.total_bags_cy);
+      r.push('');
+      s.monthly_mt_cy.forEach(function(v){ r.push(v || 0); });
+      r.push(s.total_mt_cy);
+      aoa.push(r);
+    });
+    (g.sub_groups || []).forEach(function(sg){
+      aoa.push(['', '', sg.name]);
+      (sg.skus || []).forEach(function(s){
+        var r = ['', s.item_code, s.name, s.bag_size_kg];
+        s.monthly_bags_cy.forEach(function(v){ r.push(v || 0); });
+        r.push(s.total_bags_cy);
+        r.push('');
+        s.monthly_mt_cy.forEach(function(v){ r.push(v || 0); });
+        r.push(s.total_mt_cy);
+        aoa.push(r);
+      });
+    });
+  });
+  // Form summary
+  (d.form_summary || []).forEach(function(f){
+    var r = ['', '', f.form, ''];
+    f.monthly_bags_cy.forEach(function(v){ r.push(v || 0); });
+    r.push(f.total_bags_cy);
+    r.push('');
+    f.monthly_mt_cy.forEach(function(v){ r.push(v || 0); });
+    r.push(f.total_mt_cy);
+    aoa.push(r);
+  });
+  // Grand total
+  var tr = ['', '', 'TOTAL', ''];
+  d.district_total.monthly_bags_cy.forEach(function(v){ tr.push(v || 0); });
+  tr.push(d.district_total.total_bags_cy);
+  tr.push('');
+  d.district_total.monthly_mt_cy.forEach(function(v){ tr.push(v || 0); });
+  tr.push(d.district_total.total_mt_cy);
+  aoa.push(tr);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  // Column widths
+  ws['!cols'] = [{wch:8},{wch:14},{wch:44},{wch:5}]
+    .concat(MONTH_LABELS.map(function(){return {wch:8}}))
+    .concat([{wch:10},{wch:2}])
+    .concat(MONTH_LABELS.map(function(){return {wch:8}}))
+    .concat([{wch:10}]);
+  // Apply xlsx-js-style cell styling if the bundle is loaded
+  if (XLSX.utils.book_new && (XLSX.writeFile + '').indexOf('style') !== -1){
+    // xlsx-js-style bundle detected
+  }
+  // Style the group header rows and totals (best-effort; plain xlsx won't render colors)
+  var wb = XLSX.utils.book_new();
+  var sheetName = (d.district || 'Itemized').slice(0, 28);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  var dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var fname = 'VPI_Itemized_' + (d.district||'Data').replace(/[^a-zA-Z0-9]+/g,'_') + '_' + d.year + '_' + dateStr + '.xlsx';
+  XLSX.writeFile(wb, fname);
 }
 
 // ===== CHARTS =====

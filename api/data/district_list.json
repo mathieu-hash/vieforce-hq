@@ -1,0 +1,60 @@
+{
+  "DISTRICT": [
+    "CEBU NORTH",
+    "CEBU SOUTH",
+    "CENTRAL CEBU",
+    "BOHOL",
+    "LEYTE",
+    "SAMAR",
+    "NEGROS OR",
+    "NEGROS OCC",
+    "PANAY",
+    "PALAWAN",
+    "NORTH MIN",
+    "EAST MIN",
+    "WEST MIN 1",
+    "WEST MIN 2",
+    "SOUTH MIN",
+    "CENTRAL MIN",
+    "NE LUZON",
+    "NW LUZON",
+    "CENTRAL LUZ",
+    "ILOCOS",
+    "CAGAYAN",
+    "NORTH LUZ",
+    "CALABARZON",
+    "BICOL",
+    "MINDORO"
+  ],
+  "KEY_ACCOUNTS": [
+    "KA NEG-PANAY",
+    "KA - SM",
+    "KA - CM",
+    "KA - MIN",
+    "KA LUZON",
+    "KA - RIZAL-CAVITE",
+    "KA - NL"
+  ],
+  "PET": [
+    "PET VISAYAS",
+    "PET MINDANAO",
+    "PET LUZON"
+  ],
+  "OTHER": [
+    "CSD",
+    "MATHIEU"
+  ],
+  "TOTAL": [
+    "TOTAL CENTRAL&EAST VIS 2025",
+    "TOTAL WEST VISAYAS 2025",
+    "TOTAL VISAYAS 2025",
+    "TOTAL MINDANAO 2025",
+    "TOTAL NORTH LUZON 2025",
+    "TOTAL SOUTH LUZON 2025",
+    "TOTAL LUZON 2025",
+    "TOTAL KA VISMIN 2025",
+    "TOTAL KA LUZON 2025",
+    "TOTAL PET 2025",
+    "TOTAL NATIONAL 2025"
+  ]
+}
