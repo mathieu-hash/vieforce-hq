@@ -219,7 +219,15 @@ module.exports = async (req, res) => {
 
     const result = {
       period,
-      actual_mt: Math.round(actual_mt * 10) / 10,
+      // Canonical (new) names — prefer these on the frontend
+      mtd_actual:     Math.round(actual_mt * 10) / 10,
+      daily_pullout:  Math.round(speed_per_day * 10) / 10,
+      days_elapsed:   elapsed_days,
+      days_total:     total_days,
+      days_remaining: total_days - elapsed_days,
+      projected_mtd:  projected_mt,
+      // Legacy names (kept for back-compat with existing pages)
+      actual_mt:     Math.round(actual_mt * 10) / 10,
       speed_per_day: Math.round(speed_per_day * 10) / 10,
       elapsed_days,
       total_days,
