@@ -60,6 +60,48 @@ function getPeriodEnd(period) {
   }
 }
 
+/**
+ * Prior period window (same shape as current, shifted one period back).
+ * Used for vs_prior_period_pct on Daily Pullout.
+ */
+function getPriorPeriodWindow(period, currentFrom, today) {
+  const day = 86400000
+  switch (period) {
+    case '7D': {
+      return {
+        from: new Date(currentFrom.getTime() - 7 * day),
+        to:   new Date(today.getTime() - 7 * day)
+      }
+    }
+    case 'MTD': {
+      // Previous month, from day 1 through same day-of-month (clamped to month length)
+      const from = new Date(currentFrom.getFullYear(), currentFrom.getMonth() - 1, 1)
+      const lastDayPrev = new Date(today.getFullYear(), today.getMonth(), 0).getDate()
+      const to = new Date(currentFrom.getFullYear(), currentFrom.getMonth() - 1,
+                          Math.min(today.getDate(), lastDayPrev))
+      return { from, to }
+    }
+    case 'QTD': {
+      // Previous quarter, from Q start through same elapsed days count (calendar)
+      const pq = Math.floor(currentFrom.getMonth() / 3) - 1
+      const pyear = pq < 0 ? currentFrom.getFullYear() - 1 : currentFrom.getFullYear()
+      const pqMonthStart = pq < 0 ? 9 : pq * 3
+      const from = new Date(pyear, pqMonthStart, 1)
+      const elapsedMs = today.getTime() - currentFrom.getTime()
+      const to = new Date(from.getTime() + elapsedMs)
+      return { from, to }
+    }
+    case 'YTD': {
+      return {
+        from: new Date(currentFrom.getFullYear() - 1, 0, 1),
+        to:   new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
+      }
+    }
+    default:
+      return { from: currentFrom, to: today }
+  }
+}
+
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -217,7 +259,7 @@ module.exports = async (req, res) => {
       }))
     }
 
-    // Last month comparison (same-day-of-month window)
+    // Last month comparison (same-day-of-month window) — kept for legacy
     const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
     const lastMonthEnd   = new Date(today.getFullYear(), today.getMonth(), 0)
     const lastMonthSameDay = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
@@ -236,21 +278,46 @@ module.exports = async (req, res) => {
     const vs_lm_volume = actual_mt - lm_same
     const vs_lm_pct = lm_same > 0 ? Math.round(((actual_mt - lm_same) / lm_same) * 1000) / 10 : 0
 
+    // ---- vs prior period (same shape, shifted back) for dynamic Daily Pullout ----
+    const prior = getPriorPeriodWindow(period, dateFrom, today)
+    const priorRow = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'
+    `, { pFrom: prior.from, pTo: prior.to })
+
+    const prior_period_volume = priorRow[0]?.mt || 0
+    const prior_elapsed_days = countShippingDays(prior.from, prior.to)
+    const prior_daily_pullout = prior_elapsed_days > 0 ? prior_period_volume / prior_elapsed_days : 0
+    const vs_prior_period_pct = prior_daily_pullout > 0
+      ? Math.round(((speed_per_day - prior_daily_pullout) / prior_daily_pullout) * 1000) / 10
+      : 0
+
     const result = {
       period,
-      // Canonical (new) names — prefer these on the frontend
+      // ---- Canonical period-aware fields (prefer these) ----
+      period_volume_mt:          Math.round(actual_mt * 10) / 10,
+      shipping_days_elapsed:     elapsed_days,
+      shipping_days_total:       total_days,
+      shipping_days_remaining:   total_days - elapsed_days,
+      daily_pullout:             Math.round(speed_per_day * 10) / 10,
+      projected_period_volume:   projected_mt,
+      vs_prior_period_pct:       vs_prior_period_pct,
+      prior_period_volume_mt:    Math.round(prior_period_volume * 10) / 10,
+      prior_period_daily_pullout:Math.round(prior_daily_pullout * 10) / 10,
+      // ---- Back-compat aliases (retain for older code paths) ----
       mtd_actual:     Math.round(actual_mt * 10) / 10,
-      daily_pullout:  Math.round(speed_per_day * 10) / 10,
       days_elapsed:   elapsed_days,
       days_total:     total_days,
       days_remaining: total_days - elapsed_days,
       projected_mtd:  projected_mt,
-      // Last-month comparison
       last_month_full_mt:      Math.round(lm_full * 10) / 10,
       last_month_same_day_mt:  Math.round(lm_same * 10) / 10,
       vs_last_month_volume:    Math.round(vs_lm_volume * 10) / 10,
       vs_last_month_pct:       vs_lm_pct,
-      // Legacy names (kept for back-compat with existing pages)
+      // Legacy names kept for back-compat with existing pages
       actual_mt:     Math.round(actual_mt * 10) / 10,
       speed_per_day: Math.round(speed_per_day * 10) / 10,
       elapsed_days,
