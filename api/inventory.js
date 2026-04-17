@@ -36,6 +36,7 @@ module.exports = async (req, res) => {
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
       WHERE W.Inactive = 'N'
+        AND UPPER(IW.ItemCode) LIKE 'FG%'   -- FINISHED GOODS only (match itemized classifier)
         ${plantFilter}
       GROUP BY W.WhsCode, W.WhsName
       ORDER BY W.WhsCode
@@ -61,6 +62,7 @@ module.exports = async (req, res) => {
       INNER JOIN OITM I  ON IW.ItemCode = I.ItemCode
       WHERE W.Inactive = 'N'
         AND IW.OnHand > 0
+        AND UPPER(IW.ItemCode) LIKE 'FG%'
         ${plantFilter}
       ORDER BY W.WhsCode, I.ItemName
     `, { plant })
@@ -86,6 +88,7 @@ module.exports = async (req, res) => {
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
       WHERE W.Inactive = 'N'
+        AND UPPER(IW.ItemCode) LIKE 'FG%'
       GROUP BY
         CASE
           WHEN W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
@@ -96,10 +99,19 @@ module.exports = async (req, res) => {
       ORDER BY region
     `)
 
-    // --- By sales group (ItmsGrpCod → OITB.ItmsGrpNam) ---
+    // --- By sales group (based on ItemName first-word for feed segmentation) ---
+    // SAP OITB groups are organisational (FINISHED GOODS / RAW MATERIALS) not feed-ops
+    // (HOGS/POULTRY/GAMEFOWL). Group by ItemName prefix instead.
     const by_sales_group = await query(`
       SELECT
-        ISNULL(G.ItmsGrpNam, 'OTHERS')                                     AS group_name,
+        CASE
+          WHEN UPPER(I.ItemName) LIKE '%HOG%' OR UPPER(I.ItemName) LIKE '%PIGLET%' OR UPPER(I.ItemName) LIKE '%SOW%' OR UPPER(I.ItemName) LIKE '%BOAR%' THEN 'HOGS'
+          WHEN UPPER(I.ItemName) LIKE '%LAYER%' OR UPPER(I.ItemName) LIKE '%BROILER%' OR UPPER(I.ItemName) LIKE '%CHICK%' OR UPPER(I.ItemName) LIKE '%POULTRY%' OR UPPER(I.ItemName) LIKE '%DUCK%' THEN 'POULTRY'
+          WHEN UPPER(I.ItemName) LIKE '%GAMEFOWL%' OR UPPER(I.ItemName) LIKE '%MUSCLY%' THEN 'GAMEFOWL'
+          WHEN UPPER(I.ItemName) LIKE '%KEOS%' OR UPPER(I.ItemName) LIKE '%PLAISIR%' OR UPPER(I.ItemName) LIKE '%NOVOPET%' THEN 'PET'
+          WHEN UPPER(I.ItemName) LIKE '%VANA%' OR UPPER(I.ItemName) LIKE '%SHRIMP%' THEN 'AQUA'
+          ELSE 'OTHERS'
+        END                                                                AS group_name,
         ISNULL(SUM(IW.OnHand), 0)                                          AS on_hand_bags,
         ISNULL(SUM(IW.IsCommited), 0)                                      AS committed_bags,
         ISNULL(SUM(IW.OnOrder), 0)                                         AS on_order_bags,
@@ -108,9 +120,17 @@ module.exports = async (req, res) => {
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
-      LEFT JOIN OITB G ON I.ItmsGrpCod = G.ItmsGrpCod
       WHERE W.Inactive = 'N'
-      GROUP BY G.ItmsGrpNam
+        AND UPPER(IW.ItemCode) LIKE 'FG%'
+      GROUP BY
+        CASE
+          WHEN UPPER(I.ItemName) LIKE '%HOG%' OR UPPER(I.ItemName) LIKE '%PIGLET%' OR UPPER(I.ItemName) LIKE '%SOW%' OR UPPER(I.ItemName) LIKE '%BOAR%' THEN 'HOGS'
+          WHEN UPPER(I.ItemName) LIKE '%LAYER%' OR UPPER(I.ItemName) LIKE '%BROILER%' OR UPPER(I.ItemName) LIKE '%CHICK%' OR UPPER(I.ItemName) LIKE '%POULTRY%' OR UPPER(I.ItemName) LIKE '%DUCK%' THEN 'POULTRY'
+          WHEN UPPER(I.ItemName) LIKE '%GAMEFOWL%' OR UPPER(I.ItemName) LIKE '%MUSCLY%' THEN 'GAMEFOWL'
+          WHEN UPPER(I.ItemName) LIKE '%KEOS%' OR UPPER(I.ItemName) LIKE '%PLAISIR%' OR UPPER(I.ItemName) LIKE '%NOVOPET%' THEN 'PET'
+          WHEN UPPER(I.ItemName) LIKE '%VANA%' OR UPPER(I.ItemName) LIKE '%SHRIMP%' THEN 'AQUA'
+          ELSE 'OTHERS'
+        END
       ORDER BY on_hand_bags DESC
     `)
 
@@ -122,6 +142,7 @@ module.exports = async (req, res) => {
       WHERE W.Inactive = 'N'
         AND IW.OnHand > 0
         AND (IW.OnHand - IW.IsCommited) < 0
+        AND UPPER(IW.ItemCode) LIKE 'FG%'
     `)
 
     // --- Cover days (national: total on-hand / avg daily shipment last 30d) ---
