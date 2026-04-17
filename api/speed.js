@@ -211,12 +211,16 @@ module.exports = async (req, res) => {
     const today = new Date()
     const periodEnd = getPeriodEnd(period)
 
-    // elapsed_days respects the 5am cutoff (only count finalized shipping days)
+    // Calendar day counters (Mon-Sat) — for hero "X of Y shipping days" display
     const elapsed_days = dateFrom > cutoff ? 0 : countShippingDays(dateFrom, cutoff)
     const total_days = countShippingDays(dateFrom, periodEnd)
 
-    const speed_per_day = elapsed_days > 0 ? actual_mt / elapsed_days : 0
-    const projected_mt = elapsed_days > 0
+    // Daily pullout divisor = days that actually had shipments (matches Ops tool).
+    // Mon-Sat calendar days with zero shipments (holidays, plant-down) are excluded from the rate.
+    const days_with_shipments = (daily || []).filter(r => (r.daily_mt || 0) > 0).length
+    const divisor = days_with_shipments > 0 ? days_with_shipments : elapsed_days
+    const speed_per_day = divisor > 0 ? actual_mt / divisor : 0
+    const projected_mt = divisor > 0
       ? Math.round(speed_per_day * total_days)
       : 0
 
