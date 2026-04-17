@@ -1,0 +1,15 @@
+# Vercel is the frontend host only.
+# The API lives on Cloud Run — frontend/js/api.js calls Cloud Run directly.
+# Exclude server-side code from the Vercel build (and stay under the 12-function Hobby limit).
+api/
+server.js
+Dockerfile
+scripts/
+docs/
+node_modules/
+.autopsy/
+*.backup
+*.md
+app.html.backup
+index.html.backup
+vieforce-hq-desktop.html
