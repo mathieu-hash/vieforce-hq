@@ -86,6 +86,23 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
     `, { prevFrom: prev.from, prevTo: prev.to })
 
+    // --- Same period last year (for vs LY compare) ---
+    const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
+    const lyTo   = new Date(dateTo);   lyTo.setFullYear(lyTo.getFullYear() - 1)
+    const lyKpis = await query(`
+      SELECT
+        ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                                AS gmt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED = 'N'
+    `, { lyFrom, lyTo })
+
     // --- YTD actuals ---
     const ytdKpis = await query(`
       SELECT
@@ -114,21 +131,25 @@ module.exports = async (req, res) => {
       ${arFilteredWhere}
     `)
 
-    // --- DSO (active + total) ---
-    const dsoWhere = `WHERE T0.CANCELED = 'N' AND T0.DocDate >= DATEADD(YEAR, -1, GETDATE())`
-    const dsoFiltered = applyRoleFilter(session, dsoWhere)
+    // --- DSO (active + total) — trailing 90-day formula calibrated to Finance Dashboard ---
     const dsoRow = await query(`
+      DECLARE @ar_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE});
+      DECLARE @ar_total  DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate);
+      DECLARE @s90_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(O.DocTotal),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE});
+      DECLARE @s90_total  DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(O.DocTotal),0)
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()));
       SELECT
-        ISNULL(
-          (SELECT SUM(T0.DocTotal - T0.PaidToDate) FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${arFilteredWhere}) /
-          NULLIF((SELECT SUM(T0.DocTotal)/365.0 FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${dsoFiltered}),0),
-        0) AS dso_total,
-        ISNULL(
-          (SELECT SUM(T0.DocTotal - T0.PaidToDate) FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${arFilteredWhere} AND ${ACTIVE_PREDICATE}) /
-          NULLIF(
-            (SELECT SUM(T0.DocTotal)/365.0 FROM OINV T0 INNER JOIN OCRD C ON T0.CardCode=C.CardCode ${dsoFiltered} AND ${ACTIVE_PREDICATE}),
-          0),
-        0) AS dso_active
+        CASE WHEN @s90_active > 0 THEN @ar_active / (@s90_active/90.0) ELSE 0 END AS dso_active,
+        CASE WHEN @s90_total  > 0 THEN @ar_total  / (@s90_total /90.0) ELSE 0 END AS dso_total
     `)
 
     // --- Pending PO (open sales orders) + oldest age ---
@@ -204,7 +225,7 @@ module.exports = async (req, res) => {
       ) sub
     `, { dateFrom, dateTo })
 
-    const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}
+    const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}, ly = lyKpis[0] || {}
 
     // Delta vs previous period (pct)
     const delta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : 0)
@@ -223,11 +244,23 @@ module.exports = async (req, res) => {
         gross_margin: p.gross_margin || 0,
         gmt:          p.gmt || 0
       },
+      last_year: {
+        revenue:      ly.revenue || 0,
+        volume_mt:    ly.volume_mt || 0,
+        gross_margin: ly.gross_margin || 0,
+        gmt:          ly.gmt || 0
+      },
       delta_pct: {
         revenue:      delta(d.revenue, p.revenue),
         volume_mt:    delta(d.volume_mt, p.volume_mt),
         gross_margin: delta(d.gross_margin, p.gross_margin),
         gmt:          delta(d.gmt, p.gmt)
+      },
+      delta_pct_ly: {
+        revenue:      delta(d.revenue, ly.revenue),
+        volume_mt:    delta(d.volume_mt, ly.volume_mt),
+        gross_margin: delta(d.gross_margin, ly.gross_margin),
+        gmt:          delta(d.gmt, ly.gmt)
       },
       ytd: {
         revenue:      y.revenue || 0,

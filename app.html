@@ -1387,45 +1387,101 @@ body{
               <div class="kpi" style="text-align:center"><div class="kpi-label">Clients</div><div class="kpi-val" id="ar-clients">710</div></div>
               <div class="kpi" style="text-align:center;border-left:3px solid var(--red)"><div class="kpi-label" style="color:var(--red)">Delinquent AR</div><div class="kpi-val" style="color:var(--red)" id="ar-delinq">₱0</div><div class="kpi-delta" style="color:var(--text3);font-size:10px" id="ar-delinq-sub">0 customers frozen</div></div>
             </div>
+            <!-- Account Status strip -->
+            <div class="grid-3 stagger" style="margin-bottom:16px">
+              <div class="kpi" style="text-align:center;border-top:2px solid var(--green)"><div class="kpi-label">Active</div><div class="kpi-val" id="ar-status-active" style="color:var(--green)">0</div><div class="kpi-delta" style="color:var(--text3);font-size:10px">customers w/ AR</div></div>
+              <div class="kpi" style="text-align:center;border-top:2px solid var(--red)"><div class="kpi-label">Delinquent</div><div class="kpi-val" id="ar-status-delinq" style="color:var(--red)">0</div><div class="kpi-delta" style="color:var(--text3);font-size:10px">frozen + flagged</div></div>
+              <div class="kpi" style="text-align:center;border-top:2px solid var(--text4)"><div class="kpi-label">Inactive</div><div class="kpi-val" id="ar-status-inactive" style="color:var(--text3)">0</div><div class="kpi-delta" style="color:var(--text3);font-size:10px">dormant accounts</div></div>
+            </div>
+            <!-- 7-bucket Aging -->
             <div class="card" style="margin-bottom:16px">
-              <div class="card-hdr"><div class="card-title">AR Aging</div></div>
+              <div class="card-hdr"><div class="card-title">AR Aging (Active)</div><div class="card-badge b-green" id="ar-aging-total" style="font-family:var(--mono)">₱0</div></div>
               <div class="card-body">
-                <div class="aging-bar" style="margin-bottom:12px">
-                  <div style="width:50%;background:linear-gradient(135deg,var(--green),var(--green2))">50%</div>
-                  <div style="width:18%;background:linear-gradient(135deg,var(--blue),var(--blue2))">18%</div>
-                  <div style="width:12%;background:linear-gradient(135deg,var(--gold),#E0A800);color:#000">12%</div>
-                  <div style="width:20%;background:linear-gradient(135deg,var(--red),#CC3333)">20%</div>
+                <div class="aging-bar" style="margin-bottom:12px;display:flex;height:22px;border-radius:4px;overflow:hidden" id="ar-aging-bar">
+                  <div style="flex:0 0 74%;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000" data-bucket="current">74%</div>
+                  <div style="flex:0 0 16%;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700" data-bucket="d1_30">16%</div>
+                  <div style="flex:0 0 2%;background:var(--gold)" data-bucket="d31_60"></div>
+                  <div style="flex:0 0 1%;background:#E0A800" data-bucket="d61_90"></div>
+                  <div style="flex:0 0 1%;background:#F08030" data-bucket="d91_120"></div>
+                  <div style="flex:0 0 4%;background:linear-gradient(135deg,var(--red),#CC3333)" data-bucket="d121_365"></div>
+                  <div style="flex:0 0 4%;background:#8B0000" data-bucket="over_1y"></div>
                 </div>
-                <table class="tbl">
-                  <tr><th>Bucket</th><th class="num">Amount</th><th class="num">%</th><th class="num">Clients</th></tr>
-                  <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px"></span>Current (≤30d)</td><td class="num">₱381.4M</td><td class="num">50%</td><td class="num">383</td></tr>
-                  <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px"></span>1-30d Overdue</td><td class="num">₱137.5M</td><td class="num">18%</td><td class="num">142</td></tr>
-                  <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px"></span>31-60d Overdue</td><td class="num">₱91.7M</td><td class="num">12%</td><td class="num">98</td></tr>
-                  <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:8px"></span>&gt;60d Overdue</td><td class="num">₱153.2M</td><td class="num">20%</td><td class="num">87</td></tr>
+                <table class="tbl" id="ar-aging-table">
+                  <tr><th>Bucket</th><th class="num">Amount</th><th class="num">%</th></tr>
+                  <tr data-bucket="current"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px"></span>Current (not yet due)</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="d1_30"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px"></span>1-30d Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="d31_60"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px"></span>31-60d Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="d61_90"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E0A800;margin-right:8px"></span>61-90d Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="d91_120"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F08030;margin-right:8px"></span>91-120d Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="d121_365"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:8px"></span>121-365d Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
+                  <tr data-bucket="over_1y"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B0000;margin-right:8px"></span>Over 1 Year Overdue</td><td class="num">₱0</td><td class="num">0%</td></tr>
                 </table>
               </div>
             </div>
-            <div class="card">
+            <!-- Regional DSO -->
+            <div class="card" style="margin-bottom:16px">
               <div class="card-hdr"><div class="card-title">AR by Region</div></div>
               <div class="card-body" style="padding-top:8px">
                 <table class="tbl">
-                  <tr><th>Region</th><th class="num">AR Balance</th><th class="num">AR &gt;60d</th><th class="num">%Overdue</th><th class="num">DSO</th></tr>
-                  <tr><td style="font-weight:700">LUZON</td><td class="num">₱412M</td><td class="num" style="color:var(--red)">₱82M</td><td class="num">20%</td><td class="num"><span class="badge b-green">42d</span></td></tr>
-                  <tr><td style="font-weight:700">VISAYAS</td><td class="num">₱198M</td><td class="num" style="color:var(--red)">₱41M</td><td class="num">21%</td><td class="num"><span class="badge b-gold">51d</span></td></tr>
-                  <tr><td style="font-weight:700">MINDANAO</td><td class="num">₱154M</td><td class="num" style="color:var(--red)">₱30M</td><td class="num">19%</td><td class="num"><span class="badge b-red">58d</span></td></tr>
+                  <thead><tr><th>Region</th><th class="num">AR Balance</th><th class="num">90d Sales</th><th class="num">DSO</th></tr></thead>
+                  <tbody id="ar-region-tbody">
+                    <tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Top clients detail -->
+            <div class="card">
+              <div class="card-hdr"><div class="card-title">Top 20 Clients · Active</div></div>
+              <div class="card-body" style="padding-top:8px;overflow-x:auto">
+                <table class="tbl" style="min-width:900px">
+                  <thead><tr>
+                    <th style="min-width:180px">Client</th>
+                    <th class="num">AR</th>
+                    <th class="num">Current</th>
+                    <th class="num">Overdue</th>
+                    <th class="num">Falling Due</th>
+                    <th class="num">New Overdue</th>
+                    <th>Terms</th>
+                    <th class="num">Aging</th>
+                  </tr></thead>
+                  <tbody id="ar-clients-tbody">
+                    <tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
+                  </tbody>
                 </table>
               </div>
             </div>
           </div>
           <div>
+            <!-- DSO gauge -->
             <div class="dso-wrap"><div class="dso-gauge"><div class="dso-ring" id="ar-dso-ring"></div><div class="val" style="color:var(--green)" id="ar-dso-val">47</div><div class="lbl">DAYS DSO</div><div class="status" style="color:var(--green)" id="ar-dso-status">HEALTHY</div></div></div>
-            <div style="text-align:center;font-size:10px;color:var(--text3);margin-bottom:16px">▼ 3 days vs prior month · Target: &lt;55 days</div>
+            <div style="text-align:center;font-size:10px;color:var(--text3);margin-bottom:16px" id="ar-dso-sub">Target: &lt;45 days</div>
+            <!-- DSO Variation -->
+            <div class="card" style="margin-bottom:12px">
+              <div class="card-hdr"><div class="card-title">DSO · 7-day Variation</div></div>
+              <div class="card-body">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+                  <div><div style="font-size:10px;color:var(--text3)">7 DAYS AGO</div><div style="font-family:var(--mono);font-size:18px;font-weight:700" id="ar-dso-7d">—</div></div>
+                  <div style="text-align:right"><div style="font-size:10px;color:var(--text3)">TODAY</div><div style="font-family:var(--mono);font-size:18px;font-weight:700" id="ar-dso-now">—</div></div>
+                </div>
+                <div style="text-align:center;padding:8px;border-radius:4px" id="ar-dso-variation-wrap">
+                  <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Change</div>
+                  <div style="font-family:var(--mono);font-size:22px;font-weight:800" id="ar-dso-variation">—</div>
+                </div>
+              </div>
+            </div>
+            <!-- AR Variation -->
             <div class="card">
-              <div class="card-hdr"><div class="card-title">Collections · MTD</div><div class="card-badge b-green" style="font-family:var(--mono)">₱312M</div></div>
-              <div class="card-body" style="padding:0">
-                <div class="list-row"><div style="flex:1;font-size:12px"><b>Metro Feeds Corp.</b><br><span style="color:var(--text3);font-size:10px">Apr 11 · ORCT-4521</span></div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)">₱4.8M</div></div>
-                <div class="list-row"><div style="flex:1;font-size:12px"><b>Laguna Premium Feeds</b><br><span style="color:var(--text3);font-size:10px">Apr 10 · ORCT-4519</span></div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)">₱3.2M</div></div>
-                <div class="list-row"><div style="flex:1;font-size:12px"><b>Cebu Agri Partners</b><br><span style="color:var(--text3);font-size:10px">Apr 9 · ORCT-4517</span></div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)">₱2.9M</div></div>
+              <div class="card-hdr"><div class="card-title">AR · 7-day Variation</div></div>
+              <div class="card-body">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+                  <div><div style="font-size:10px;color:var(--text3)">7 DAYS AGO</div><div style="font-family:var(--mono);font-size:16px;font-weight:700" id="ar-bal-7d">—</div></div>
+                  <div style="text-align:right"><div style="font-size:10px;color:var(--text3)">TODAY</div><div style="font-family:var(--mono);font-size:16px;font-weight:700" id="ar-bal-now">—</div></div>
+                </div>
+                <div style="text-align:center;padding:8px;border-radius:4px" id="ar-bal-variation-wrap">
+                  <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Change</div>
+                  <div style="font-family:var(--mono);font-size:18px;font-weight:800" id="ar-bal-variation">—</div>
+                </div>
               </div>
             </div>
           </div>
@@ -2859,7 +2915,10 @@ if (S) { console.log('VieForce HQ session:', S.name, S.role, S.id); initApp(S); 
 else { console.error('No valid session — redirecting to login'); }
 
 /* ===== STATE ===== */
-var PD = 'MTD', RG = 'ALL', PG = 'pg-home', CX = {}, CH = {}, UT = 'MT', DC = {};
+var PD = localStorage.getItem('vf_period') || 'MTD';
+var CMP = localStorage.getItem('vf_compare') || 'vs_pp';
+var UT  = localStorage.getItem('vf_unit') || 'MT';
+var RG = 'ALL', PG = 'pg-home', CX = {}, CH = {}, DC = {};
 
 /* ===== INIT ===== */
 function initApp(s) {
@@ -2870,6 +2929,7 @@ function initApp(s) {
   // Restore theme
   var saved = localStorage.getItem('vf_theme');
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
+  syncFilterUI();
   loadPage('pg-home');
   // Auto-refresh every 60s
   setInterval(function(){ DC = {}; loadPage(PG); }, 60000);
@@ -2953,11 +3013,41 @@ function setPd(el){
   el.parentElement.querySelectorAll('.tb-chip').forEach(function(c){c.classList.remove('active')});
   el.classList.add('active');
   PD = el.textContent.trim();
-  DC = {};
+  try{localStorage.setItem('vf_period',PD)}catch(e){}
+  DC = {};               // clear cache — period change = refetch
   loadPage(PG);
 }
-function setCmp(el){el.parentElement.querySelectorAll('.tb-compare-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
-function setU(el){el.parentElement.querySelectorAll('.tb-toggle-btn').forEach(function(c){c.classList.remove('active')});el.classList.add('active');UT=el.textContent.trim()}
+function setCmp(el){
+  el.parentElement.querySelectorAll('.tb-compare-chip').forEach(function(c){c.classList.remove('active')});
+  el.classList.add('active');
+  CMP = el.textContent.trim().toLowerCase().indexOf('ly')>=0 ? 'vs_ly' : 'vs_pp';
+  try{localStorage.setItem('vf_compare',CMP)}catch(e){}
+  // No refetch needed — data already has both delta_pct and delta_pct_ly; just re-render
+  loadPage(PG);
+}
+function setU(el){
+  el.parentElement.querySelectorAll('.tb-toggle-btn').forEach(function(c){c.classList.remove('active')});
+  el.classList.add('active');
+  UT = el.textContent.trim();
+  try{localStorage.setItem('vf_unit',UT)}catch(e){}
+  // No refetch — volume_mt and volume_bags already returned; re-render switches display
+  loadPage(PG);
+}
+// Sync UI on boot with persisted prefs
+function syncFilterUI(){
+  document.querySelectorAll('.tb-chip').forEach(function(c){
+    if(c.textContent.trim()===PD) c.classList.add('active'); else c.classList.remove('active');
+  });
+  document.querySelectorAll('.tb-compare-chip').forEach(function(c){
+    var isLy = c.textContent.trim().toLowerCase().indexOf('ly')>=0;
+    if((isLy && CMP==='vs_ly') || (!isLy && CMP==='vs_pp')) c.classList.add('active'); else c.classList.remove('active');
+  });
+  // Unit toggles exist in multiple places (topbar + inventory) — only sync topbar
+  var tbToggle = document.querySelector('#topbar-controls .tb-toggle');
+  if(tbToggle) tbToggle.querySelectorAll('.tb-toggle-btn').forEach(function(c){
+    if(c.textContent.trim()===UT) c.classList.add('active'); else c.classList.remove('active');
+  });
+}
 function setF(el){el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
 function doSearch(){var q=document.getElementById('global-search').value.trim();if(q){navTo('pg-customers');loadCust(q)}}
 
@@ -3016,17 +3106,23 @@ async function loadHome(){
       if(st){ st.className='kpi-enr-status '+statusClass(pct); st.textContent=pct+'% YTD'; }
     }
     if(d){
-      var dp = d.delta_pct || {};
+      // Compare mode — pick between delta_pct (vs PP) and delta_pct_ly (vs LY)
+      var dp = (CMP==='vs_ly' && d.delta_pct_ly) ? d.delta_pct_ly : (d.delta_pct || {});
       var ytd = d.ytd || {};
       var bud = d.budget || {};
+      // Unit switch — volume display in MT or Bags
+      var volMtd = UT==='Bags' ? d.volume_bags : d.volume_mt;
+      var volYtd = UT==='Bags' ? (ytd.volume_bags||ytd.volume_mt*50) : ytd.volume_mt; // fallback: 50 bags/MT
+      var volBud = UT==='Bags' ? (bud.ytd_bags || bud.ytd_mt*50) : bud.ytd_mt;
+      var volFmt = UT==='Bags' ? function(n){return fn(n)+' bags'} : fn;
       // 1-4: Sales / Volume / GM / GM-per-Ton
       setCard('sales', d.revenue,      dp.revenue,      ytd.revenue,      bud.ytd_sales,  fc);
-      setCard('vol',   d.volume_mt,    dp.volume_mt,    ytd.volume_mt,    bud.ytd_mt,     fn);
+      setCard('vol',   volMtd,         dp.volume_mt,    volYtd,           volBud,         volFmt);
       setCard('gm',    d.gross_margin, dp.gross_margin, ytd.gross_margin, bud.ytd_gm,     fc);
-      // GM/Ton: no YTD budget — compare to YTD actual (show 100%)
+      // GM/Ton: target ≥₱6,550 — green if met
       var gmtFmt = function(n){ return '₱'+fcn(Math.round(n)); };
-      setCard('gmt',   d.gmt,          dp.gmt,          ytd.gmt,          ytd.gmt,        gmtFmt);
-      sett('hk-gmt-ytd-bud','YTD avg');
+      setCard('gmt',   d.gmt,          dp.gmt,          ytd.gmt,          6550,           gmtFmt);
+      sett('hk-gmt-ytd-bud','/ ₱6,550 target');
 
       // Pending PO
       if(d.pending_po){
@@ -3096,18 +3192,23 @@ async function loadHome(){
     var dsoTotal  = (d && d.dso_total!=null)  ? d.dso_total  : (ar && ar.dso_total!=null  ? ar.dso_total  : null);
     if(dsoActive!=null){
       seth('hk-dso', Math.round(dsoActive)+'<span style="font-size:13px;color:var(--text3)">d</span>');
-      var under = dsoActive <= 45;
+      // Mat's thresholds: <35d "very good" | 35-45 "good" | 45-60 "watch" | >60 "bad"
+      var dsoRating, dsoColor, dsoStatusCls;
+      if(dsoActive < 35)      { dsoRating='Very good'; dsoColor='var(--green)'; dsoStatusCls='ok'; }
+      else if(dsoActive <=45) { dsoRating='Good';      dsoColor='var(--green)'; dsoStatusCls='ok'; }
+      else if(dsoActive <=60) { dsoRating='Watch';     dsoColor='var(--gold)';  dsoStatusCls='warn'; }
+      else                    { dsoRating='Critical';  dsoColor='var(--red)';   dsoStatusCls='bad'; }
       var dsoBar = sel('hk-dso-bar');
       if(dsoBar){
-        // Target ≤45d. Fill: 100% if ≤target, scaled down as DSO grows above
-        var fillPct = under ? 100 : Math.max(20, Math.round(45/dsoActive*100));
+        // Fill: 100% at 0d, linearly decreases to 0% at 90d
+        var fillPct = Math.max(0, Math.min(100, Math.round((90 - dsoActive) / 90 * 100)));
         dsoBar.style.width = fillPct+'%';
-        dsoBar.style.background = under ? 'var(--green)' : 'var(--red)';
+        dsoBar.style.background = dsoColor;
       }
       var dsoStatus = sel('hk-dso-pct');
       if(dsoStatus){
-        dsoStatus.className = 'kpi-enr-status '+(under?'ok':'bad');
-        dsoStatus.textContent = under ? 'On target' : (Math.round(dsoActive-45)+'d over target');
+        dsoStatus.className = 'kpi-enr-status '+dsoStatusCls;
+        dsoStatus.textContent = dsoRating;
       }
     }
     // Delinquent gap badge
@@ -3199,27 +3300,120 @@ async function loadAR(){
     var activeBal = d.active_balance!=null ? d.active_balance : d.total_balance;
     var totalBal  = d.total_balance!=null  ? d.total_balance  : activeBal;
     var delinqBal = d.delinquent_balance!=null ? d.delinquent_balance : 0;
-    var delinqCust = d.delinquent_customer_count || 0;
-    var activeCust = d.active_customer_count || 0;
+    var st = d.account_status || {active:0,delinquent:0,inactive:0};
 
     sett('ar-total', fc(showDelinq ? totalBal : activeBal));
     sett('ar-total-sub', showDelinq ? 'All accounts' : 'Active customers only');
-    sett('ar-clients', (showDelinq ? (activeCust+delinqCust) : activeCust).toString());
+    sett('ar-clients', (showDelinq ? (st.active+st.delinquent+st.inactive) : st.active).toString());
     sett('ar-delinq', fc(delinqBal));
-    sett('ar-delinq-sub', delinqCust+' customer'+(delinqCust===1?'':'s')+' frozen');
+    sett('ar-delinq-sub', st.delinquent+' customer'+(st.delinquent===1?'':'s')+' frozen');
 
-    // DSO — prefer active; if toggle ON show total
+    // Account Status strip
+    sett('ar-status-active', st.active);
+    sett('ar-status-delinq', st.delinquent);
+    sett('ar-status-inactive', st.inactive);
+
+    // DSO gauge — Mat's thresholds
     var dsoVal = showDelinq ? (d.dso_total!=null?d.dso_total:d.dso) : (d.dso_active!=null?d.dso_active:d.dso);
     if(dsoVal!=null){
       var dv=Math.round(dsoVal);
       sett('ar-dso-val',dv.toString());
       var el=sel('ar-dso-val');
-      var st=sel('ar-dso-status');
-      if(dv<=50){if(el)el.style.color='var(--green)';if(st){st.textContent='HEALTHY';st.style.color='var(--green)'}}
-      else if(dv<=65){if(el)el.style.color='var(--gold)';if(st){st.textContent='CAUTION';st.style.color='var(--gold)'}}
-      else{if(el)el.style.color='var(--red)';if(st){st.textContent='HIGH';st.style.color='var(--red)'}}
+      var stat=sel('ar-dso-status');
+      var color, label;
+      if(dv<35)      { color='var(--green)'; label='VERY GOOD'; }
+      else if(dv<=45){ color='var(--green)'; label='GOOD'; }
+      else if(dv<=60){ color='var(--gold)';  label='WATCH'; }
+      else           { color='var(--red)';   label='CRITICAL'; }
+      if(el)el.style.color=color;
+      if(stat){stat.textContent=label; stat.style.color=color;}
       var ring=sel('ar-dso-ring');
-      if(ring){var deg=Math.min(dv/90*360,360);ring.style.background='conic-gradient(var(--green) 0deg, var(--green) '+deg+'deg, var(--divider) '+deg+'deg)'}
+      if(ring){var deg=Math.min(dv/90*360,360);ring.style.background='conic-gradient('+color+' 0deg, '+color+' '+deg+'deg, var(--divider) '+deg+'deg)'}
+    }
+
+    // 7-bucket aging
+    if(d.buckets){
+      var b = d.buckets;
+      var order = ['current','d1_30','d31_60','d61_90','d91_120','d121_365','over_1y'];
+      var total = order.reduce(function(sum,k){return sum + (+b[k]||0)},0);
+      sett('ar-aging-total', fc(total));
+      // Fill table rows + bar segments
+      order.forEach(function(k){
+        var amt = +b[k]||0;
+        var pct = total>0 ? (amt/total*100) : 0;
+        var row = document.querySelector('#ar-aging-table tr[data-bucket="'+k+'"]');
+        if(row){
+          var cells = row.querySelectorAll('td');
+          if(cells[1]) cells[1].textContent = fc(amt);
+          if(cells[2]) cells[2].textContent = pct.toFixed(1)+'%';
+        }
+        var seg = document.querySelector('#ar-aging-bar [data-bucket="'+k+'"]');
+        if(seg){
+          seg.style.flex = '0 0 '+Math.max(pct,0.5)+'%';
+          if(pct>=5) seg.textContent = pct.toFixed(0)+'%'; else seg.textContent='';
+        }
+      });
+    }
+
+    // Regional DSO
+    if(d.by_region && d.by_region.length){
+      var rhtml='';
+      d.by_region.forEach(function(r){
+        var badge = r.dso<35?'b-green':r.dso<=45?'b-green':r.dso<=60?'b-gold':'b-red';
+        rhtml += '<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
+        rhtml += '<td class="num">'+fc(r.ar||0)+'</td>';
+        rhtml += '<td class="num">'+fc(r.sales_90d||0)+'</td>';
+        rhtml += '<td class="num"><span class="badge '+badge+'">'+Math.round(r.dso||0)+'d</span></td></tr>';
+      });
+      seth('ar-region-tbody',rhtml);
+    }
+
+    // Top 20 clients
+    if(d.clients && d.clients.length){
+      var chtml='';
+      var rows = d.clients.filter(function(c){
+        return showDelinq ? true : !c.is_delinquent;
+      }).slice(0,20);
+      rows.forEach(function(c){
+        var badgeCls = c.days_overdue<=0?'b-green':c.days_overdue<=30?'b-blue':c.days_overdue<=60?'b-gold':'b-red';
+        var statusTag = c.is_delinquent ? ' <span class="badge b-red" style="font-size:8px">DELINQ</span>' : '';
+        chtml += '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.CardCode||'')+'\')">';
+        chtml += '<td><div style="font-weight:600;font-size:11px">'+esc(c.CardName||'')+statusTag+'</div><div style="font-size:9px;color:var(--text3)">'+esc(c.CardCode||'')+'</div></td>';
+        chtml += '<td class="num">'+fc(c.balance||0)+'</td>';
+        chtml += '<td class="num" style="color:var(--green)">'+fc(c.current_amt||0)+'</td>';
+        chtml += '<td class="num" style="color:var(--red)">'+fc(c.overdue||0)+'</td>';
+        chtml += '<td class="num" style="color:var(--gold)">'+fc(c.falling_due||0)+'</td>';
+        chtml += '<td class="num">'+fc(c.new_overdue||0)+'</td>';
+        chtml += '<td style="font-size:10px;color:var(--text3)">'+esc(c.terms||'—')+'</td>';
+        chtml += '<td class="num"><span class="badge '+badgeCls+'">'+(c.days_overdue>0?('+'+c.days_overdue+'d'):(c.days_overdue===0?'due':Math.abs(c.days_overdue)+'d left'))+'</span></td></tr>';
+      });
+      seth('ar-clients-tbody',chtml);
+    }
+
+    // DSO + AR variation (7-day)
+    if(d.dso_7d_ago!=null){
+      sett('ar-dso-7d', Math.round(d.dso_7d_ago)+'d');
+      sett('ar-dso-now', Math.round(d.dso_active||d.dso||0)+'d');
+      var varDso = d.dso_variation!=null ? d.dso_variation : 0;
+      var varDsoEl = sel('ar-dso-variation');
+      if(varDsoEl){
+        varDsoEl.textContent = (varDso>=0?'+':'')+varDso+'d';
+        varDsoEl.style.color = varDso<=0 ? 'var(--green)' : 'var(--red)';  // dropping = good
+      }
+      var wrap = sel('ar-dso-variation-wrap');
+      if(wrap) wrap.style.background = varDso<=0 ? 'var(--glow-green)' : 'var(--glow-red)';
+    }
+    if(d.ar_7d_ago!=null){
+      sett('ar-bal-7d', fc(d.ar_7d_ago));
+      sett('ar-bal-now', fc(d.active_balance||0));
+      var varAr = d.ar_variation!=null ? d.ar_variation : 0;
+      var varArEl = sel('ar-bal-variation');
+      if(varArEl){
+        varArEl.textContent = (varAr>=0?'+':'')+fc(Math.abs(varAr));
+        varArEl.style.color = varAr<=0 ? 'var(--green)' : 'var(--red)';
+      }
+      var wrap2 = sel('ar-bal-variation-wrap');
+      if(wrap2) wrap2.style.background = varAr<=0 ? 'var(--glow-green)' : 'var(--glow-red)';
     }
   } catch(e) { console.error('AR:', e); showError('pg-ar','Unable to load AR data'); }
 }
