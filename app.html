@@ -3931,15 +3931,24 @@ async function loadSpeed(){
         slmEl.style.color = slm >= 0 ? 'var(--green)' : 'var(--red)';
       }
     }
-    // Chart update
-    if(d.daily && d.daily.length && charts.speed){
-      var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
-      var vals=d.daily.map(function(x){return Math.round(x.daily_mt||0)});
-      charts.speed.data.labels=labels;
-      charts.speed.data.datasets[0].data=vals;
-      charts.speed.data.datasets[0].backgroundColor=vals.map(function(v){return v===0?'rgba(255,255,255,0.02)':v>700?'rgba(151,215,0,0.45)':'rgba(0,174,239,0.35)'});
-      charts.speed.data.datasets[0].hoverBackgroundColor=vals.map(function(v){return v===0?'rgba(255,255,255,0.04)':v>700?'rgba(151,215,0,0.7)':'rgba(0,174,239,0.6)'});
-      charts.speed.update();
+    // Chart — destroy & recreate from real API data (bypasses categorical axis caching from any prototype init)
+    if(d.daily && d.daily.length){
+      var ctxS = document.getElementById('speedChart');
+      if(ctxS){
+        var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
+        var vals=d.daily.map(function(x){return Math.round(x.daily_mt||0)});
+        if(charts.speed){ try{charts.speed.destroy();}catch(e){} charts.speed=null; }
+        charts.speed = new Chart(ctxS,{type:'bar',data:{labels:labels,datasets:[{
+          data:vals,
+          backgroundColor:vals.map(function(v){return v===0?'rgba(255,255,255,0.02)':v>700?'rgba(151,215,0,0.45)':'rgba(0,174,239,0.35)'}),
+          hoverBackgroundColor:vals.map(function(v){return v===0?'rgba(255,255,255,0.04)':v>700?'rgba(151,215,0,0.7)':'rgba(0,174,239,0.6)'}),
+          borderRadius:4,borderSkipped:false
+        }]},options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y===0?'Sunday':''+c.parsed.y+' MT'}}}},
+          scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9}}},x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.2)',font:{size:9}}}}
+        }});
+      }
     }
     // RSM speed table (3 cols: name / vol / delta-placeholder)
     if(d.rsm_speed && d.rsm_speed.length){
@@ -5425,22 +5434,7 @@ function initCharts(pageId){
       }
     }
     if(pageId==='pg-speed'){
-      if(!charts.speed){
-        const ctx = document.getElementById('speedChart');
-        if(!ctx) return;
-        const days=['Mar 31','Apr 1','Apr 2','Apr 3','Apr 4','Apr 5','Apr 7','Apr 8','Apr 9','Apr 10','Apr 11','Apr 12','Apr 13'];
-        const vals=[620,680,710,650,690,0,720,695,740,680,712,690,712];
-        charts.speed = new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{
-          data:vals,
-          backgroundColor:vals.map(v=>v===0?'rgba(255,255,255,0.02)':v>700?'rgba(151,215,0,0.45)':'rgba(0,174,239,0.35)'),
-          hoverBackgroundColor:vals.map(v=>v===0?'rgba(255,255,255,0.04)':v>700?'rgba(151,215,0,0.7)':'rgba(0,174,239,0.6)'),
-          borderRadius:4,borderSkipped:false
-        }]},options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y===0?'Sunday':''+c.parsed.y+' MT'}}},
-          scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9}}},x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.2)',font:{size:9}}}}
-        }});
-      }
+      // Main speed bar chart is created by loadSpeed() using real API data — no prototype init here
       // Speed sparkline
       if(!charts.speedSparkline){
         const ctx2 = document.getElementById('speedSparkline');
