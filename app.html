@@ -1765,13 +1765,13 @@ body{
           <!-- As of -->
           <div style="padding:16px 24px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center">
             <div style="font-size:10px;color:var(--text3);font-weight:600">As of:</div>
-            <div style="font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:-1px">Apr 14</div>
+            <div style="font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:-1px" id="sp-asof">—</div>
           </div>
           <!-- Avg Pullout -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
             <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Pullout</div>
-            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-pullout">602</div>
-            <div style="font-size:11px;font-weight:700;color:var(--red)">↓ -0.2%</div>
+            <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-pullout">—</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text3)" id="sp-pullout-delta">—</div>
           </div>
           <!-- Projected (End of Month) -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
@@ -1810,27 +1810,20 @@ body{
           </div>
           <div>
             <div class="card" style="margin-bottom:12px">
-              <div class="card-hdr"><div class="card-title">Weekly Matrix (MT)</div></div>
-              <div class="card-body" style="padding-top:8px">
-                <table class="matrix">
-                  <tr><th></th><th>W10</th><th>W11</th><th>W12</th><th>W13</th><th>W14</th></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">LUZON</td><td class="heat-4">2,840</td><td class="heat-3">2,510</td><td class="heat-4">2,920</td><td class="heat-3">2,680</td><td class="heat-2">1,890</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">VISAYAS</td><td class="heat-2">1,120</td><td class="heat-2">1,080</td><td class="heat-3">1,240</td><td class="heat-2">1,150</td><td class="heat-1">820</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">MINDANAO</td><td class="heat-1">890</td><td class="heat-2">940</td><td class="heat-1">870</td><td class="heat-2">980</td><td class="heat-1">710</td></tr>
-                  <tr><td style="text-align:left;font-size:10px;color:var(--blue);font-weight:800">TOTAL</td><td class="heat-4">4,850</td><td class="heat-3">4,530</td><td class="heat-4">5,030</td><td class="heat-3">4,810</td><td class="heat-2">3,420</td></tr>
+              <div class="card-hdr"><div class="card-title">Weekly Matrix (MT) — Plants × Weeks</div></div>
+              <div class="card-body" style="padding-top:8px;overflow-x:auto">
+                <table class="matrix" id="speed-weekly-matrix">
+                  <thead id="speed-weekly-thead"><tr><th colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</th></tr></thead>
+                  <tbody id="speed-weekly-tbody"></tbody>
                 </table>
               </div>
             </div>
             <div class="card">
-              <div class="card-hdr"><div class="card-title">Plant Matrix (3 Days)</div></div>
-              <div class="card-body" style="padding-top:8px">
+              <div class="card-hdr"><div class="card-title">Plant Breakdown (MTD)</div></div>
+              <div class="card-body" style="padding-top:8px;overflow-x:auto">
                 <table class="matrix">
-                  <tr><th>Plant</th><th>Apr 11</th><th>Apr 12</th><th>Apr 13</th></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">AC</td><td class="heat-3">280</td><td class="heat-4">310</td><td class="heat-3">295</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">ACEXT</td><td class="heat-2">145</td><td class="heat-2">138</td><td class="heat-2">152</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">HOREB</td><td class="heat-2">120</td><td class="heat-1">98</td><td class="heat-2">115</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">BUKID</td><td class="heat-1">85</td><td class="heat-1">92</td><td class="heat-2">110</td></tr>
-                  <tr><td style="font-weight:700;text-align:left;font-size:10px">ARGAO</td><td class="heat-0">42</td><td class="heat-1">55</td><td class="heat-0">40</td></tr>
+                  <thead><tr><th>Plant</th><th>MTD (MT)</th></tr></thead>
+                  <tbody id="speed-plantmatrix-tbody"><tr><td colspan="2" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -2520,15 +2513,15 @@ body{
             <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--green2));color:#000;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;letter-spacing:0.5px">EVP</div>
             <div style="flex:1">
               <div style="font-size:18px;font-weight:800">EVP Sales & Marketing — National Overview</div>
-              <div style="font-size:11px;color:var(--text3);margin-top:2px">National · All Regions · All BU · 8 RSMs · 24 DSMs · 710 Active Accounts</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px" id="team-evp-meta">National · All Regions · All BU · — RSMs · — DSMs · — Active Accounts</div>
             </div>
             <div style="display:flex;gap:16px;flex-shrink:0">
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">YTD Vol</div><div style="font-family:var(--mono);font-size:22px;font-weight:700">54.4K</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Budget</div><div style="font-family:var(--mono);font-size:22px;font-weight:700">62.6K</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Ach %</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--gold)">87%</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">vs LY</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">+92%</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Speed</div><div style="font-family:var(--mono);font-size:22px;font-weight:700">15.6K</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">GM/Ton</div><div style="font-family:var(--mono);font-size:22px;font-weight:700">₱6,953</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">YTD Vol</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-ytd">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Budget</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-budget">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Ach %</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--gold)" id="team-evp-ach">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">vs LY</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)" id="team-evp-vsly">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Speed</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-speed">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">GM/Ton</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-gmton">—</div></div>
             </div>
           </div>
         </div>
@@ -3424,20 +3417,44 @@ async function loadSales(){
   try {
     if(!DC) DC={};
     if(!DC['pg-sales']){
-      DC['pg-sales'] = await getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null});
+      var results = await Promise.all([
+        getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null}),
+        getSpeedData({period:PD}).catch(function(e){console.error('speed:',e);return null})
+      ]);
+      DC['pg-sales'] = { d: results[0], sp: results[1] };
     }
-    var d = DC['pg-sales'];
+    var ctx = DC['pg-sales'];
+    var d = ctx.d, sp = ctx.sp;
     if(!d){showError('pg-sales','Unable to load sales data');return}
     console.log('[SALES] Rendering:', Object.keys(d));
-    // KPIs
-    if(d.volume_mt!=null) seth('sk-vol',fn(d.volume_mt)+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-    if(d.ytd_volume_mt!=null) seth('sk-ytdvol',fn(d.ytd_volume_mt)+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-    if(d.revenue!=null) sett('sk-sales',fc(d.revenue));
-    if(d.gmt!=null) sett('sk-gmt','₱'+fcn(Math.round(d.gmt)));
+    var kp = d.kpis || d;
+    // KPIs — bind to top-level (new) or legacy aliases
+    if(kp.volume_mt!=null)     animateNumber(sel('sk-vol'),     kp.volume_mt,     function(v){return fn(v)+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  kp.ytd_volume_mt, function(v){return fn(v)+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    if(kp.revenue!=null)       animateNumber(sel('sk-sales'),   kp.revenue,       fc);
+    if(kp.gmt!=null)           animateNumber(sel('sk-gmt'),     kp.gmt,           function(v){return '₱'+fcn(Math.round(v))});
+    // Deltas
+    var dp = kp.delta_pct || {};
+    function setDelta(id, pct){
+      var el = sel(id); if(!el || pct==null) return;
+      var arrow = pct>=0?'▲':'▼';
+      el.className = 'kpi-delta ' + (pct>=0?'up':'down');
+      el.textContent = arrow + ' ' + Math.abs(pct).toFixed(1) + '%';
+    }
+    setDelta('sk-vol-d', dp.volume_mt);
+    setDelta('sk-sales-d', dp.revenue);
+    setDelta('sk-gmt-d', dp.gmt);
+    // YTD Volume delta — vs LY not computed here, skip arrow
+    // Avg Speed — pull from /api/speed
+    if(sp){
+      var dpv = sp.daily_pullout != null ? sp.daily_pullout : sp.speed_per_day;
+      if(dpv!=null) animateNumber(sel('sk-speed'), dpv, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT/d</span>'});
+      if(sp.vs_prior_period_pct!=null) setDelta('sk-speed-d', sp.vs_prior_period_pct);
+    }
     // Pending PO
     if(d.pending_po && d.pending_po.summary){
       var ps=d.pending_po.summary;
-      if(ps.total_mt!=null) seth('sk-pending',fcn(Math.round(ps.total_mt))+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
+      if(ps.total_mt!=null) animateNumber(sel('sk-pending'), ps.total_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
       if(ps.total_orders!=null) sett('sk-pending-sub',ps.total_orders+' orders');
     }
     // Customer rankings
@@ -3873,6 +3890,25 @@ async function loadSpeed(){
       var el = sel('spk-vslm');
       if(el){ el.textContent=(pct>=0?'+':'')+pct.toFixed(1)+'%'; el.style.color = pct>=0 ? 'var(--green)' : 'var(--red)'; }
     }
+    // As-of date = latest daily[].ship_date or today
+    var asOf = (d.daily && d.daily.length) ? d.daily[d.daily.length-1].ship_date : null;
+    var asOfDate = asOf ? new Date(asOf) : new Date();
+    sett('sp-asof', asOfDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    // Pullout delta (vs prior period)
+    if(d.vs_prior_period_pct!=null){
+      var vp = d.vs_prior_period_pct;
+      var pdel = sel('sp-pullout-delta');
+      if(pdel){ pdel.textContent=(vp>=0?'↑ +':'↓ ')+vp.toFixed(1)+'%'; pdel.style.color = vp>=0?'var(--green)':'var(--red)'; }
+    }
+    // Speed vs LM — derived ratio daily_pullout / prior_period_daily_pullout - 1
+    if(dailyPull!=null && d.prior_period_daily_pullout > 0){
+      var slm = ((dailyPull - d.prior_period_daily_pullout) / d.prior_period_daily_pullout) * 100;
+      var slmEl = sel('spk-speedlm');
+      if(slmEl){
+        slmEl.textContent = (slm>=0?'+':'')+slm.toFixed(1)+'%';
+        slmEl.style.color = slm >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+    }
     // Chart update
     if(d.daily && d.daily.length && charts.speed){
       var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
@@ -3911,7 +3947,7 @@ async function loadSpeed(){
       var tgt2 = sel('speed-feed-tbody');
       if(tgt2) seth('speed-feed-tbody', fhtml);
     }
-    // Plant breakdown table
+    // Plant breakdown table (side-nav existing tbody)
     if(d.plant_breakdown && d.plant_breakdown.length){
       var phtml='';
       d.plant_breakdown.forEach(function(p){
@@ -3920,6 +3956,56 @@ async function loadSpeed(){
       });
       var tgt3 = sel('speed-plant-tbody');
       if(tgt3) seth('speed-plant-tbody', phtml);
+      // Mirror plant breakdown to the new Plant Matrix card
+      var mxBody = sel('speed-plantmatrix-tbody');
+      if(mxBody){
+        var sorted = d.plant_breakdown.slice().sort(function(a,b){return (b.mtd||0)-(a.mtd||0)});
+        var tot = sorted.reduce(function(s,p){return s+(+p.mtd||0)},0);
+        var html = sorted.map(function(p){
+          var vol = Math.round(p.mtd||p.vol||0);
+          var heatCls = vol > 1500 ? 'heat-4' : vol > 800 ? 'heat-3' : vol > 400 ? 'heat-2' : vol > 100 ? 'heat-1' : 'heat-0';
+          return '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc(p.plant||'—')+'</td>'
+            + '<td class="'+heatCls+'">'+fcn(vol)+'</td></tr>';
+        }).join('');
+        html += '<tr><td style="text-align:left;font-size:10px;color:var(--blue);font-weight:800">TOTAL</td><td class="heat-4">'+fcn(Math.round(tot))+'</td></tr>';
+        mxBody.innerHTML = html;
+      }
+    }
+    // Weekly Matrix (Plants × Weeks, from weekly_matrix.grid)
+    if(d.weekly_matrix && d.weekly_matrix.weeks && d.weekly_matrix.plants){
+      var wm = d.weekly_matrix;
+      var thead = '<tr><th>Plant</th>' + wm.weeks.map(function(w){return '<th>'+esc(w)+'</th>'}).join('') + '</tr>';
+      seth('speed-weekly-thead', thead);
+      var plantTotals = wm.plants.map(function(_,i){ return wm.grid[i].reduce(function(s,v){return s+v},0) });
+      // show top 12 plants by total, rest grouped as OTHER
+      var plantIdx = plantTotals.map(function(v,i){return {i,v}}).sort(function(a,b){return b.v-a.v});
+      var topPlants = plantIdx.slice(0, 12);
+      var otherPlants = plantIdx.slice(12);
+      var bodyRows = topPlants.map(function(idx){
+        var row = '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc(wm.plants[idx.i])+'</td>';
+        wm.grid[idx.i].forEach(function(v){
+          var heatCls = v > 1500 ? 'heat-4' : v > 800 ? 'heat-3' : v > 400 ? 'heat-2' : v > 100 ? 'heat-1' : 'heat-0';
+          row += '<td class="'+heatCls+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>';
+        });
+        return row + '</tr>';
+      });
+      if(otherPlants.length){
+        var otherRow = new Array(wm.weeks.length).fill(0);
+        otherPlants.forEach(function(idx){ wm.grid[idx.i].forEach(function(v,wi){ otherRow[wi]+=v }); });
+        var r = '<tr><td style="font-weight:700;text-align:left;font-size:10px;color:var(--text3)">OTHER ('+otherPlants.length+')</td>';
+        otherRow.forEach(function(v){
+          var heatCls = v > 1500 ? 'heat-4' : v > 800 ? 'heat-3' : v > 400 ? 'heat-2' : v > 100 ? 'heat-1' : 'heat-0';
+          r += '<td class="'+heatCls+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>';
+        });
+        bodyRows.push(r + '</tr>');
+      }
+      // Total row
+      var weekTotals = wm.weeks.map(function(_,wi){ return wm.grid.reduce(function(s,row){return s+(row[wi]||0)},0) });
+      var totalRow = '<tr><td style="text-align:left;font-size:10px;color:var(--blue);font-weight:800">TOTAL</td>'
+        + weekTotals.map(function(v){return '<td class="heat-4" style="font-weight:800">'+fcn(Math.round(v))+'</td>'}).join('')
+        + '</tr>';
+      bodyRows.push(totalRow);
+      seth('speed-weekly-tbody', bodyRows.join(''));
     }
     pulseRefresh('pg-speed');
   } catch(e) { console.error('Speed:', e); showError('pg-speed','Unable to load speed data'); }
@@ -4275,13 +4361,28 @@ async function loadTeam(){
     if(!d){showError('pg-team','Unable to load team data');return}
     console.log('[TEAM] Rendering:', d.evp);
     var pg=sel('pg-team');
-    // EVP Hero — update hero numbers
+    // EVP Hero — wired to d.evp + FY26 budget
     if(d.evp){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"], [style*="font-size:24px"]');
-      // Try to find EVP name and stats
-      var h1=pg.querySelector('.detail-hero h1, [style*="font-size:24px"]');
-      if(h1 && !h1.closest('.detail-hero')){}// skip non-hero
-      console.log('[TEAM] EVP: '+d.evp.name+', YTD Vol: '+d.evp.ytd_vol+', RSMs: '+d.evp.rsm_count);
+      var e = d.evp;
+      // Meta line: actual rsm/dsm/customer counts (but keep generic "National" scope copy)
+      sett('team-evp-meta', 'National · All Regions · All BU · ' + (e.rsm_count || 0) + ' RSMs · ' + (e.dsm_count || 0) + ' DSMs · ' + fcn(e.customers_count || 0) + ' Active Accounts');
+      // YTD Vol + Budget prorated (FY 188,266 MT × (months_elapsed / 12) — loose approx)
+      var ytdVol = Math.round(e.ytd_vol || 0);
+      var monthsElapsed = (new Date()).getMonth() + 1;
+      var prorated = Math.round(188266 * (monthsElapsed / 12));
+      var ach = prorated > 0 ? Math.round((ytdVol / prorated) * 100) : 0;
+      animateNumber(sel('team-evp-ytd'),   ytdVol,   function(v){return fcn(Math.round(v)) + ' MT'});
+      animateNumber(sel('team-evp-budget'),prorated, function(v){return fcn(Math.round(v)) + ' MT'});
+      var achEl = sel('team-evp-ach');
+      if(achEl){
+        achEl.textContent = ach + '%';
+        achEl.style.color = ach >= 95 ? 'var(--green)' : ach >= 80 ? 'var(--gold)' : 'var(--red)';
+      }
+      animateNumber(sel('team-evp-speed'), e.speed || 0, function(v){return fcn(Math.round(v))+' MT/d'});
+      animateNumber(sel('team-evp-gmton'), e.gm_ton || 0, function(v){return '₱'+fcn(Math.round(v))});
+      // vs LY — backend returns 0 (no 2025 data); show "—" until data exists
+      sett('team-evp-vsly', '—');
+      console.log('[TEAM] EVP hero wired:', 'YTD='+ytdVol, 'Budget='+prorated, 'Ach='+ach+'%', 'RSMs='+e.rsm_count);
     }
     // RSM SCORECARD — main team table
     if(d.rsms && d.rsms.length){

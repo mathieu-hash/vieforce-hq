@@ -165,8 +165,8 @@ module.exports = async (req, res) => {
       WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
     `)
 
-    // --- Region performance ---
-    const regionPerf = await query(`
+    // --- Region performance (current period + previous period for vs_pp delta) ---
+    const regionPerfCur = await query(`
       SELECT
         CASE
           WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
@@ -175,6 +175,7 @@ module.exports = async (req, res) => {
           ELSE 'Other'
         END                                                                AS region,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS sales,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
           ELSE 0 END                                                       AS gm_ton
@@ -191,6 +192,37 @@ module.exports = async (req, res) => {
         END
       ORDER BY vol DESC
     `, { dateFrom, dateTo })
+
+    // Previous period for vs_pp
+    const regionPerfPrev = await query(`
+      SELECT
+        CASE
+          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
+          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
+          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+          ELSE 'Other'
+        END                                                                AS region,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED='N'
+      GROUP BY
+        CASE
+          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
+          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
+          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+          ELSE 'Other'
+        END
+    `, { ppFrom: prev.from, ppTo: prev.to })
+
+    const prevMap = Object.fromEntries(regionPerfPrev.map(r => [r.region, r.vol]))
+    const regionPerf = regionPerfCur.map(r => ({
+      ...r,
+      vs_pp: prevMap[r.region] > 0
+        ? Math.round(((r.vol - prevMap[r.region]) / prevMap[r.region]) * 1000) / 10
+        : null
+    }))
 
     // --- Top 5 customers ---
     const topCust = await query(`
