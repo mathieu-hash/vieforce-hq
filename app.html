@@ -1401,29 +1401,26 @@ body{
         </div>
 
         <!-- PENDING PO -->
-        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">📋 Pending Purchase Orders</div><div class="sec-line"></div><div class="sec-count">42 orders · 7,432 MT · ₱256M</div></div>
+        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">📋 Pending Purchase Orders</div><div class="sec-line"></div><div class="sec-count" id="po-sec-count">—</div></div>
 
         <!-- Pending KPIs -->
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-label" style="color:var(--gold)">Total Pending</div><div class="kpi-val" style="font-size:20px;color:var(--gold)">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src">ORDR · Open</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending Value</div><div class="kpi-val" style="font-size:20px">₱256M</div><div class="kpi-src">est. revenue</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Orders</div><div class="kpi-val" style="font-size:20px">42</div><div class="kpi-src">open POs</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:20px">177<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src">per PO</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Credit Holds</div><div class="kpi-val" style="font-size:20px;color:var(--red)">6</div><div class="kpi-src">₱42M blocked</div></div>
+          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-label" style="color:var(--gold)">Total Pending</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="po-k-mt">—</div><div class="kpi-src">ORDR · Open</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending Value</div><div class="kpi-val" style="font-size:20px" id="po-k-value">—</div><div class="kpi-src">est. revenue</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Orders</div><div class="kpi-val" style="font-size:20px" id="po-k-orders">—</div><div class="kpi-src">open POs</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:20px" id="po-k-avg">—</div><div class="kpi-src">MT per PO</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Oldest</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="po-k-oldest">—</div><div class="kpi-src">days pending</div></div>
         </div>
 
-        <!-- Pending: Region × BU matrix + By Brand + By SKU -->
-        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;margin-bottom:16px">
-          <!-- Region × BU Matrix (Image style) -->
+        <!-- Pending: By Region + By Brand + By SKU -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <!-- By Region (with detail) -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Pending Tons — Region × BU</div></div>
+            <div class="card-hdr"><div class="card-title">Pending by Region</div></div>
             <div class="card-body" style="padding-top:8px">
-              <table class="gm-matrix">
-                <tr><th>Region</th><th>Key Accounts</th><th>Distribution</th><th>Pet Care</th><th>Employees</th><th style="color:var(--text)">Total</th></tr>
-                <tr class="row-blue"><td>LUZON</td><td>553</td><td>142</td><td>8</td><td>0</td><td style="font-weight:700;color:var(--text)">702</td></tr>
-                <tr class="row-green"><td>VISAYAS</td><td>3,661</td><td>1,265</td><td>1</td><td>0</td><td style="font-weight:700;color:var(--text)">4,927</td></tr>
-                <tr class="row-blue"><td>MINDANAO</td><td>854</td><td>948</td><td>0</td><td>0</td><td style="font-weight:700;color:var(--text)">1,803</td></tr>
-                <tr class="row-total"><td>Total</td><td>5,068</td><td>2,356</td><td>9</td><td>0</td><td style="font-weight:800;color:var(--gold)">7,432</td></tr>
+              <table class="rank-tbl">
+                <thead><tr><td class="rh">Region</td><td class="rh" style="text-align:right">Orders</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">Value</td></tr></thead>
+                <tbody id="po-region-detail-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1433,16 +1430,8 @@ body{
             <div class="card-hdr"><div class="card-title">Pending by Brand</div></div>
             <div class="card-body" style="padding-top:8px">
               <table class="rank-tbl">
-                <tr><td class="rh">Brand</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">%</td></tr>
-                <tr><td class="rn">VIEPRO PREMIUM</td><td class="rv">3,240</td><td class="rv">43.6%</td></tr>
-                <tr><td class="rn">VIEPRO LAYER</td><td class="rv">1,180</td><td class="rv">15.9%</td></tr>
-                <tr><td class="rn">VIEPRO PRIME</td><td class="rv">920</td><td class="rv">12.4%</td></tr>
-                <tr><td class="rn">VIEPRO PROBOOST</td><td class="rv">680</td><td class="rv">9.1%</td></tr>
-                <tr><td class="rn">VIEPRO BROILER</td><td class="rv">540</td><td class="rv">7.3%</td></tr>
-                <tr><td class="rn">VIEPROMO</td><td class="rv">380</td><td class="rv">5.1%</td></tr>
-                <tr><td class="rn">VIEPRO PDP</td><td class="rv">280</td><td class="rv">3.8%</td></tr>
-                <tr><td class="rn">OTHERS</td><td class="rv">212</td><td class="rv">2.9%</td></tr>
-                <tr style="background:rgba(255,199,44,0.06)"><td class="rn" style="font-weight:800">Total</td><td class="rv" style="font-weight:700;color:var(--gold)">7,432</td><td class="rv" style="font-weight:700">100%</td></tr>
+                <thead><tr><td class="rh">Brand</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">%</td></tr></thead>
+                <tbody id="po-brand-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1452,48 +1441,32 @@ body{
             <div class="card-hdr"><div class="card-title">Pending by Major SKU</div></div>
             <div class="card-body" style="padding-top:8px">
               <table class="rank-tbl">
-                <tr><td class="rh">Product</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">%</td></tr>
-                <tr><td class="rn">VP MUSCLY PREM GROWER</td><td class="rv">1,420</td><td class="rv">19.1%</td></tr>
-                <tr><td class="rn">VP MUSCLY PREM STARTER</td><td class="rv">980</td><td class="rv">13.2%</td></tr>
-                <tr><td class="rn">VP PRIME GESTATING</td><td class="rv">720</td><td class="rv">9.7%</td></tr>
-                <tr><td class="rn">VP LAYER 1 CRUMBLE</td><td class="rv">640</td><td class="rv">8.6%</td></tr>
-                <tr><td class="rn">VP 3000 MAINTENANCE</td><td class="rv">510</td><td class="rv">6.9%</td></tr>
-                <tr><td class="rn">VP BROILER STARTER 2.5MM</td><td class="rv">480</td><td class="rv">6.5%</td></tr>
-                <tr><td class="rn">VP GESTATING PELLET</td><td class="rv">390</td><td class="rv">5.2%</td></tr>
-                <tr><td class="rn">ALL OTHERS (24 SKUs)</td><td class="rv">2,292</td><td class="rv">30.8%</td></tr>
-                <tr style="background:rgba(255,199,44,0.06)"><td class="rn" style="font-weight:800">Total</td><td class="rv" style="font-weight:700;color:var(--gold)">7,432</td><td class="rv" style="font-weight:700">100%</td></tr>
+                <thead><tr><td class="rh">Product</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">%</td></tr></thead>
+                <tbody id="po-sku-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- Pending by Region detail + by Customer -->
+        <!-- Pending: Region × Customer table + Top Customers -->
         <div class="grid-2" style="margin-bottom:16px">
-          <!-- Region detail -->
+          <!-- Region detail (4-col) -->
           <div class="card">
             <div class="card-hdr"><div class="card-title">Pending by Region — Detail</div></div>
-            <div class="card-body" style="padding-top:8px">
+            <div class="card-body" style="padding-top:8px;overflow-x:auto">
               <table class="tbl">
-                <tr><th>Region</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th><th class="num">Avg Size</th><th class="num">Confirmed</th><th class="num">Credit Hold</th><th class="num">Awaiting Stock</th></tr>
-                <tr><td style="font-weight:700">LUZON</td><td class="num">12</td><td class="num">702 MT</td><td class="num">₱24.2M</td><td class="num">59 MT</td><td class="num" style="color:var(--green)">9</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--gold)">1</td></tr>
-                <tr><td style="font-weight:700">VISAYAS</td><td class="num">18</td><td class="num">4,927 MT</td><td class="num">₱169.8M</td><td class="num">274 MT</td><td class="num" style="color:var(--green)">14</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--gold)">2</td></tr>
-                <tr><td style="font-weight:700">MINDANAO</td><td class="num">12</td><td class="num">1,803 MT</td><td class="num">₱62.1M</td><td class="num">150 MT</td><td class="num" style="color:var(--green)">8</td><td class="num" style="color:var(--red)">2</td><td class="num" style="color:var(--gold)">2</td></tr>
-                <tr class="total"><td style="font-weight:800">TOTAL</td><td class="num" style="font-weight:800">42</td><td class="num" style="font-weight:800">7,432 MT</td><td class="num" style="font-weight:800">₱256M</td><td class="num" style="font-weight:800">177 MT</td><td class="num" style="font-weight:800;color:var(--green)">31</td><td class="num" style="font-weight:800;color:var(--red)">6</td><td class="num" style="font-weight:800;color:var(--gold)">5</td></tr>
+                <thead><tr><th>Region</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th><th class="num">Avg Size</th></tr></thead>
+                <tbody id="po-region-big-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
           <!-- Top pending customers -->
           <div class="card">
             <div class="card-hdr"><div class="card-title">Top Pending Customers</div></div>
-            <div class="card-body" style="padding-top:8px">
+            <div class="card-body" style="padding-top:8px;overflow-x:auto">
               <table class="tbl">
-                <tr><th>Customer</th><th>Region</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th><th>Status</th></tr>
-                <tr><td style="font-weight:700">Pacifica Agrivet Supplies</td><td style="color:var(--text3);font-size:11px">Visayas</td><td class="num">4</td><td class="num">1,240 MT</td><td class="num">₱42.8M</td><td><span class="badge b-green">Confirmed</span></td></tr>
-                <tr><td style="font-weight:700">SAO Feeds Trading</td><td style="color:var(--text3);font-size:11px">Visayas</td><td class="num">3</td><td class="num">860 MT</td><td class="num">₱29.6M</td><td><span class="badge b-green">Confirmed</span></td></tr>
-                <tr><td style="font-weight:700">Cathay Farms Development</td><td style="color:var(--text3);font-size:11px">Visayas</td><td class="num">2</td><td class="num">680 MT</td><td class="num">₱23.4M</td><td><span class="badge b-gold">Partial</span></td></tr>
-                <tr><td style="font-weight:700">Metro Feeds Corp.</td><td style="color:var(--text3);font-size:11px">Luzon</td><td class="num">2</td><td class="num">380 MT</td><td class="num">₱14.8M</td><td><span class="badge b-gold">Awaiting</span></td></tr>
-                <tr><td style="font-weight:700">Bukidnon Farms Trading</td><td style="color:var(--text3);font-size:11px">Mindanao</td><td class="num">2</td><td class="num">340 MT</td><td class="num">₱11.7M</td><td><span class="badge b-red">Credit Hold</span></td></tr>
-                <tr><td style="font-weight:700">Falcor Marketing Corp.</td><td style="color:var(--text3);font-size:11px">Mindanao</td><td class="num">2</td><td class="num">310 MT</td><td class="num">₱10.7M</td><td><span class="badge b-green">Confirmed</span></td></tr>
+                <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th></tr></thead>
+                <tbody id="po-topcust-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1501,19 +1474,11 @@ body{
 
         <!-- PO Detail table -->
         <div class="card">
-          <div class="card-hdr"><div class="card-title">Recent PO Detail</div><div class="card-badge b-gold">42 open</div></div>
-          <div class="card-body" style="padding-top:8px;overflow-x:auto">
+          <div class="card-hdr"><div class="card-title">Recent PO Detail</div><div class="card-badge b-gold" id="po-detail-count">—</div></div>
+          <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:500px;overflow-y:auto">
             <table class="tbl">
-              <tr><th>PO #</th><th>Customer</th><th>Region</th><th>District</th><th class="num">Volume</th><th class="num">Amount</th><th>Status</th><th>Date</th><th>Aging</th></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0482</td><td style="font-weight:700">Metro Feeds Corp.</td><td>Luzon</td><td style="color:var(--text3);font-size:11px">Metro Manila</td><td class="num">380 MT</td><td class="num">₱14.8M</td><td><span class="badge b-gold">Awaiting Stock</span></td><td style="font-size:11px;color:var(--text3)">Apr 14</td><td style="font-family:var(--mono);font-size:11px">1d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0479</td><td style="font-weight:700">Cebu Agri Partners</td><td>Visayas</td><td style="color:var(--text3);font-size:11px">Cebu North</td><td class="num">320 MT</td><td class="num">₱12.1M</td><td><span class="badge b-green">Confirmed</span></td><td style="font-size:11px;color:var(--text3)">Apr 13</td><td style="font-family:var(--mono);font-size:11px">2d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0477</td><td style="font-weight:700">Pampanga Agri Supply</td><td>Luzon</td><td style="color:var(--text3);font-size:11px">Central Luzon</td><td class="num">280 MT</td><td class="num">₱10.2M</td><td><span class="badge b-green">Confirmed</span></td><td style="font-size:11px;color:var(--text3)">Apr 12</td><td style="font-family:var(--mono);font-size:11px">3d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0475</td><td style="font-weight:700">Davao Livestock Inc.</td><td>Mindanao</td><td style="color:var(--text3);font-size:11px">East Mindanao</td><td class="num">240 MT</td><td class="num">₱8.9M</td><td><span class="badge b-gold">Credit Hold</span></td><td style="font-size:11px;color:var(--text3)">Apr 12</td><td style="font-family:var(--mono);font-size:11px">3d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0473</td><td style="font-weight:700">Laguna Premium Feeds</td><td>Luzon</td><td style="color:var(--text3);font-size:11px">Calabarzon</td><td class="num">210 MT</td><td class="num">₱7.8M</td><td><span class="badge b-green">Confirmed</span></td><td style="font-size:11px;color:var(--text3)">Apr 11</td><td style="font-family:var(--mono);font-size:11px">4d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0470</td><td style="font-weight:700">Bukidnon Farms Trading</td><td>Mindanao</td><td style="color:var(--text3);font-size:11px">North Mindanao</td><td class="num">180 MT</td><td class="num">₱6.8M</td><td><span class="badge b-red">Credit Hold</span></td><td style="font-size:11px;color:var(--text3)">Apr 10</td><td style="font-family:var(--mono);font-size:11px">5d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0468</td><td style="font-weight:700">Iloilo Feed Center</td><td>Visayas</td><td style="color:var(--text3);font-size:11px">Negros Occidental</td><td class="num">160 MT</td><td class="num">₱5.9M</td><td><span class="badge b-green">Confirmed</span></td><td style="font-size:11px;color:var(--text3)">Apr 10</td><td style="font-family:var(--mono);font-size:11px">5d</td></tr>
-              <tr><td style="font-family:var(--mono);font-weight:600;color:var(--blue)">PO-26-0465</td><td style="font-weight:700">Negros Feed House</td><td>Visayas</td><td style="color:var(--text3);font-size:11px">Negros Oriental</td><td class="num">140 MT</td><td class="num">₱5.2M</td><td><span class="badge b-gold">Awaiting Stock</span></td><td style="font-size:11px;color:var(--text3)">Apr 9</td><td style="font-family:var(--mono);font-size:11px">6d</td></tr>
-              <tr style="background:rgba(255,199,44,0.04)"><td style="font-weight:800" colspan="3">+ 34 more orders</td><td></td><td class="num" style="font-weight:800">5,522 MT</td><td class="num" style="font-weight:800">₱184.3M</td><td colspan="3"></td></tr>
+              <thead><tr><th>PO #</th><th>Customer</th><th>Brand</th><th>Plant</th><th class="num">Volume</th><th class="num">Amount</th><th>Date</th><th class="num">Aging</th></tr></thead>
+              <tbody id="po-detail-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -3442,11 +3407,91 @@ async function loadSales(){
       if(dpv!=null) animateNumber(sel('sk-speed'), dpv, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT/d</span>'});
       if(sp.vs_prior_period_pct!=null) setDelta('sk-speed-d', sp.vs_prior_period_pct);
     }
-    // Pending PO
-    if(d.pending_po && d.pending_po.summary){
-      var ps=d.pending_po.summary;
+    // Pending PO — hero KPI + full section tables
+    if(d.pending_po){
+      var pp = d.pending_po;
+      var ps = pp.summary || {};
       if(ps.total_mt!=null) animateNumber(sel('sk-pending'), ps.total_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
-      if(ps.total_orders!=null) sett('sk-pending-sub',ps.total_orders+' orders');
+      if(ps.total_orders!=null) sett('sk-pending-sub', ps.total_orders+' orders');
+      // Section counter + 5 PO KPIs
+      sett('po-sec-count', (ps.total_orders||0)+' orders · '+fcn(Math.round(ps.total_mt||0))+' MT · '+fc(ps.total_value||0));
+      animateNumber(sel('po-k-mt'),     ps.total_mt||0,    function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+      animateNumber(sel('po-k-value'),  ps.total_value||0, fc);
+      animateNumber(sel('po-k-orders'), ps.total_orders||0, function(v){return fcn(Math.round(v))});
+      animateNumber(sel('po-k-avg'),    ps.avg_order_mt||0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+      animateNumber(sel('po-k-oldest'), ps.oldest_days||0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> d</span>'});
+      // By Region (compact)
+      if(pp.by_region && pp.by_region.length){
+        var totR = pp.by_region.reduce(function(s,r){return s+r.mt},0);
+        var rhtml = pp.by_region.map(function(r){
+          return '<tr><td class="rn">'+esc((r.region||'').toUpperCase())+'</td>'
+            +'<td class="rv">—</td>'
+            +'<td class="rv">'+fcn(Math.round(r.mt||0))+'</td>'
+            +'<td class="rv">'+(totR>0?((r.mt/totR*100).toFixed(1)+'%'):'—')+'</td></tr>';
+        }).join('');
+        seth('po-region-detail-tbody', rhtml);
+      }
+      // Region detail (big, 5-col with orders + value + avg)
+      if(pp.by_region_detail && pp.by_region_detail.length){
+        var rdhtml = pp.by_region_detail.map(function(r){
+          return '<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>'
+            +'<td class="num">'+fcn(r.orders||0)+'</td>'
+            +'<td class="num">'+fcn(Math.round(r.mt||0))+' MT</td>'
+            +'<td class="num">'+fc(r.value||0)+'</td>'
+            +'<td class="num">'+fcn(Math.round(r.avg_size_mt||0))+' MT</td></tr>';
+        }).join('');
+        seth('po-region-big-tbody', rdhtml);
+      }
+      // By Brand (top 10)
+      if(pp.by_brand && pp.by_brand.length){
+        var totB = pp.by_brand.reduce(function(s,b){return s+b.mt},0);
+        var bhtml = pp.by_brand.slice(0, 10).map(function(b){
+          return '<tr><td class="rn">'+esc(b.brand||'—').slice(0,40)+'</td>'
+            +'<td class="rv">'+fcn(Math.round(b.mt||0))+'</td>'
+            +'<td class="rv">'+(totB>0?((b.mt/totB*100).toFixed(1)+'%'):'—')+'</td></tr>';
+        }).join('');
+        bhtml += '<tr style="background:rgba(255,199,44,0.06)"><td class="rn" style="font-weight:800">Total (top 10)</td><td class="rv" style="font-weight:700;color:var(--gold)">'+fcn(Math.round(pp.by_brand.slice(0,10).reduce(function(s,b){return s+b.mt},0)))+'</td><td class="rv"></td></tr>';
+        seth('po-brand-tbody', bhtml);
+      }
+      // By Major SKU (top 10)
+      if(pp.by_sku && pp.by_sku.length){
+        var totS = pp.by_sku.reduce(function(s,x){return s+x.mt},0);
+        var shtml = pp.by_sku.slice(0, 10).map(function(s){
+          return '<tr><td class="rn">'+esc(s.name || s.sku || '—').slice(0,38)+'</td>'
+            +'<td class="rv">'+fcn(Math.round(s.mt||0))+'</td>'
+            +'<td class="rv">'+(totS>0?((s.mt/totS*100).toFixed(1)+'%'):'—')+'</td></tr>';
+        }).join('');
+        seth('po-sku-tbody', shtml);
+      }
+      // Top pending customers
+      if(pp.top_customers && pp.top_customers.length){
+        var cthtml = pp.top_customers.slice(0, 10).map(function(c){
+          return '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.code||'')+'\')">'
+            +'<td style="font-weight:700">'+esc(c.customer||'—').slice(0,40)+'</td>'
+            +'<td class="num">'+fcn(c.orders||0)+'</td>'
+            +'<td class="num">'+fcn(Math.round(c.mt||0))+' MT</td>'
+            +'<td class="num">'+fc(c.value||0)+'</td></tr>';
+        }).join('');
+        seth('po-topcust-tbody', cthtml);
+      }
+      // PO Detail
+      if(pp.detail && pp.detail.length){
+        sett('po-detail-count', pp.detail.length + ' lines shown');
+        var pohtml = pp.detail.map(function(x){
+          var region = ['AC','ACEXT','BAC'].indexOf(x.plant)>=0?'Luzon' : ['HOREB','ARGAO','ALAE'].indexOf(x.plant)>=0?'Visayas' : ['BUKID','CCPC'].indexOf(x.plant)>=0?'Mindanao' : 'Other';
+          var dateStr = x.date ? new Date(x.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+          return '<tr style="cursor:pointer" onclick="openCust(\''+esc(x.code||'')+'\')">'
+            +'<td style="font-family:var(--mono);font-weight:600;color:var(--blue)">'+esc(String(x.doc_num||''))+'</td>'
+            +'<td style="font-weight:700">'+esc(x.customer||'—').slice(0,32)+'</td>'
+            +'<td style="font-size:11px">'+esc((x.brand||'—').slice(0,22))+'</td>'
+            +'<td style="font-size:11px;color:var(--text3)">'+esc(x.plant||'')+'</td>'
+            +'<td class="num">'+fcn(Math.round(x.mt||0))+' MT</td>'
+            +'<td class="num">'+fc(x.amount||0)+'</td>'
+            +'<td style="font-size:11px;color:var(--text3)">'+dateStr+'</td>'
+            +'<td class="num" style="font-family:var(--mono);font-size:11px">'+(x.age_days||0)+'d</td></tr>';
+        }).join('');
+        seth('po-detail-tbody', pohtml);
+      }
     }
     // Customer rankings
     if(d.top_customers && d.top_customers.length){
