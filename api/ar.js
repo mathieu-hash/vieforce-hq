@@ -122,7 +122,7 @@ module.exports = async (req, res) => {
         CASE WHEN s.sales_90d > 0 THEN CAST(a.ar_share / (s.sales_90d/90.0) AS INT) ELSE 0 END AS dso
       FROM ar_by_region a
       LEFT JOIN sales_by_region s ON a.region = s.region
-      ORDER BY a.ar DESC
+      ORDER BY a.ar_share DESC
     `)
 
     // -------------------- 5. CLIENT-LEVEL with terms + per-client DSO --------------------
