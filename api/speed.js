@@ -1,6 +1,14 @@
 const { query } = require('./_db')
-const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
+const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
+const {
+  countShippingDays,
+  listHolidaysInPeriod,
+  getPeriodBounds,
+  getPeriodEndBound,
+  getManilaToday,
+  fmtISO
+} = require('./lib/shipping_days')
 
 // 2026 Budget targets (from Sales Volume Budget 2026)
 // Annual: 188,266 MT | Q1: 41,800 | Q2: 45,184 | Q3: 49,389 | Q4: 51,893
@@ -29,61 +37,8 @@ function getTarget(period) {
   }
 }
 
-/**
- * Count Mon-Sat shipping days between two dates (inclusive).
- * Sunday (getDay()===0) is excluded.
- */
-function countShippingDays(from, to) {
-  let count = 0
-  const d = new Date(from)
-  while (d <= to) {
-    if (d.getDay() !== 0) count++ // Mon=1 through Sat=6
-    d.setDate(d.getDate() + 1)
-  }
-  return count
-}
-
-/**
- * Compute the shipping cutoff based on 5am Philippines rule.
- * Ops counts today's shipping as "closed" only after 5am the next morning.
- *   - If current PH hour >= 5 → cutoff = yesterday (today's shipping not yet finalized)
- *   - If current PH hour  < 5 → cutoff = day-before-yesterday (walk back past unfinished night)
- * If the resulting cutoff lands on Sunday, walk back one more day (Sat).
- * Returns { cutoff: Date@00:00 local, nowPH: Date, logic: 'after_5am' | 'before_5am' }.
- */
-function getShippingCutoff() {
-  const nowUtc = new Date()
-  // Philippines = UTC+8, no DST
-  const nowPH = new Date(nowUtc.getTime() + 8 * 3600 * 1000)
-  const phHour = nowPH.getUTCHours()
-  const offsetDays = phHour >= 5 ? 1 : 2
-  const logic = phHour >= 5 ? 'after_5am' : 'before_5am'
-  // Build cutoff from PH calendar date minus offset, at 00:00 local (server time)
-  const y = nowPH.getUTCFullYear()
-  const m = nowPH.getUTCMonth()
-  const d = nowPH.getUTCDate()
-  const cutoff = new Date(y, m, d - offsetDays)
-  // Walk past Sunday (shouldn't count Sunday as shipping day)
-  while (cutoff.getDay() === 0) cutoff.setDate(cutoff.getDate() - 1)
-  return { cutoff, nowPH, logic }
-}
-
-/**
- * Get the last day of the period.
- */
-function getPeriodEnd(period) {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth()
-
-  switch (period) {
-    case '7D':  return new Date(y, m, now.getDate())
-    case 'MTD': return new Date(y, m + 1, 0)
-    case 'QTD': return new Date(y, Math.floor(m / 3) * 3 + 3, 0)
-    case 'YTD': return new Date(y, 11, 31)
-    default:    return new Date(y, m + 1, 0)
-  }
-}
+// countShippingDays / getPeriodBounds / getPeriodEndBound / getManilaToday
+// are imported from ./lib/shipping_days (calendar-aware: Sundays + PH holidays).
 
 /**
  * Prior period window (same shape as current, shifted one period back).
@@ -145,12 +100,11 @@ module.exports = async (req, res) => {
 
   try {
     const { period = 'MTD' } = req.query
-    const { dateFrom, dateTo: dateToRaw } = getPeriodDates(period)
 
-    // 5am shipping cutoff rule — caps dateTo so volume/days only include finalized shipping days.
-    // Applied to period-bounded queries (actual, daily, plant, rsm, feed_type, weekly_matrix, prior-period).
-    const { cutoff, nowPH, logic: cutoffLogic } = getShippingCutoff()
-    const dateTo = cutoff < dateToRaw ? cutoff : dateToRaw  // use cutoff unless period ends earlier
+    // Period bounds — calendar-aware, today (Manila) counts as the upper bound.
+    const todayPH = getManilaToday()
+    const { start: dateFrom, end: dateTo } = getPeriodBounds(period, todayPH)
+    const periodEnd = getPeriodEndBound(period, todayPH)
 
     // Actual MT shipped (from ODLN delivery notes, NOT OINV invoices)
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
@@ -208,25 +162,16 @@ module.exports = async (req, res) => {
     }
 
     const actual_mt = totalRow[0]?.actual_mt || 0
-    const today = new Date()
-    const periodEnd = getPeriodEnd(period)
+    const today = todayPH
 
-    // Calendar day counters (Mon-Sat) — for hero "X of Y shipping days" display
-    const elapsed_days = dateFrom > cutoff ? 0 : countShippingDays(dateFrom, cutoff)
+    // Calendar-aware shipping day counters. Today (Manila) counts as a shipping day.
+    // Sundays + PH holidays (api/data/shipping_calendar_ph.json) are excluded.
+    const elapsed_days = countShippingDays(dateFrom, today)
     const total_days = countShippingDays(dateFrom, periodEnd)
+    const holidays_in_period = listHolidaysInPeriod(dateFrom, periodEnd)
 
-    // Daily pullout divisor:
-    //   - 7D/MTD: daily[] is per-day, so use count of days with shipments (matches Ops tool;
-    //     excludes Mon-Sat days that had zero shipments — holidays, plant-down)
-    //   - QTD: daily[] is per-week (aggregated) → fall back to Mon-Sat elapsed_days
-    //   - YTD: daily[] is per-month (aggregated) → fall back to Mon-Sat elapsed_days
-    const dailyIsPerDay = period === '7D' || period === 'MTD'
-    const days_with_shipments = dailyIsPerDay
-      ? (daily || []).filter(r => (r.daily_mt || 0) > 0).length
-      : 0
-    const divisor = days_with_shipments > 0 ? days_with_shipments : elapsed_days
-    const speed_per_day = divisor > 0 ? actual_mt / divisor : 0
-    const projected_mt = divisor > 0
+    const speed_per_day = elapsed_days > 0 ? actual_mt / elapsed_days : 0
+    const projected_mt = elapsed_days > 0
       ? Math.round(speed_per_day * total_days)
       : 0
 
@@ -320,8 +265,7 @@ module.exports = async (req, res) => {
     const vs_lm_pct = lm_same > 0 ? Math.round(((actual_mt - lm_same) / lm_same) * 1000) / 10 : 0
 
     // ---- vs prior period (same shape, shifted back) for dynamic Daily Pullout ----
-    // Use cutoff (not today) so the prior window shares the same 5am-finalized shape.
-    const prior = getPriorPeriodWindow(period, dateFrom, cutoff)
+    const prior = getPriorPeriodWindow(period, dateFrom, today)
     const priorRow = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt
       FROM ODLN T0
@@ -337,13 +281,13 @@ module.exports = async (req, res) => {
       ? Math.round(((speed_per_day - prior_daily_pullout) / prior_daily_pullout) * 1000) / 10
       : 0
 
-    const fmtDate = (d) => d.toISOString().slice(0, 10)
     const result = {
       period,
-      // ---- Cutoff debug (5am shipping rule) ----
-      cutoff_date:         fmtDate(cutoff),
-      cutoff_logic:        cutoffLogic,
-      current_datetime_ph: nowPH.toISOString().replace('Z', '+08:00'),
+      // ---- Calendar debug (PH shipping calendar — Sundays + holidays excluded) ----
+      current_date_ph:     fmtISO(today),
+      period_start:        fmtISO(dateFrom),
+      period_end:          fmtISO(periodEnd),
+      holidays_in_period,
       // ---- Canonical period-aware fields (prefer these) ----
       period_volume_mt:          Math.round(actual_mt * 10) / 10,
       shipping_days_elapsed:     elapsed_days,
