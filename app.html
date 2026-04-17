@@ -476,6 +476,47 @@ body{
 .kpi-sm{padding:14px 16px}
 .kpi-sm .kpi-val{font-size:20px;margin-top:4px}
 
+/* ===== ANIMATION LAYERS ===== */
+/* Layer 1: KPI card pulse glow on data refresh (dark mode) */
+.kpi{transition:box-shadow 400ms ease-out}
+.kpi.refreshing{animation:kpi-pulse 600ms ease-out}
+@keyframes kpi-pulse{
+  0%   { box-shadow: 0 0 0 0 rgba(0,174,239,0); }
+  30%  { box-shadow: 0 0 0 3px rgba(0,174,239,0.4); }
+  100% { box-shadow: 0 0 0 0 rgba(0,174,239,0); }
+}
+[data-theme="light"] .kpi.refreshing{animation:kpi-pulse-light 600ms ease-out}
+@keyframes kpi-pulse-light{
+  0%   { box-shadow: 0 0 0 0 rgba(0,74,100,0); }
+  30%  { box-shadow: 0 0 0 3px rgba(0,74,100,0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(0,74,100,0); }
+}
+
+/* Layer 3: filter pill click feedback */
+.tb-chip, .tb-compare-chip, .tb-toggle-btn, .filter-chip{transition:transform 120ms ease-out}
+.tb-chip:active, .tb-compare-chip:active, .tb-toggle-btn:active, .filter-chip:active{transform:scale(0.94)}
+.tb-chip.just-clicked, .tb-compare-chip.just-clicked, .tb-toggle-btn.just-clicked, .filter-chip.just-clicked{
+  animation:pill-click 200ms ease-out
+}
+@keyframes pill-click{
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+/* Reduced-motion a11y */
+@media (prefers-reduced-motion: reduce){
+  .kpi.refreshing,
+  .tb-chip.just-clicked, .tb-compare-chip.just-clicked,
+  .tb-toggle-btn.just-clicked, .filter-chip.just-clicked{
+    animation:none !important;
+  }
+  *{
+    animation-duration:0.01ms !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
 /* ===== ENRICHED KPI (Home hero strip) ===== */
 .kpi-enr{display:flex;flex-direction:column}
 .kpi-enr .kpi-enr-div{height:1px;background:var(--divider);margin:10px 0 8px}
@@ -935,15 +976,15 @@ body{
             <div class="kpi-enr-status ok" id="hk-dso-pct">On target</div>
             <div class="kpi-enr-badge" id="hk-dso-badge" style="display:none">+0d from delinquent</div>
           </div>
-          <!-- 6. Daily Pullout (was Speed) -->
+          <!-- 6. Daily Pullout (period-aware) -->
           <div class="kpi kpi-sm kpi-enr">
-            <div class="kpi-label">Daily Pullout</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-speed">682<span style="font-size:11px;color:var(--text3)"> MT/d</span></div>
-            <div class="kpi-delta up" id="hk-speed-d">▲ 4.8%</div>
+            <div class="kpi-label" id="hk-speed-label">Daily Pullout · MTD</div>
+            <div class="kpi-val" style="font-size:20px" id="hk-speed">—<span style="font-size:11px;color:var(--text3)"> MT/d</span></div>
+            <div class="kpi-delta" id="hk-speed-d">vs prior period</div>
             <div class="kpi-enr-div"></div>
-            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-speed-days">14 of 26</span><span class="kpi-enr-ytd-budget">shipping days</span></div>
-            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-speed-bar" style="width:54%;background:var(--blue)"></div></div>
-            <div class="kpi-enr-status" style="color:var(--text3)" id="hk-speed-pct">12 days remaining</div>
+            <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-speed-days">— of —</span><span class="kpi-enr-ytd-budget">shipping days</span></div>
+            <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-speed-bar" style="width:0%;background:var(--blue)"></div></div>
+            <div class="kpi-enr-status" style="color:var(--text3)" id="hk-speed-pct">— days remaining</div>
           </div>
           <!-- 7. Pending PO -->
           <div class="kpi kpi-sm kpi-enr" style="border-left:3px solid var(--gold);cursor:pointer" onclick="navTo('pg-sales')">
@@ -2871,6 +2912,62 @@ function showError(pgId,msg){
 }
 function clearError(pgId){var pg=sel(pgId);if(!pg)return;var b=pg.querySelector('.api-error-banner');if(b)b.remove()}
 
+/* ===== ANIMATION HELPERS ===== */
+// Honour the OS reduced-motion preference — skip all custom animations.
+var PREFERS_REDUCED_MOTION = (function(){
+  try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch(e){ return false; }
+})();
+
+// Layer 1: pulse the .kpi cards on the given page when data refreshes.
+function pulseRefresh(pageId){
+  if(PREFERS_REDUCED_MOTION) return;
+  if(!pageId) return;
+  var pg = document.getElementById(pageId);
+  if(!pg) return;
+  var cards = pg.querySelectorAll('.kpi');
+  cards.forEach(function(c){
+    c.classList.remove('refreshing');
+    void c.offsetWidth; // force reflow
+    c.classList.add('refreshing');
+    setTimeout(function(){ c.classList.remove('refreshing'); }, 650);
+  });
+}
+
+// Layer 2: tick a number from old to new over `duration` ms.
+// Formatter receives a numeric value and returns HTML (innerHTML-safe — keeps <span>s).
+function animateNumber(el, newValue, formatter, duration){
+  if(!el) return;
+  duration = duration || 500;
+  var oldVal = parseFloat(el.dataset.rawValue);
+  if(isNaN(oldVal)) oldVal = 0;
+  el.dataset.rawValue = String(newValue);
+  if(PREFERS_REDUCED_MOTION || Math.abs(oldVal - newValue) < 0.01){
+    el.innerHTML = formatter(newValue);
+    return;
+  }
+  var start = performance.now();
+  var diff  = newValue - oldVal;
+  function step(now){
+    var t = Math.min((now - start) / duration, 1);
+    var eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    var current = oldVal + diff * eased;
+    el.innerHTML = formatter(current);
+    if(t < 1) requestAnimationFrame(step);
+    else el.innerHTML = formatter(newValue);
+  }
+  requestAnimationFrame(step);
+}
+
+// Layer 3: bounce a filter pill on click.
+function addClickAnimation(btn){
+  if(!btn || PREFERS_REDUCED_MOTION) return;
+  btn.classList.remove('just-clicked');
+  void btn.offsetWidth;
+  btn.classList.add('just-clicked');
+  setTimeout(function(){ btn.classList.remove('just-clicked'); }, 220);
+}
+
 /* ===== XLSX EXPORT ===== */
 function exportTableToXlsx(table, filename){
   if(typeof XLSX === 'undefined'){ alert('Export library not loaded — please refresh.'); return; }
@@ -2955,7 +3052,14 @@ function toggleSidebar(){
   btn.textContent = sb.classList.contains('collapsed') ? '›' : '‹';
 }
 
+// Debounce guard — avoid double-animating on rapid clicks of the same filter
+var LAST_FILTER_CLICK = 0;
 function setPd(el){
+  if(!el) return;
+  var now = Date.now();
+  if(el.classList.contains('active') && now - LAST_FILTER_CLICK < 250) return; // same-click debounce
+  LAST_FILTER_CLICK = now;
+  addClickAnimation(el);
   el.parentElement.querySelectorAll('.tb-chip').forEach(function(c){c.classList.remove('active')});
   el.classList.add('active');
   PD = el.textContent.trim();
@@ -2964,6 +3068,8 @@ function setPd(el){
   loadPage(PG);
 }
 function setCmp(el){
+  if(!el) return;
+  addClickAnimation(el);
   el.parentElement.querySelectorAll('.tb-compare-chip').forEach(function(c){c.classList.remove('active')});
   el.classList.add('active');
   CMP = el.textContent.trim().toLowerCase().indexOf('ly')>=0 ? 'vs_ly' : 'vs_pp';
@@ -2972,6 +3078,8 @@ function setCmp(el){
   loadPage(PG);
 }
 function setU(el){
+  if(!el) return;
+  addClickAnimation(el);
   el.parentElement.querySelectorAll('.tb-toggle-btn').forEach(function(c){c.classList.remove('active')});
   el.classList.add('active');
   UT = el.textContent.trim();
@@ -2994,7 +3102,7 @@ function syncFilterUI(){
     if(c.textContent.trim()===UT) c.classList.add('active'); else c.classList.remove('active');
   });
 }
-function setF(el){el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
+function setF(el){if(!el)return;addClickAnimation(el);el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
 function doSearch(){var q=document.getElementById('global-search').value.trim();if(q){navTo('pg-customers');loadCust(q)}}
 
 /* ===== LOAD ROUTER ===== */
@@ -3037,7 +3145,7 @@ async function loadHome(){
     function barColor(pct){ return pct>=95?'var(--green)' : pct>=80?'var(--gold)' : 'var(--red)'; }
     function setCard(prefix, mtd, deltaPct, ytdActual, ytdBudget, formatFn){
       var pct = ytdBudget>0 ? Math.round((ytdActual/ytdBudget)*100) : 0;
-      if(mtd!=null) seth('hk-'+prefix, formatFn(mtd));
+      if(mtd!=null) animateNumber(sel('hk-'+prefix), mtd, formatFn);
       if(deltaPct!=null){
         var arrow = deltaPct>=0 ? '▲' : '▼';
         var cls   = deltaPct>=0 ? 'up' : 'down';
@@ -3073,7 +3181,7 @@ async function loadHome(){
       // Pending PO
       if(d.pending_po){
         var pp=d.pending_po;
-        if(pp.total_mt!=null) seth('hk-pending',fcn(Math.round(pp.total_mt))+'<span style="font-size:11px;color:var(--text3)"> MT</span>');
+        if(pp.total_mt!=null) animateNumber(sel('hk-pending'), pp.total_mt, function(v){ return fcn(Math.round(v))+'<span style="font-size:11px;color:var(--text3)"> MT</span>'; });
         sett('hk-pending-sub',(pp.total_value?fc(pp.total_value):'')+(pp.total_orders?' · '+pp.total_orders+' orders':''));
         if(pp.oldest_days!=null){
           sett('hk-pending-oldest', pp.oldest_days+'d ago');
@@ -3137,7 +3245,7 @@ async function loadHome(){
     var dsoActive = (d && d.dso_active!=null) ? d.dso_active : (ar && ar.dso_active!=null ? ar.dso_active : (ar && ar.dso!=null ? ar.dso : null));
     var dsoTotal  = (d && d.dso_total!=null)  ? d.dso_total  : (ar && ar.dso_total!=null  ? ar.dso_total  : null);
     if(dsoActive!=null){
-      seth('hk-dso', Math.round(dsoActive)+'<span style="font-size:13px;color:var(--text3)">d</span>');
+      animateNumber(sel('hk-dso'), dsoActive, function(v){ return Math.round(v)+'<span style="font-size:13px;color:var(--text3)">d</span>'; });
       // Mat's thresholds: <35d "very good" | 35-45 "good" | 45-60 "watch" | >60 "bad"
       var dsoRating, dsoColor, dsoStatusCls;
       if(dsoActive < 35)      { dsoRating='Very good'; dsoColor='var(--green)'; dsoStatusCls='ok'; }
@@ -3163,25 +3271,44 @@ async function loadHome(){
       if(badge){ badge.style.display=''; badge.textContent = '+'+Math.round(dsoTotal-dsoActive)+'d from delinquent accounts'; }
     }
 
-    // Daily Pullout — shipping days context
+    // Daily Pullout — period-aware (label, value, days, delta, progress)
     if(sp){
+      sett('hk-speed-label', 'Daily Pullout · ' + PD);
       var dpVal = sp.daily_pullout!=null ? sp.daily_pullout : sp.speed_per_day;
-      if(dpVal!=null) seth('hk-speed', fcn(Math.round(dpVal))+'<span style="font-size:11px;color:var(--text3)"> MT/d</span>');
-      var elapsed = sp.days_elapsed!=null ? sp.days_elapsed : sp.elapsed_days;
-      var total   = sp.days_total!=null   ? sp.days_total   : sp.total_days;
-      var remain  = sp.days_remaining!=null ? sp.days_remaining : sp.remaining_days;
+      if(dpVal!=null) animateNumber(sel('hk-speed'), dpVal, function(v){ return fcn(Math.round(v))+'<span style="font-size:11px;color:var(--text3)"> MT/d</span>'; });
+      // Delta vs prior period
+      var vsPrior = sp.vs_prior_period_pct;
+      var dEl = sel('hk-speed-d');
+      if(dEl){
+        if(vsPrior!=null && !isNaN(vsPrior) && vsPrior !== 0){
+          var arrow = vsPrior >= 0 ? '▲' : '▼';
+          dEl.className = 'kpi-delta ' + (vsPrior >= 0 ? 'up' : 'down');
+          dEl.textContent = arrow + ' ' + Math.abs(vsPrior).toFixed(1) + '% vs prior ' + PD;
+        } else {
+          dEl.className = 'kpi-delta';
+          dEl.style.color = 'var(--text3)';
+          dEl.textContent = 'vs prior ' + PD;
+        }
+      }
+      var elapsed = sp.shipping_days_elapsed!=null ? sp.shipping_days_elapsed
+                  : sp.days_elapsed!=null ? sp.days_elapsed : sp.elapsed_days;
+      var total   = sp.shipping_days_total!=null ? sp.shipping_days_total
+                  : sp.days_total!=null ? sp.days_total : sp.total_days;
+      var remain  = sp.shipping_days_remaining!=null ? sp.shipping_days_remaining
+                  : sp.days_remaining!=null ? sp.days_remaining : sp.remaining_days;
       if(elapsed!=null && total!=null){
-        sett('hk-speed-days', elapsed+' of '+total);
+        sett('hk-speed-days', elapsed + ' of ' + total);
         var dayPct = total>0 ? Math.round((elapsed/total)*100) : 0;
         var spBar = sel('hk-speed-bar');
-        if(spBar){ spBar.style.width = dayPct+'%'; spBar.style.background='var(--blue)'; }
+        if(spBar){ spBar.style.width = dayPct + '%'; spBar.style.background = 'var(--blue)'; }
         var spStatus = sel('hk-speed-pct');
         if(spStatus){
-          spStatus.textContent = (remain!=null?remain:(total-elapsed))+' days remaining';
+          spStatus.textContent = (remain!=null ? remain : (total - elapsed)) + ' days remaining';
           spStatus.style.color = 'var(--text3)';
         }
       }
     }
+    pulseRefresh('pg-home');
   } catch(e) { console.error('Home:', e); showError('pg-home','Unable to load live data'); }
 }
 
@@ -3226,6 +3353,7 @@ async function loadSales(){
       // Not available directly — chart uses hardcoded region split. Log for Agent 4.
       console.warn('[SALES] monthly_trend available but chart expects region-split data. Keeping prototype chart.');
     }
+    pulseRefresh('pg-sales');
   } catch(e) { console.error('Sales:', e); showError('pg-sales','Unable to load sales data'); }
 }
 
@@ -3235,6 +3363,7 @@ var AR_SORT = { key:'balance', dir:'desc' };
 var AR_FILTER = 'ALL';  // ALL | ACTIVE | DELINQ | OVERDUE
 
 function setARFilter(el, mode){
+  if(el) addClickAnimation(el);
   document.querySelectorAll('[data-ar-filter]').forEach(function(b){b.classList.remove('active')});
   if(el) el.classList.add('active');
   AR_FILTER = mode;
@@ -3418,6 +3547,7 @@ async function loadAR(){
       var wrap2 = sel('ar-bal-variation-wrap');
       if(wrap2) wrap2.style.background = varAr<=0 ? 'var(--glow-green)' : 'var(--glow-red)';
     }
+    pulseRefresh('pg-ar');
   } catch(e) { console.error('AR:', e); showError('pg-ar','Unable to load AR data'); }
 }
 
@@ -3447,14 +3577,15 @@ async function loadInv(){
     if(d.by_region && d.by_region.length){
       console.log('[INV] '+d.by_region.length+' regions received');
     }
+    pulseRefresh('pg-inv');
   } catch(e) { console.error('Inv:', e); showError('pg-inv','Unable to load inventory data'); }
 }
 
-/* ===== SPEED — wired to /api/speed (ALWAYS MTD — speed is inherently monthly) ===== */
+/* ===== SPEED — wired to /api/speed (mirrors topbar period) ===== */
 async function loadSpeed(){
   clearError('pg-speed');
   try {
-    var d = await getSpeedData({period:'MTD'});  // Force MTD — Speed page is monthly-only
+    var d = await getSpeedData({period:PD});  // period mirrors topbar selection
     if(!d){showError('pg-speed','Unable to load speed data');return}
     console.log('[SPEED] Rendering:', Object.keys(d), '| daily_pullout:', d.daily_pullout, 'days:', d.days_elapsed+'/'+d.days_total);
     // Hero banner — canonical fields
@@ -3534,13 +3665,14 @@ async function loadSpeed(){
       var tgt3 = sel('speed-plant-tbody');
       if(tgt3) seth('speed-plant-tbody', phtml);
     }
+    pulseRefresh('pg-speed');
   } catch(e) { console.error('Speed:', e); showError('pg-speed','Unable to load speed data'); }
 }
 
 /* ===== CUSTOMERS — wired to /api/customers ===== */
 var CF = 'ALL';
 function fltCust(r, el){
-  if(el){el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
+  if(el){addClickAnimation(el);el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
   CF = r;
   DC['pg-customers']=null;
   loadCust();
@@ -3656,6 +3788,7 @@ async function openCust(code){
     } else {
       seth('cust-orders-list','<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">No recent orders</div>');
     }
+    pulseRefresh('pg-custdetail');
   } catch(e) { console.error('CustDetail:', e); showError('pg-custdetail','Unable to load customer profile'); }
 }
 
@@ -3788,6 +3921,7 @@ async function loadMargin(){
       });
       seth('margin-worst-tbody',shtml);
     }
+    pulseRefresh('pg-margin');
   } catch(e) { console.error('Margin:', e); showError('pg-margin','Unable to load margin data'); }
 }
 
@@ -3869,6 +4003,7 @@ async function loadIntelligence(){
     if(d.health_distribution && d.health_distribution.length){
       console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands available (prototype bar retained)');
     }
+    pulseRefresh('pg-insights');
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
 }
 
@@ -3962,6 +4097,7 @@ async function loadTeam(){
     if(d.performance_matrix){
       console.log('[TEAM] Performance matrix: '+((d.performance_matrix.months||[]).length)+' months × '+((d.performance_matrix.rsms||[]).length)+' RSMs');
     }
+    pulseRefresh('pg-team');
   } catch(e) { console.error('Team:', e); showError('pg-team','Unable to load team data'); }
 }
 
@@ -4033,11 +4169,23 @@ async function loadBudget(){
     if(d.pl_summary){
       console.log('[BUDGET] P&L summary: '+((d.pl_summary.months||[]).length)+' months — prototype table retained');
     }
+    pulseRefresh('pg-budget');
   } catch(e) { console.error('Budget:', e); showError('pg-budget','Unable to load budget data'); }
 }
 
 // ===== CHARTS =====
 Chart.defaults.font.family = 'Montserrat';
+// Layer 4: smooth animation defaults for all Chart.js instances
+Chart.defaults.animation = { duration: 800, easing: 'easeOutQuart' };
+Chart.defaults.transitions = {
+  active:  { animation: { duration: 400 } },
+  resize:  { animation: { duration: 0 } }
+};
+// Honour OS reduced-motion
+if(typeof PREFERS_REDUCED_MOTION !== 'undefined' && PREFERS_REDUCED_MOTION){
+  Chart.defaults.animation = { duration: 0 };
+  Chart.defaults.transitions = { active:{ animation:{ duration: 0 } } };
+}
 // Datalabels plugin — register globally, disabled by default (enable per-dataset)
 if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.defaults.plugins.datalabels = { display:false }; }
 let charts = {};
