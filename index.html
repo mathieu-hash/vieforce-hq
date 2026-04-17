@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VieForce HQ — Login</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+  <link rel="shortcut icon" href="/assets/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#003350">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -34,19 +40,18 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 80px;
-      height: 80px;
-      background: rgba(255,255,255,0.1);
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 20px;
-      margin-bottom: 16px;
+      width: 140px;
+      height: 140px;
+      margin-bottom: 20px;
+      filter: drop-shadow(0 8px 28px rgba(0, 174, 239, 0.35))
+              drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
     }
 
-    .login-logo-box span {
-      font-size: 32px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: #F1B11D;
+    .login-logo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
 
     .login-title {
@@ -166,7 +171,7 @@
 <body>
   <div class="login-container">
     <div class="login-logo">
-      <div class="login-logo-box"><span>HQ</span></div>
+      <div class="login-logo-box"><img src="/assets/vieforce-logo-md.png" alt="VieForce HQ"></div>
       <div class="login-title">VieForce HQ</div>
       <div class="login-subtitle">Vienovo Philippines Inc.</div>
     </div>

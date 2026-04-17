@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VieForce HQ — Desktop</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+<link rel="shortcut icon" href="/assets/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#00293A">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -111,7 +117,7 @@
 [data-theme="light"] .rank-3{background:rgba(215,171,38,0.12);color:rgba(160,120,20,0.8)}
 [data-theme="light"] .rank-n{background:rgba(0,74,100,0.04);color:var(--text3)}
 [data-theme="light"] .sap-live{background:rgba(151,215,0,0.1);color:var(--green);border-color:rgba(151,215,0,0.15)}
-[data-theme="light"] .brand-logo{box-shadow:0 2px 12px rgba(0,74,100,0.15)}
+[data-theme="light"] .brand-logo{background:transparent}
 [data-theme="light"] .user-block:hover{background:rgba(0,74,100,0.02)}
 [data-theme="light"] .list-row:hover{background:rgba(0,74,100,0.02)}
 [data-theme="light"] .tbl tr:hover td{background:rgba(0,74,100,0.015)}
@@ -140,7 +146,7 @@
 [data-theme="light"] .brand{background:var(--navy);border-bottom-color:rgba(0,0,0,0.06)}
 [data-theme="light"] .brand .brand-name{color:#fff}
 [data-theme="light"] .brand .brand-sub{color:rgba(255,255,255,0.6)}
-[data-theme="light"] .brand-logo{background:linear-gradient(135deg,#97D700,#7AB800);box-shadow:0 2px 10px rgba(151,215,0,0.3)}
+[data-theme="light"] .brand-logo{background:transparent;filter:drop-shadow(0 2px 10px rgba(0,74,100,0.35))}
 [data-theme="light"] .sap-status{background:var(--navy);border-top-color:rgba(0,0,0,0.06)}
 [data-theme="light"] .sap-status-text{color:rgba(255,255,255,0.6)}
 [data-theme="light"] .user-block{background:var(--navy);border-top-color:rgba(0,0,0,0.06)}
@@ -275,13 +281,12 @@ body{
   border-bottom:1px solid var(--divider);flex-shrink:0;
 }
 .brand-logo{
-  width:36px;height:36px;border-radius:10px;
-  background:linear-gradient(135deg,#004A64,#00AEEF);
+  width:40px;height:40px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:800;color:white;flex-shrink:0;
-  box-shadow:0 2px 12px rgba(0,174,239,0.25);
-  letter-spacing:-0.5px;
+  flex-shrink:0;background:transparent;overflow:hidden;
+  filter:drop-shadow(0 2px 8px rgba(0,174,239,0.28));
 }
+.brand-logo img{width:100%;height:100%;object-fit:contain;display:block}
 .brand-text{overflow:hidden;white-space:nowrap}
 .brand-name{font-size:15px;font-weight:800;letter-spacing:-0.3px}
 .brand-sub{font-size:9px;color:var(--text3);font-weight:500;margin-top:1px}
@@ -880,7 +885,7 @@ body{
   <aside class="sidebar" id="sidebar">
     <div class="collapse-btn" onclick="toggleSidebar()" id="collapse-btn">‹</div>
     <div class="brand">
-      <div class="brand-logo">VF</div>
+      <div class="brand-logo"><img src="/assets/vieforce-logo-sm.png" alt="VieForce HQ"></div>
       <div class="brand-text">
         <div class="brand-name">VieForce HQ</div>
         <div class="brand-sub">Sales Intelligence</div>
