@@ -1125,11 +1125,12 @@ body{
             <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-sales-bar" style="width:93%;background:var(--green)"></div></div>
             <div class="kpi-enr-status ok" id="hk-sales-pct">93% YTD</div>
           </div>
-          <!-- 2. Volume -->
-          <div class="kpi kpi-sm kpi-enr" title="Based on invoiced data (OINV). Delivery volume may differ — see Speed Monitor for operational MT shipped.">
-            <div class="kpi-label">Volume <span style="font-size:9px;color:var(--text4);font-weight:500;letter-spacing:0.3px">(INVOICED)</span></div>
+          <!-- 2. Volume — DR (ODLN) primary · Invoiced (OINV) shown in sub-line · pending-bill count -->
+          <div class="kpi kpi-sm kpi-enr" title="Volume reports physical MT shipped (ODLN/DR), including deliveries not yet invoiced. Gross Margin and GM/Ton use invoiced volume (OINV).">
+            <div class="kpi-label">Volume <span style="font-size:9px;color:var(--text4);font-weight:500;letter-spacing:0.3px">(DR)</span></div>
             <div class="kpi-val" style="font-size:20px" id="hk-vol">14.2K<span style="font-size:11px;color:var(--text3)"> MT</span></div>
             <div class="kpi-delta up" id="hk-vol-d">▲ 12.1%</div>
+            <div class="kpi-vol-sub" id="hk-vol-sub" style="font-size:10px;color:var(--text3);margin-top:2px;letter-spacing:0.1px">— invoiced · — pending</div>
             <div class="kpi-enr-div"></div>
             <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-val" id="hk-vol-ytd">54.4K</span><span class="kpi-enr-ytd-budget" id="hk-vol-ytd-bud">/ 58.3K MT</span></div>
             <div class="prog kpi-enr-prog"><div class="prog-fill" id="hk-vol-bar" style="width:93%;background:var(--green)"></div></div>
@@ -3868,6 +3869,23 @@ async function loadHome(){
       // 1-4: Sales / Volume / GM / GM-per-Ton
       setCard('sales', d.revenue,      dp.revenue,      ytd.revenue,      bud.ytd_sales,  fc);
       setCard('vol',   volMtd,         dp.volume_mt,    volYtd,           volBud,         volFmt);
+      // Volume sub-line: "7,920 MT invoiced · 260 MT (15 docs) pending bill"
+      var volSub = sel('hk-vol-sub');
+      if(volSub){
+        var inv = UT==='Bags' ? d.volume_bags_invoiced : d.volume_mt_invoiced;
+        var unitLbl = UT==='Bags' ? 'bags' : 'MT';
+        var pendMt  = d.pending_billing_mt || 0;
+        var pendDocs = d.pending_billing_docs || 0;
+        if(inv!=null){
+          var parts = [fcn(Math.round(inv)) + ' ' + unitLbl + ' invoiced'];
+          if(pendMt > 0 || pendDocs > 0){
+            parts.push(fcn(Math.round(pendMt)) + ' ' + unitLbl + ' (' + pendDocs + ' doc' + (pendDocs===1?'':'s') + ') pending bill');
+          }
+          volSub.textContent = parts.join(' · ');
+        } else {
+          volSub.textContent = '';
+        }
+      }
       setCard('gm',    d.gross_margin, dp.gross_margin, ytd.gross_margin, bud.ytd_gm,     fc);
       // GM/Ton: target ≥₱6,550 — green if met
       var gmtFmt = function(n){ return '₱'+fcn(Math.round(n)); };
