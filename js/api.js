@@ -55,3 +55,24 @@ function getBudgetData(params) { return apiFetch('budget', params); }
 function getItemizedData(params) { return apiFetch('itemized', params); }
 function getCustomerSOA(params) { return apiFetch('customer/soa', params); }
 function searchGlobal(params) { return apiFetch('search', params); }
+
+// Silence system — POST helpers use JSON body; GET helper reuses apiFetch
+async function apiPost(endpoint, body) {
+  var url = API_BASE + '/' + endpoint;
+  var res = await fetch(url, {
+    method: 'POST',
+    headers: getApiHeaders(),
+    body: JSON.stringify(body || {})
+  });
+  if (res.status === 401) { logout(); return null; }
+  var data = null;
+  try { data = await res.json(); } catch(e) {}
+  if (!res.ok) {
+    var msg = (data && data.error) ? data.error : ('HTTP ' + res.status);
+    throw new Error(msg);
+  }
+  return data;
+}
+function silenceAlert(payload)   { return apiPost('silence',   payload); }
+function unsilenceAlert(payload) { return apiPost('unsilence', payload); }
+function getSilenced()           { return apiFetch('silenced'); }

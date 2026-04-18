@@ -1,6 +1,7 @@
 const { query } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
+const { isNonCustomer } = require('./lib/non-customer-codes')
 
 // 2026 Budget targets (mirrors api/speed.js + api/budget.js)
 const BUDGET_2026 = {
@@ -52,12 +53,13 @@ module.exports = async (req, res) => {
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
     const filteredWhere = applyRoleFilter(session, baseWhere)
 
-    // --- Current period KPIs ---
+    // --- Current period KPIs — OINV is REVENUE/MARGIN basis only.
+    //     Volume reporting uses ODLN (see below). Unit margin (gmt) uses OINV/OINV per Mat's rule 2026-04-18.
     const kpis = await query(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
-        ISNULL(SUM(T1.Quantity), 0)                                                AS volume_bags,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.Quantity), 0)                                                AS volume_bags_invoiced,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt_invoiced,
         ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
         CASE WHEN SUM(T1.Quantity) > 0
           THEN SUM(T1.GrssProfit) / SUM(T1.Quantity)
@@ -71,11 +73,36 @@ module.exports = async (req, res) => {
       ${filteredWhere}
     `, { dateFrom, dateTo })
 
+    // --- Current period VOLUME from ODLN (delivery notes — physical MT shipped) ---
+    const odlnCur = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity), 0)                                                AS volume_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)              AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+    `, { dateFrom, dateTo })
+
+    // --- Pending billing: ODLN docs in period that are not yet fully invoiced (DocStatus='O') ---
+    const pendingBilling = await query(`
+      SELECT
+        COUNT(DISTINCT T0.DocEntry)                                                AS pending_docs,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)              AS pending_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo
+        AND T0.CANCELED = 'N'
+        AND T0.DocStatus = 'O'
+    `, { dateFrom, dateTo })
+
     // --- Previous period KPIs (for MoM delta) ---
+    // Revenue + GM from OINV; volume from ODLN (compared apples-to-apples with current ODLN volume)
     const prevKpis = await query(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt_invoiced,
         ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
@@ -86,13 +113,21 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
     `, { prevFrom: prev.from, prevTo: prev.to })
 
+    const prevOdln = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
+    `, { prevFrom: prev.from, prevTo: prev.to })
+
     // --- Same period last year (for vs LY compare) ---
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
     const lyTo   = new Date(dateTo);   lyTo.setFullYear(lyTo.getFullYear() - 1)
     const lyKpis = await query(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt_invoiced,
         ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
@@ -103,17 +138,33 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED = 'N'
     `, { lyFrom, lyTo })
 
+    const lyOdln = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED = 'N'
+    `, { lyFrom, lyTo })
+
     // --- YTD actuals ---
     const ytdKpis = await query(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt_invoiced,
         ISNULL(SUM(T1.GrssProfit), 0)                                              AS gross_margin,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
           ELSE 0 END                                                                AS gmt
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'
+    `, { ytdFrom, today: now })
+
+    const ytdOdln = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'
     `, { ytdFrom, today: now })
@@ -224,9 +275,10 @@ module.exports = async (req, res) => {
         : null
     }))
 
-    // --- Top 5 customers ---
-    const topCust = await query(`
-      SELECT TOP 5
+    // --- Top customers (pull extra rows so filtering warehouse codes still yields 5) ---
+    const topCustRaw = await query(`
+      SELECT TOP 15
+        T0.CardCode                                                     AS code,
         T0.CardName                                                     AS name,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS vol,
         ISNULL(SUM(T1.LineTotal), 0)                                    AS revenue
@@ -234,9 +286,10 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-      GROUP BY T0.CardName
+      GROUP BY T0.CardCode, T0.CardName
       ORDER BY vol DESC
     `, { dateFrom, dateTo })
+    const topCust = topCustRaw.filter(c => !isNonCustomer(c.code)).slice(0, 5)
 
     // --- Monthly performance (last 7 months, CY + LY volume + GM) — OINV only ---
     const monthlyRaw = await query(`

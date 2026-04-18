@@ -1,25 +1,23 @@
 const { query } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
+const { isNonCustomer, excludeNonCustomers } = require('./lib/non-customer-codes')
+const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 
 // --- Scoring helpers (deterministic, explainable) ---
 function scoreRescue(ar_balance, days_silent) {
-  // priority = (AR_millions) × log10(days_silent+1) × 10 · clamped 0–100
   const raw = (ar_balance / 1_000_000) * Math.log10((days_silent || 0) + 1) * 10
   return Math.max(0, Math.min(100, Math.round(raw)))
 }
 function scoreGrowth(upside_php_yearly) {
-  // priority = log10(upside/100K) × 25 · clamped 0–100
   const raw = Math.log10(Math.max(1, upside_php_yearly / 100_000)) * 25
   return Math.max(0, Math.min(100, Math.round(raw)))
 }
 function scoreWarning(revenue_impact, change_pct) {
-  // priority = (impact_millions × |Δ%|) / 5 · clamped 0–100
   const raw = (revenue_impact / 1_000_000) * Math.min(100, Math.abs(change_pct)) / 5
   return Math.max(0, Math.min(100, Math.round(raw)))
 }
 
-// Brand token = first two words of INV1.Dscription (e.g. "VIEPRO LAYER 1 Crumble" → "VIEPRO LAYER")
 function extractBrandToken(dscription) {
   if (!dscription) return 'UNKNOWN'
   const parts = String(dscription).trim().split(/\s+/)
@@ -36,7 +34,6 @@ function fmtPhpShort(n) {
 }
 
 function tierOf(c) {
-  // Volume tier = average monthly MT over last 90 days (or lifetime if no recent vol)
   const monthly = c.vol_90d_mt > 0 ? c.vol_90d_mt / 3 : (c.vol_36m_mt || 0) / 36
   if (monthly < 50) return 'Small'
   if (monthly < 200) return 'Medium'
@@ -52,12 +49,17 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `intelligence_v2_${session.role}_${session.region || 'ALL'}`
+  // Cache key includes userId so silences are user-scoped.
+  const cacheKey = `intelligence_v3_${session.id}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    // ============== QUERY 1: per-customer activity (36mo window) ==============
+    // Pull user's active silences up-front (Supabase; independent of SAP)
+    const silences  = await getActiveSilences(session.id)
+    const silenceIdx = buildSilenceIndex(silences)
+
+    // ============== Q1: per-customer activity (36mo) + 2024+ flag =========
     const actBase = await query(`
       SELECT
         T0.CardCode,
@@ -67,6 +69,7 @@ module.exports = async (req, res) => {
         MAX(T0.DocDate)                                                           AS last_order_date,
         DATEDIFF(DAY, MAX(T0.DocDate), GETDATE())                                 AS days_silent,
         COUNT(DISTINCT T0.DocEntry)                                               AS order_count,
+        SUM(CASE WHEN T0.DocDate >= '2024-01-01' THEN 1 ELSE 0 END)              AS orders_since_2024,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)              AS vol_36m_mt,
         ISNULL(SUM(T1.LineTotal), 0)                                              AS rev_36m,
         ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,GETDATE())
@@ -86,7 +89,7 @@ module.exports = async (req, res) => {
       GROUP BY T0.CardCode
     `)
 
-    // ============== QUERY 2: last-order details (date, amount, sales rep) ==============
+    // ============== Q2: last-order details ==============
     const lastOrderDetail = await query(`
       WITH Ranked AS (
         SELECT
@@ -109,7 +112,7 @@ module.exports = async (req, res) => {
       WHERE rn = 1
     `)
 
-    // ============== QUERY 3: dominant region per customer (last 12mo) ==============
+    // ============== Q3: dominant region (last 12mo) ==============
     const regionsRaw = await query(`
       WITH RegAgg AS (
         SELECT
@@ -142,7 +145,7 @@ module.exports = async (req, res) => {
       SELECT CardCode, region FROM Ranked WHERE rn = 1
     `)
 
-    // ============== QUERY 4: open-AR balance per customer (any age) ==============
+    // ============== Q4: open-AR per customer (any age) ==============
     const arRows = await query(`
       SELECT T0.CardCode, SUM(T0.DocTotal - T0.PaidToDate) AS ar_balance
       FROM OINV T0
@@ -151,7 +154,7 @@ module.exports = async (req, res) => {
       GROUP BY T0.CardCode
     `)
 
-    // ============== QUERY 5: per-customer × per-SKU basket (12mo), brand-token built in JS ==============
+    // ============== Q5: brand basket (12mo) ==============
     const brandBasket = await query(`
       SELECT
         T0.CardCode,
@@ -167,14 +170,27 @@ module.exports = async (req, res) => {
       GROUP BY T0.CardCode, T1.Dscription
     `)
 
-    // ============== Build customer map ==============
-    const regionMap = new Map(regionsRaw.map(r => [r.CardCode, r.region]))
-    const arMap     = new Map(arRows.map(r => [r.CardCode, Number(r.ar_balance || 0)]))
-    const lastMap   = new Map(lastOrderDetail.map(r => [r.CardCode, r]))
+    // ============== Q6: last invoice date (full OINV history, any age) ========
+    // Catches pre-2023 OINV rows for legacy-AR classification (e.g. opening balances)
+    const arLastInv = await query(`
+      SELECT T0.CardCode,
+             MAX(T0.DocDate) AS last_inv_date,
+             SUM(CASE WHEN T0.DocDate >= '2024-01-01' THEN 1 ELSE 0 END) AS orders_since_2024_full
+      FROM OINV T0
+      WHERE T0.CANCELED = 'N'
+      GROUP BY T0.CardCode
+    `)
+
+    // Build customer map
+    const regionMap       = new Map(regionsRaw.map(r => [r.CardCode, r.region]))
+    const arMap           = new Map(arRows.map(r => [r.CardCode, Number(r.ar_balance || 0)]))
+    const lastMap         = new Map(lastOrderDetail.map(r => [r.CardCode, r]))
+    const arLastInvMap    = new Map(arLastInv.map(r => [r.CardCode, { last_inv_date: r.last_inv_date, orders_since_2024_full: Number(r.orders_since_2024_full || 0) }]))
 
     const custMap = new Map()
     for (const row of actBase) {
       const cc = row.CardCode
+      if (isNonCustomer(cc)) continue    // Part A: plant codes out
       const last = lastMap.get(cc) || {}
       custMap.set(cc, {
         card_code:         cc,
@@ -188,6 +204,7 @@ module.exports = async (req, res) => {
         last_order_amount: Number(last.last_order_amount || 0),
         days_silent:       Number(row.days_silent || 0),
         order_count:       Number(row.order_count || 0),
+        orders_since_2024: Number(row.orders_since_2024 || 0),
         vol_36m_mt:        Number(row.vol_36m_mt || 0),
         rev_36m:           Number(row.rev_36m || 0),
         vol_30d_mt:        Number(row.vol_30d_mt || 0),
@@ -197,14 +214,17 @@ module.exports = async (req, res) => {
       })
     }
 
-    // Include customers with open AR but no OINV in 36mo (orphaned dormant balances)
+    // AR-only orphans (balances but no OINV in 36mo scan window)
     for (const [cc, arbal] of arMap.entries()) {
+      if (isNonCustomer(cc)) continue
       if (custMap.has(cc)) continue
+      const arLast = arLastInvMap.get(cc) || {}
       custMap.set(cc, {
         card_code: cc, name: '(unknown)', frozen_for: 'N', bp_status: '',
         region: 'Other', sales_rep: '', ar_balance: arbal,
-        last_order_date: null, last_order_amount: 0,
+        last_order_date: arLast.last_inv_date || null, last_order_amount: 0,
         days_silent: 9999, order_count: 0,
+        orders_since_2024: arLast.orders_since_2024_full || 0,
         vol_36m_mt: 0, rev_36m: 0,
         vol_30d_mt: 0, vol_90d_mt: 0, rev_30d: 0, rev_90d: 0
       })
@@ -233,7 +253,6 @@ module.exports = async (req, res) => {
     const allCustomers = [...custMap.values()]
 
     // ============== LIST 1 — TOP RESCUE ==============
-    // Active (not frozen/delinquent), AR > 0, silent 30–90 days.
     const rescueAll = allCustomers
       .filter(c => {
         if (c.frozen_for === 'Y') return false
@@ -264,13 +283,14 @@ module.exports = async (req, res) => {
         }
       })
       .sort((a, b) => b.priority_score - a.priority_score)
-    const top_rescue = rescueAll.slice(0, 15)
+    const rescueFiltered = applySilenceFilter(rescueAll, 'rescue', silenceIdx, r => r.card_code)
+    const top_rescue = rescueFiltered.kept.slice(0, 15)
 
-    // ============== LIST 2 — TOP GROWTH (peer-driven cross-sell) ==============
-    // Build per-customer brand basket from SKU aggregate
-    const custBrand = new Map()  // cc → Map(brand → {vol_mt, revenue, kg})
+    // ============== LIST 2 — GROWTH (peer-driven) ==============
+    const custBrand = new Map()
     for (const row of brandBasket) {
       const cc = row.CardCode
+      if (isNonCustomer(cc)) continue
       const brand = extractBrandToken(row.dscription)
       if (!custBrand.has(cc)) custBrand.set(cc, new Map())
       const bm = custBrand.get(cc)
@@ -282,7 +302,6 @@ module.exports = async (req, res) => {
       })
     }
 
-    // Peer groups keyed by region|tier; members = active customers (silent < 90d, not frozen)
     const peerGroups = new Map()
     for (const c of allCustomers) {
       if (c.days_silent >= 90) continue
@@ -292,7 +311,6 @@ module.exports = async (req, res) => {
       peerGroups.get(key).members.push(c.card_code)
     }
 
-    // Aggregate brand stats within each peer group
     for (const [, group] of peerGroups.entries()) {
       const raw = new Map()
       for (const cc of group.members) {
@@ -321,14 +339,13 @@ module.exports = async (req, res) => {
       group.brandStats = final
     }
 
-    // For each active customer, pick the single best missing brand (highest PHP upside)
     const growthAll = []
     for (const c of allCustomers) {
       if (c.days_silent >= 90) continue
       if (c.frozen_for === 'Y') continue
       const tier = tierOf(c)
       const group = peerGroups.get(`${c.region}|${tier}`)
-      if (!group || group.members.length < 5) continue   // peer group too small for signal
+      if (!group || group.members.length < 5) continue
       const basket = custBrand.get(c.card_code) || new Map()
       const currentBrands = [...basket.keys()].sort()
 
@@ -349,14 +366,14 @@ module.exports = async (req, res) => {
           }
         }
       }
-      if (!best || best.upside_php_yearly < 50000) continue   // skip trivial
+      if (!best || best.upside_php_yearly < 50000) continue
       const priority_score = scoreGrowth(best.upside_php_yearly)
       growthAll.push({
         card_code:                 c.card_code,
         name:                      c.name,
         region:                    c.region,
         sales_rep:                 c.sales_rep,
-        current_volume_ytd_mt:     Math.round(c.vol_90d_mt * 4 * 10) / 10,  // 90d annualised
+        current_volume_ytd_mt:     Math.round(c.vol_90d_mt * 4 * 10) / 10,
         current_brands:            currentBrands,
         missing_brands:            [best.brand],
         peer_avg_volume_mt:        best.peer_avg_volume_mt,
@@ -369,10 +386,10 @@ module.exports = async (req, res) => {
       })
     }
     growthAll.sort((a, b) => b.upside_php_yearly - a.upside_php_yearly)
-    const top_growth = growthAll.slice(0, 15)
+    const growthFiltered = applySilenceFilter(growthAll, 'grow', silenceIdx, r => r.card_code)
+    const top_growth = growthFiltered.kept.slice(0, 15)
 
     // ============== LIST 3 — EARLY WARNING ==============
-    // Active (< 30d silent), vol_30d < 70% of (vol_90d/3), meaningful size.
     const warningAll = []
     for (const c of allCustomers) {
       if (c.days_silent >= 30) continue
@@ -382,13 +399,10 @@ module.exports = async (req, res) => {
       if (avg_30d_from_90d <= 0) continue
       const change_pct = ((c.vol_30d_mt - avg_30d_from_90d) / avg_30d_from_90d) * 100
       if (change_pct >= -30) continue
-
       const monthly_gap = avg_30d_from_90d - c.vol_30d_mt
-      // php per MT from trailing 90d revenue ÷ 90d volume (MT)
       const php_per_mt = c.vol_90d_mt > 0 ? c.rev_90d / c.vol_90d_mt : 0
       const revenue_impact_php_yearly = Math.max(0, Math.round(monthly_gap * 12 * php_per_mt))
       if (revenue_impact_php_yearly < 50000) continue
-
       const priority_score = scoreWarning(revenue_impact_php_yearly, change_pct)
       warningAll.push({
         card_code:                  c.card_code,
@@ -407,28 +421,44 @@ module.exports = async (req, res) => {
       })
     }
     warningAll.sort((a, b) => b.revenue_impact_php_yearly - a.revenue_impact_php_yearly)
-    const early_warning = warningAll.slice(0, 15)
+    const warningFiltered = applySilenceFilter(warningAll, 'warning', silenceIdx, r => r.card_code)
+    const early_warning = warningFiltered.kept.slice(0, 15)
 
-    // ============== LIST 4 — DORMANT ==============
-    const dormantAll = allCustomers.filter(c => c.days_silent >= 60)
-    const dormant_count = dormantAll.length
-    const historical_ar_amt = Math.round(dormantAll.reduce((s, c) => s + c.ar_balance, 0))
-    const lifetime_volume_mt = Math.round(dormantAll.reduce((s, c) => s + c.vol_36m_mt, 0) * 10) / 10
-    const avg_dormancy_days = dormant_count > 0
-      ? Math.round(dormantAll.reduce((s, c) => s + c.days_silent, 0) / dormant_count)
-      : 0
+    // ============== LISTS 4/5 — DORMANT ACTIVE vs LEGACY AR ==============
+    // Split criteria (per Mat 2026-04-18 brief):
+    //   dormant_active: days_silent >= 60 AND orders_since_2024 > 0
+    //                   (stopped recently — winback target)
+    //   legacy_ar:      ar_balance > 0 AND orders_since_2024 == 0
+    //                   (no post-2024 activity — likely opening-balance migration)
+    //
+    // A customer can be in legacy_ar without being dormant_active (AR-only
+    // orphan). A customer can be dormant_active without being legacy_ar (has
+    // recent orders, just silent for 60+d now).
+    const dormantActiveAll = allCustomers.filter(c =>
+      c.days_silent >= 60 && c.orders_since_2024 > 0
+    )
+    const legacyArAll = allCustomers.filter(c =>
+      c.ar_balance > 0 && c.orders_since_2024 === 0
+    )
 
-    const by_region = { Luzon: 0, Visayas: 0, Mindanao: 0, Other: 0 }
-    for (const c of dormantAll) by_region[c.region] = (by_region[c.region] || 0) + 1
+    // Summary for dormant_active
+    const dormant_active_count       = dormantActiveAll.length
+    const dormant_active_ar          = Math.round(dormantActiveAll.reduce((s, c) => s + c.ar_balance, 0))
+    const dormant_active_vol         = Math.round(dormantActiveAll.reduce((s, c) => s + c.vol_36m_mt, 0) * 10) / 10
+    const dormant_active_avg_days    = dormant_active_count > 0
+      ? Math.round(dormantActiveAll.reduce((s, c) => s + c.days_silent, 0) / dormant_active_count) : 0
 
-    const by_last_active_year = {}
-    for (const c of dormantAll) {
+    const dormant_by_region = { Luzon: 0, Visayas: 0, Mindanao: 0, Other: 0 }
+    for (const c of dormantActiveAll) dormant_by_region[c.region] = (dormant_by_region[c.region] || 0) + 1
+
+    const dormant_by_last_year = {}
+    for (const c of dormantActiveAll) {
       if (!c.last_order_date) continue
       const y = new Date(c.last_order_date).getFullYear().toString()
-      by_last_active_year[y] = (by_last_active_year[y] || 0) + 1
+      dormant_by_last_year[y] = (dormant_by_last_year[y] || 0) + 1
     }
 
-    const dormant_list = dormantAll
+    const dormant_active_list = dormantActiveAll
       .slice()
       .sort((a, b) => (b.ar_balance - a.ar_balance) || (b.vol_36m_mt - a.vol_36m_mt))
       .slice(0, 50)
@@ -443,6 +473,29 @@ module.exports = async (req, res) => {
         lifetime_volume_mt: Math.round(c.vol_36m_mt * 10) / 10
       }))
 
+    // Summary for legacy_ar (opening-balance migration bucket)
+    const legacy_ar_count = legacyArAll.length
+    const legacy_ar_total = Math.round(legacyArAll.reduce((s, c) => s + c.ar_balance, 0))
+    const legacy_by_region = { Luzon: 0, Visayas: 0, Mindanao: 0, Other: 0 }
+    for (const c of legacyArAll) legacy_by_region[c.region] = (legacy_by_region[c.region] || 0) + 1
+
+    const legacyFiltered = applySilenceFilter(legacyArAll, 'legacy_ar', silenceIdx, r => r.card_code)
+    const legacy_ar_top = legacyFiltered.kept
+      .slice()
+      .sort((a, b) => b.ar_balance - a.ar_balance)
+      .slice(0, 20)
+      .map(c => ({
+        card_code:       c.card_code,
+        name:            c.name,
+        region:          c.region,
+        sales_rep:       c.sales_rep,
+        last_inv_date:   c.last_order_date,
+        ar_balance:      Math.round(c.ar_balance),
+        years_silent:    c.last_order_date
+          ? Math.round((Date.now() - new Date(c.last_order_date).getTime()) / (365.25 * 86400000) * 10) / 10
+          : null
+      }))
+
     // ============== HERO STATS ==============
     const hero_stats = {
       rescue_at_risk_amt:         Math.round(top_rescue.reduce((s, r) => s + r.ar_balance, 0)),
@@ -451,8 +504,13 @@ module.exports = async (req, res) => {
       growth_count:               top_growth.length,
       early_warning_amt:          Math.round(early_warning.reduce((s, w) => s + w.revenue_impact_php_yearly, 0)),
       early_warning_count:        early_warning.length,
-      dormant_count,
-      dormant_historical_ar_amt:  historical_ar_amt
+      dormant_active_count,
+      dormant_active_ar_amt:      dormant_active_ar,
+      legacy_ar_count,
+      legacy_ar_amt:              legacy_ar_total,
+      // Preserved for backward compat (older clients may still read these)
+      dormant_count:              dormant_active_count,
+      dormant_historical_ar_amt:  dormant_active_ar
     }
 
     const result = {
@@ -460,21 +518,51 @@ module.exports = async (req, res) => {
       top_rescue,
       top_growth,
       early_warning,
-      dormant_summary: {
-        customer_count:       dormant_count,
-        historical_ar_amt,
-        lifetime_volume_mt,
-        avg_dormancy_days,
-        by_region,
-        by_last_active_year
+      dormant_active: {
+        customer_count:       dormant_active_count,
+        historical_ar_amt:    dormant_active_ar,
+        lifetime_volume_mt:   dormant_active_vol,
+        avg_dormancy_days:    dormant_active_avg_days,
+        by_region:            dormant_by_region,
+        by_last_active_year:  dormant_by_last_year,
+        list:                 dormant_active_list
       },
-      dormant_list,
+      legacy_ar: {
+        customer_count:       legacy_ar_count,
+        total_ar:             legacy_ar_total,
+        by_region:            legacy_by_region,
+        top_accounts:         legacy_ar_top,
+        description:          'Customers with open AR but no invoices since 2024-01-01. Likely opening-balance migration artifacts — finance/reconciliation task, not a sales alert.'
+      },
+      // v2-compat shape retained for any cached older clients
+      dormant_summary: {
+        customer_count:     dormant_active_count,
+        historical_ar_amt:  dormant_active_ar,
+        lifetime_volume_mt: dormant_active_vol,
+        avg_dormancy_days:  dormant_active_avg_days,
+        by_region:          dormant_by_region,
+        by_last_active_year: dormant_by_last_year
+      },
+      dormant_list: dormant_active_list,
+      silenced_count:
+        rescueFiltered.removed_count +
+        growthFiltered.removed_count +
+        warningFiltered.removed_count +
+        legacyFiltered.removed_count,
+      silenced_by_type: {
+        rescue:    rescueFiltered.removed_count,
+        grow:      growthFiltered.removed_count,
+        warning:   warningFiltered.removed_count,
+        legacy_ar: legacyFiltered.removed_count
+      },
       meta: {
         total_customers_analyzed: allCustomers.length,
         rescue_pool_size:         rescueAll.length,
         growth_pool_size:         growthAll.length,
         warning_pool_size:        warningAll.length,
-        dormant_pool_size:        dormantAll.length,
+        dormant_active_pool_size: dormantActiveAll.length,
+        legacy_ar_pool_size:      legacyArAll.length,
+        non_customer_filter_applied: true,
         generated_at:             new Date().toISOString()
       }
     }
@@ -487,5 +575,5 @@ module.exports = async (req, res) => {
   }
 }
 
-// Acknowledge unused imports for future role-based filtering
 void applyRoleFilter
+void excludeNonCustomers

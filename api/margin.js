@@ -1,6 +1,8 @@
 const { query } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
+const { isNonCustomer } = require('./lib/non-customer-codes')
+const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 
 module.exports = async (req, res) => {
   // CORS
@@ -13,14 +15,18 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Cache check
-  const cacheKey = `margin_${req.url}_${session.role}_${session.region || 'ALL'}`
+  // Cache key includes userId so silence filter is user-scoped.
+  const cacheKey = `margin_v3_${session.id}_${req.url}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const { period = 'YTD' } = req.query
     const { dateFrom, dateTo } = getPeriodDates(period)
+
+    // Silence index for this user (used on critical/warning lists below)
+    const silences   = await getActiveSilences(session.id)
+    const silenceIdx = buildSilenceIndex(silences)
 
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
     const filteredWhere = applyRoleFilter(session, baseWhere)
@@ -50,11 +56,20 @@ module.exports = async (req, res) => {
       ORDER BY gp_pct ASC
     `, { dateFrom, dateTo })
 
-    // Classify customers
-    const critical = custMargin.filter(c => c.gp_pct < 0)
-    const warning = custMargin.filter(c => c.gp_pct >= 0 && c.gp_pct < 10)
-    const watch = custMargin.filter(c => c.gp_pct >= 10 && c.gp_pct < 15)
-    const healthy = custMargin.filter(c => c.gp_pct >= 15)
+    // Drop warehouse/internal-transfer codes before classifying
+    const custMarginClean = custMargin.filter(c => !isNonCustomer(c.code))
+
+    // Classify customers (operate on cleaned list)
+    const criticalRaw = custMarginClean.filter(c => c.gp_pct < 0)
+    const warningRaw  = custMarginClean.filter(c => c.gp_pct >= 0 && c.gp_pct < 10)
+    const watch       = custMarginClean.filter(c => c.gp_pct >= 10 && c.gp_pct < 15)
+    const healthy     = custMarginClean.filter(c => c.gp_pct >= 15)
+
+    // Apply per-user silence filter
+    const criticalFiltered = applySilenceFilter(criticalRaw, 'margin_critical', silenceIdx, r => r.code)
+    const warningFiltered  = applySilenceFilter(warningRaw,  'margin_warning',  silenceIdx, r => r.code)
+    const critical = criticalFiltered.kept
+    const warning  = warningFiltered.kept
 
     const negative_gp_total = critical.reduce((s, c) => s + c.gp, 0)
     const revenue_at_risk = [...critical, ...warning].reduce((s, c) => s + c.sales, 0)
@@ -284,7 +299,13 @@ module.exports = async (req, res) => {
       by_plant,
       by_sales_group,
       by_bu,
-      worst_skus
+      worst_skus,
+      silenced_count: criticalFiltered.removed_count + warningFiltered.removed_count,
+      silenced_by_type: {
+        margin_critical: criticalFiltered.removed_count,
+        margin_warning:  warningFiltered.removed_count
+      },
+      non_customer_filter_applied: true
     }
 
     cache.set(cacheKey, result, 300)
