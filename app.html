@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/evp-home.css">
 <link rel="stylesheet" href="/css/dsm-home.css">
+<link rel="stylesheet" href="/css/rsm-home.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -1007,6 +1008,9 @@ body{
       <div class="nav-item" id="nav-dsm" onclick="navTo('pg-dsm-home',this)" style="display:none">
         <span class="nav-icon">📊</span><span class="nav-label">DSM Dashboard</span>
       </div>
+      <div class="nav-item" id="nav-rsm" onclick="navTo('pg-rsm-home',this)" style="display:none">
+        <span class="nav-icon">🎯</span><span class="nav-label">RSM Dashboard</span>
+      </div>
       <div class="nav-item active" onclick="navTo('pg-home',this)">
         <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
       </div>
@@ -1476,6 +1480,211 @@ body{
           </div>
 
           <div style="height:80px"></div>
+        </div>
+      </div>
+
+      <!-- ===== RSM MOBILE HOME (Sprint B-RSM) ===== -->
+      <div class="page" id="pg-rsm-home">
+        <div class="rsm-shell">
+
+          <!-- Header -->
+          <div class="rsm-hdr">
+            <div class="rsm-hdr-info">
+              <div class="rsm-hdr-name" id="rsm-name">—</div>
+              <div class="rsm-hdr-sub" id="rsm-sub">RSM · — · — DSMs · — TSRs</div>
+            </div>
+            <div class="rsm-hdr-badge" onclick="navTo('pg-rsm-home')">🎯 RSM</div>
+          </div>
+
+          <!-- Hero: Regional Revenue MTD -->
+          <div class="rsm-hero">
+            <div class="rsm-hero-label">💰 REGIONAL REVENUE MTD</div>
+            <div class="rsm-hero-value" id="rsm-revenue">—</div>
+            <div class="rsm-hero-trend">
+              <span id="rsm-revenue-trend">—</span> vs PP ·
+              <span id="rsm-revenue-pct">—%</span> of target
+            </div>
+            <div class="rsm-hero-progress-bar">
+              <div class="rsm-hero-progress-fill" id="rsm-progress-fill"></div>
+            </div>
+            <div class="rsm-hero-meta">
+              <span id="rsm-achieved">—</span> /
+              <span id="rsm-target">—</span> MT
+            </div>
+          </div>
+
+          <!-- 4 KPI grid (2x2) -->
+          <div class="rsm-kpi-grid">
+            <div class="rsm-kpi">
+              <div class="rsm-kpi-icon">📦</div>
+              <div class="rsm-kpi-val" id="rsm-volume">—</div>
+              <div class="rsm-kpi-lbl">Volume MT MTD</div>
+            </div>
+            <div class="rsm-kpi">
+              <div class="rsm-kpi-icon">👥</div>
+              <div class="rsm-kpi-val" id="rsm-customers">—</div>
+              <div class="rsm-kpi-lbl">Active Customers</div>
+            </div>
+            <div class="rsm-kpi">
+              <div class="rsm-kpi-icon">💳</div>
+              <div class="rsm-kpi-val" id="rsm-ar">—</div>
+              <div class="rsm-kpi-lbl">AR Overdue</div>
+            </div>
+            <div class="rsm-kpi">
+              <div class="rsm-kpi-icon">🎯</div>
+              <div class="rsm-kpi-val" id="rsm-conversions">—</div>
+              <div class="rsm-kpi-lbl">Conversions MTD</div>
+            </div>
+          </div>
+
+          <!-- District Heatmap -->
+          <div class="rsm-card">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🗺️ District Performance</div>
+              <div class="rsm-card-sub" id="rsm-district-count">— districts</div>
+            </div>
+            <div class="rsm-district-list" id="rsm-districts"></div>
+          </div>
+
+          <!-- DSM Scorecards -->
+          <div class="rsm-card">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🎯 My DSMs</div>
+            </div>
+            <div class="rsm-dsm-list" id="rsm-dsms"></div>
+          </div>
+
+          <!-- Top Playbook -->
+          <div class="rsm-card rsm-playbook">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🏆 What's working</div>
+              <div class="rsm-card-sub" id="rsm-top-district">Top district</div>
+            </div>
+            <div class="rsm-playbook-insights" id="rsm-playbook"></div>
+            <div class="rsm-card-cta">Share with team →</div>
+          </div>
+
+          <!-- Whitespace -->
+          <div class="rsm-card rsm-whitespace">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">📍 Whitespace</div>
+            </div>
+            <div class="rsm-whitespace-body">
+              <div class="rsm-whitespace-num" id="rsm-whitespace-count">—</div>
+              <div class="rsm-whitespace-lbl">Towns with 0 POS coverage</div>
+              <div class="rsm-whitespace-value" id="rsm-whitespace-value">Est. untapped revenue: ₱—/month</div>
+            </div>
+            <div class="rsm-card-cta">View regional map →</div>
+          </div>
+
+          <!-- Vet Mission ROI (static placeholder) -->
+          <div class="rsm-card rsm-vet">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🧪 Vet Mission ROI</div>
+            </div>
+            <div class="rsm-vet-body">
+              <div class="rsm-vet-multi">3.4x</div>
+              <div class="rsm-vet-detail">₱47k cost → +18% uplift on 34 farms</div>
+            </div>
+            <div class="rsm-card-cta">View cost breakdown →</div>
+          </div>
+
+          <!-- Patrol Field Activity -->
+          <div class="rsm-card rsm-patrol">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🏃 Field Activity (Patrol)</div>
+              <div class="rsm-card-sub">Last 7 days</div>
+            </div>
+            <div class="rsm-patrol-grid">
+              <div class="rsm-patrol-cell">
+                <div class="rsm-patrol-num" id="rsm-patrol-visits">—</div>
+                <div class="rsm-patrol-lbl">Total visits</div>
+              </div>
+              <div class="rsm-patrol-cell">
+                <div class="rsm-patrol-num" id="rsm-patrol-new">—</div>
+                <div class="rsm-patrol-lbl">New stores</div>
+              </div>
+              <div class="rsm-patrol-cell">
+                <div class="rsm-patrol-num" id="rsm-patrol-active">—</div>
+                <div class="rsm-patrol-lbl">Active TSRs</div>
+              </div>
+              <div class="rsm-patrol-cell">
+                <div class="rsm-patrol-num" id="rsm-patrol-risk">—</div>
+                <div class="rsm-patrol-lbl">At-risk stores</div>
+              </div>
+            </div>
+            <div class="rsm-card-cta" onclick="window.open('https://vieforce-patrol.vercel.app','_blank','noopener')">Open Patrol app →</div>
+          </div>
+
+          <!-- Audit Flags (cross-DSM) -->
+          <div class="rsm-card rsm-audit">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🔍 Audit Flags</div>
+              <div class="rsm-card-sub">Cross-DSM issues</div>
+            </div>
+            <div class="rsm-audit-list" id="rsm-audit"></div>
+          </div>
+
+          <!-- Strategic Decisions -->
+          <div class="rsm-card rsm-decisions">
+            <div class="rsm-card-hdr">
+              <div class="rsm-card-title">🎯 Strategic Decisions</div>
+              <div class="rsm-badge-count" id="rsm-decisions-count">3</div>
+            </div>
+            <div class="rsm-decision-list">
+              <div class="rsm-decision-item">
+                <div class="rsm-decision-text">Relocate 2 DSMs from MM to NL?</div>
+                <div class="rsm-decision-cta">Decide</div>
+              </div>
+              <div class="rsm-decision-item">
+                <div class="rsm-decision-text">Approve Visayas vet campaign — ₱85k?</div>
+                <div class="rsm-decision-cta">Review</div>
+              </div>
+              <div class="rsm-decision-item">
+                <div class="rsm-decision-text">Q3 target revision for Mindanao</div>
+                <div class="rsm-decision-cta">Decide</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:90px"></div>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="rsm-mobile-nav" data-rsm-nav-global>
+          <div class="rsm-nav-item active" data-rsm-nav="pg-rsm-home" onclick="navTo('pg-rsm-home')">
+            <span class="rsm-nav-ico">📊</span>
+            <span class="rsm-nav-lbl">Home</span>
+          </div>
+          <div class="rsm-nav-item" data-rsm-nav="pg-sales" onclick="navTo('pg-sales')">
+            <span class="rsm-nav-ico">💰</span>
+            <span class="rsm-nav-lbl">Sales</span>
+          </div>
+          <div class="rsm-nav-item" data-rsm-nav="pg-budget" onclick="navTo('pg-budget')">
+            <span class="rsm-nav-ico">🎯</span>
+            <span class="rsm-nav-lbl">Budget</span>
+          </div>
+          <div class="rsm-nav-item" data-rsm-nav="pg-team" onclick="navTo('pg-team')">
+            <span class="rsm-nav-ico">👥</span>
+            <span class="rsm-nav-lbl">Team</span>
+          </div>
+          <div class="rsm-nav-item" onclick="openRsmMore()">
+            <span class="rsm-nav-ico">≡</span>
+            <span class="rsm-nav-lbl">More</span>
+          </div>
+        </div>
+
+        <!-- More sheet -->
+        <div class="rsm-sheet-backdrop" id="rsm-sheet-backdrop" onclick="closeRsmSheet()"></div>
+        <div class="rsm-more-sheet" id="rsm-more-sheet">
+          <div class="rsm-sheet-handle"></div>
+          <div class="rsm-sheet-title">More</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();navTo('pg-ar')"><span class="rsm-sheet-item-ico">💳</span>Accounts Receivable</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();navTo('pg-customers')"><span class="rsm-sheet-item-ico">🏢</span>Customers</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();navTo('pg-insights')"><span class="rsm-sheet-item-ico">🧠</span>Customer Intelligence</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();navTo('pg-inv')"><span class="rsm-sheet-item-ico">📦</span>Inventory</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();navTo('pg-speed')"><span class="rsm-sheet-item-ico">⚡</span>Speed Monitor</div>
+          <div class="rsm-sheet-item" onclick="closeRsmSheet();logout()"><span class="rsm-sheet-item-ico">🚪</span>Sign out</div>
         </div>
       </div>
 
@@ -3562,6 +3771,7 @@ body{
 <script src="js/api.js"></script>
 <script src="js/evp-home.js"></script>
 <script src="js/dsm-home.js"></script>
+<script src="js/rsm-home.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -3591,8 +3801,9 @@ function initApp(s) {
   var _r = (s.role||'').toLowerCase();
   var _isExec   = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
   var _isDsm    = (_r==='dsm');
+  var _isRsm    = (_r==='rsm');
   var _isMobile = window.innerWidth < 900;
-  console.log('[ROLE] routing:', _r, '→ isExec:', _isExec, '· isDsm:', _isDsm, '· isMobile:', _isMobile);
+  console.log('[ROLE] routing:', _r, '→ isExec:', _isExec, '· isRsm:', _isRsm, '· isDsm:', _isDsm, '· isMobile:', _isMobile);
 
   if(_isExec){
     document.body.classList.add('role-evp');
@@ -3604,6 +3815,38 @@ function initApp(s) {
     document.body.classList.add('role-dsm');
     var _navDsm = document.getElementById('nav-dsm');
     if(_navDsm) _navDsm.style.display = '';   // reveal the DSM Dashboard sidebar link
+  }
+
+  if(_isRsm){
+    document.body.classList.add('role-rsm');
+    var _navRsm = document.getElementById('nav-rsm');
+    if(_navRsm) _navRsm.style.display = '';   // reveal the RSM Dashboard sidebar link
+  }
+
+  if(_isRsm && _isMobile){
+    // Mobile RSM → land on RSM home directly
+    var _allPagesRsm = document.querySelectorAll('.page');
+    for(var _k=0;_k<_allPagesRsm.length;_k++){
+      _allPagesRsm[_k].classList.remove('active');
+      _allPagesRsm[_k].style.display = 'none';
+    }
+    var _rsmPage = document.getElementById('pg-rsm-home');
+    if(_rsmPage){ _rsmPage.classList.add('active'); _rsmPage.style.display = 'block'; }
+    var _navRsm2 = document.getElementById('nav-rsm');
+    if(_navRsm2){
+      document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+      _navRsm2.classList.add('active');
+    }
+    if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'RSM';
+    if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'Regional Overview';
+    PG = 'pg-rsm-home';
+    document.body.classList.add('on-rsm-home');
+    if(typeof updateRsmNavActive==='function') updateRsmNavActive('pg-rsm-home');
+    if(typeof loadRsmHome==='function') { try { loadRsmHome(); } catch(e){ console.error('[RSM] loadRsmHome failed:', e); } }
+    setTimeout(injectExportButtons, 400);
+    setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
+    stampRefresh();
+    return;   // skip the EVP / pg-home branches below
   }
 
   if(_isDsm && _isMobile){
@@ -3805,6 +4048,7 @@ function injectExportButtons(){
 var pageTitles = {
   'pg-evp-home':['EVP','Executive Overview'],
   'pg-dsm-home':['DSM','District Overview'],
+  'pg-rsm-home':['RSM','Regional Overview'],
   'pg-home':['Dashboard','National Overview'],
   'pg-sales':['Sales','Rankings & Trends'],
   'pg-ar':['Accounts Receivable','National · Live'],
@@ -3850,6 +4094,9 @@ function navTo(id, navItem){
   // EVP hooks — toggle body.on-evp-home (gates back-button visibility) + sync bottom nav
   if(id === 'pg-evp-home') document.body.classList.add('on-evp-home');
   else                     document.body.classList.remove('on-evp-home');
+  // RSM hooks — toggle body.on-rsm-home (gates sidebar/topbar visibility on mobile RSM)
+  if(id === 'pg-rsm-home') document.body.classList.add('on-rsm-home');
+  else                     document.body.classList.remove('on-rsm-home');
   if(typeof updateEvpNavActive === 'function') updateEvpNavActive(id);
   loadPage(id);
 }
@@ -3916,11 +4163,13 @@ function doSearch(){var q=document.getElementById('global-search').value.trim();
 
 /* ===== LOAD ROUTER ===== */
 function loadPage(id){
-  // Keep bottom-nav active state in sync for DSM mobile
+  // Keep bottom-nav active state in sync for DSM / RSM mobile
   if(typeof updateDsmNavActive==='function') updateDsmNavActive(id);
+  if(typeof updateRsmNavActive==='function') updateRsmNavActive(id);
   switch(id){
     case 'pg-evp-home': if(typeof loadEvpHome==='function') loadEvpHome(); break;
     case 'pg-dsm-home': if(typeof loadDsmHome==='function') loadDsmHome(); break;
+    case 'pg-rsm-home': if(typeof loadRsmHome==='function') loadRsmHome(); break;
     case 'pg-home': loadHome(); break;
     case 'pg-sales': loadSales(); break;
     case 'pg-ar': loadAR(); break;
