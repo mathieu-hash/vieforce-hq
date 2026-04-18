@@ -318,14 +318,46 @@
     var el = $('evp-performers'); if(el) el.innerHTML = html;
   }
 
-  // --- "More" menu stub -------------------------------------------------------
+  // --- More-menu bottom sheet -------------------------------------------------
   function openEvpMore(){
-    // Day 1 stub — navigates to Home (national dashboard) so user can reach anything
-    if(typeof navTo==='function') navTo('pg-home');
+    var sheet = $('evp-more-sheet');
+    var bd    = $('evp-sheet-backdrop');
+    if(sheet) sheet.classList.add('open');
+    if(bd)    bd.classList.add('open');
+    document.body.classList.add('evp-sheet-open');
+  }
+  function closeEvpSheet(){
+    var sheet = $('evp-more-sheet');
+    var bd    = $('evp-sheet-backdrop');
+    if(sheet) sheet.classList.remove('open');
+    if(bd)    bd.classList.remove('open');
+    document.body.classList.remove('evp-sheet-open');
   }
 
-  // Expose for app.html loadPage switch + bottom-nav onclick
-  window.loadEvpHome  = loadEvpHome;
-  window.openEvpMore  = openEvpMore;
-  window.EVP_STATE    = EVP_STATE;
+  // --- Bottom-nav active-state sync -------------------------------------------
+  // navTo() calls this after every page change. Highlights the matching nav item,
+  // or "More" when the current page isn't one of the 4 primary tabs.
+  function updateEvpNavActive(pageId){
+    var items = document.querySelectorAll('.evp-mobile-nav-global .evp-nav-item');
+    if(!items || !items.length) return;
+    var primaryMap = { 'pg-evp-home':'pg-evp-home', 'pg-budget':'pg-budget',
+                       'pg-margin':'pg-margin',     'pg-team':'pg-team' };
+    var tag = primaryMap[pageId] || 'more';
+    for(var i=0;i<items.length;i++){
+      if(items[i].getAttribute('data-evp-nav') === tag) items[i].classList.add('active');
+      else                                              items[i].classList.remove('active');
+    }
+  }
+
+  // ESC closes the sheet when open
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeEvpSheet(); }
+  });
+
+  // Expose globally for onclick handlers + navTo integration
+  window.loadEvpHome        = loadEvpHome;
+  window.openEvpMore        = openEvpMore;
+  window.closeEvpSheet      = closeEvpSheet;
+  window.updateEvpNavActive = updateEvpNavActive;
+  window.EVP_STATE          = EVP_STATE;
 })();
