@@ -1,4 +1,4 @@
-const { query } = require('./_db')
+const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
@@ -68,7 +68,9 @@ module.exports = async (req, res) => {
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
     const trendFiltered = applyRoleFilter(session, trendWhere)
 
-    const monthly_trend = await query(`
+    // 12-month trend crosses 2026-01-01 cutoff → union historical + current.
+    // After concat, sum by month-key (in case of overlap) and re-sort.
+    const monthlyRaw = await queryBoth(`
       SELECT
         FORMAT(T0.DocDate, 'yyyy-MM')                                   AS month,
         ISNULL(SUM(T1.Quantity), 0)                                     AS volume_bags,
@@ -81,6 +83,16 @@ module.exports = async (req, res) => {
       GROUP BY FORMAT(T0.DocDate, 'yyyy-MM')
       ORDER BY month ASC
     `)
+    const trendByMonth = {}
+    for (const r of monthlyRaw) {
+      const k = r.month
+      const cur = trendByMonth[k] || { month: k, volume_bags: 0, volume_mt: 0, revenue: 0 }
+      cur.volume_bags += Number(r.volume_bags || 0)
+      cur.volume_mt   += Number(r.volume_mt   || 0)
+      cur.revenue     += Number(r.revenue     || 0)
+      trendByMonth[k] = cur
+    }
+    const monthly_trend = Object.values(trendByMonth).sort((a, b) => a.month.localeCompare(b.month))
 
     // --- Pending PO detail (open sales orders) ---
     const pendingPO = await query(`
@@ -224,7 +236,45 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate >= @ytdFrom AND T0.CANCELED='N'
     `, { ytdFrom })
 
+    // LY same period (current period -1y) and LY YTD — pulls from historical when pre-cutoff
+    const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
+    const lyTo   = new Date(dateTo);   lyTo.setFullYear(lyTo.getFullYear() - 1)
+    const kpiLy = await queryDateRange(`
+      SELECT
+        ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                       AS gmt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+    `, {}, lyFrom, lyTo)
+
+    const ytdLyFrom = new Date(new Date().getFullYear() - 1, 0, 1)
+    const ytdLyTo   = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate())
+    const kpiYtdLy = await queryDateRange(`
+      SELECT
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+    `, {}, ytdLyFrom, ytdLyTo)
+
+    const sumRows = (rows, ...cols) => {
+      const acc = Object.fromEntries(cols.map(c => [c, 0]))
+      for (const r of rows) for (const c of cols) acc[c] += Number(r[c] || 0)
+      return acc
+    }
     const cur = kpiCurrent[0] || {}, prv = kpiPrev[0] || {}, yt = kpiYtd[0] || {}
+    const ly  = sumRows(kpiLy, 'volume_bags', 'volume_mt', 'revenue')
+    if (kpiLy.length === 1) ly.gmt = kpiLy[0].gmt || 0   // single-DB short-circuit
+    const ytdLy = sumRows(kpiYtdLy, 'volume_mt', 'revenue')
+
     const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0
 
     const kpis = {
@@ -241,6 +291,20 @@ module.exports = async (req, res) => {
         volume_mt: pct(cur.volume_mt, prv.volume_mt),
         revenue:   pct(cur.revenue,   prv.revenue),
         gmt:       pct(cur.gmt,       prv.gmt)
+      },
+      // Last-year comparators (period-matched + YTD)
+      last_year: {
+        volume_mt: Math.round(ly.volume_mt * 10) / 10,
+        volume_bags: Math.round(ly.volume_bags),
+        revenue: Math.round(ly.revenue),
+        ytd_volume_mt: Math.round(ytdLy.volume_mt * 10) / 10,
+        ytd_revenue: Math.round(ytdLy.revenue)
+      },
+      delta_pct_ly: {
+        volume_mt: pct(cur.volume_mt, ly.volume_mt),
+        revenue:   pct(cur.revenue,   ly.revenue),
+        ytd_volume_mt: pct(yt.volume_mt, ytdLy.volume_mt),
+        ytd_revenue:   pct(yt.revenue,   ytdLy.revenue)
       }
     }
 

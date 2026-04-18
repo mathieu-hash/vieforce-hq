@@ -1,4 +1,4 @@
-const { query } = require('./_db')
+const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
@@ -121,10 +121,10 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
     `, { prevFrom: prev.from, prevTo: prev.to })
 
-    // --- Same period last year (for vs LY compare) ---
+    // --- Same period last year (for vs LY compare) — reads historical DB when LY < cutoff ---
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
     const lyTo   = new Date(dateTo);   lyTo.setFullYear(lyTo.getFullYear() - 1)
-    const lyKpis = await query(`
+    const lyKpis = await queryDateRange(`
       SELECT
         ISNULL(SUM(T1.LineTotal), 0)                                               AS revenue,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)             AS volume_mt_invoiced,
@@ -135,16 +135,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED = 'N'
-    `, { lyFrom, lyTo })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+    `, {}, lyFrom, lyTo)
 
-    const lyOdln = await query(`
+    const lyOdln = await queryDateRange(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED = 'N'
-    `, { lyFrom, lyTo })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+    `, {}, lyFrom, lyTo)
 
     // --- YTD actuals ---
     const ytdKpis = await query(`
@@ -259,9 +259,23 @@ module.exports = async (req, res) => {
       GROUP BY ${REGION_CASE_ODLN}
     `, { ppFrom: prev.from, ppTo: prev.to })
 
+    // Region — same period last year (historical DB when LY is pre-cutoff)
+    const regionOdlnLy = await queryDateRange(`
+      SELECT ${REGION_CASE_ODLN} AS region,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      GROUP BY ${REGION_CASE_ODLN}
+    `, {}, lyFrom, lyTo)
+
     // Merge: ODLN vol is the headline; OINV provides sales + gm_ton.
     const invByRegion = Object.fromEntries(regionInvCur.map(r => [r.region, r]))
     const prevMap = Object.fromEntries(regionOdlnPrev.map(r => [r.region, r.vol]))
+    // LY map: queryDateRange may return 2 rows per region if spanning cutoff — sum them.
+    const lyMap = {}
+    for (const r of regionOdlnLy) lyMap[r.region] = (lyMap[r.region] || 0) + Number(r.vol || 0)
     const allRegions = new Set([...regionOdlnCur.map(r => r.region), ...regionInvCur.map(r => r.region)])
     const regionPerf = [...allRegions].map(region => {
       const odln = regionOdlnCur.find(r => r.region === region) || { vol: 0 }
@@ -270,13 +284,18 @@ module.exports = async (req, res) => {
       const vs_pp = prevMap[region] > 0
         ? Math.round(((odln.vol - prevMap[region]) / prevMap[region]) * 1000) / 10
         : null
+      const vs_ly = lyMap[region] > 0
+        ? Math.round(((odln.vol - lyMap[region]) / lyMap[region]) * 1000) / 10
+        : null
       return {
         region,
         vol: odln.vol,                 // DR (ODLN)
         vol_invoiced: inv.vol_invoiced, // OINV — for ref / sub-line
         sales: inv.sales,
         gm_ton,
-        vs_pp
+        vs_pp,
+        ly_vol: lyMap[region] || 0,
+        vs_ly
       }
     }).sort((a, b) => b.vol - a.vol)
 
@@ -308,7 +327,8 @@ module.exports = async (req, res) => {
       .map(c => ({ code: c.code, name: c.name, vol: c.vol, revenue: revByCust[c.code] || 0 }))
 
     // --- Monthly performance (last 7 months, CY + LY volume + GM) — OINV only ---
-    const monthlyRaw = await query(`
+    // 19-month scan crosses the 2026-01-01 migration cutoff → union historical + current.
+    const monthlyRaw = await queryBoth(`
       SELECT
         YEAR(T0.DocDate)                                                  AS y,
         MONTH(T0.DocDate)                                                 AS m,
@@ -323,7 +343,7 @@ module.exports = async (req, res) => {
     `)
 
     // Volume for monthly chart comes from ODLN (DR); gross margin stays OINV.
-    const monthlyOdln = await query(`
+    const monthlyOdln = await queryBoth(`
       SELECT
         YEAR(T0.DocDate)                                                  AS y,
         MONTH(T0.DocDate)                                                 AS m,
@@ -338,13 +358,17 @@ module.exports = async (req, res) => {
 
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     const monthlyMap = {}  // 'YYYY-MM' -> { volume_mt (ODLN), gm (OINV) }
+    // queryBoth concatenates rows from historical + current pools — sum (don't overwrite)
+    // in case the same (y,m) appears in both (defensive against migration overlap).
     for (const r of monthlyRaw) {
       const k = `${r.y}-${String(r.m).padStart(2,'0')}`
-      monthlyMap[k] = { volume_mt: 0, gm: Number(r.gross_margin||0) }
+      const cur = monthlyMap[k] || { volume_mt: 0, gm: 0 }
+      monthlyMap[k] = { volume_mt: cur.volume_mt, gm: cur.gm + Number(r.gross_margin||0) }
     }
     for (const r of monthlyOdln) {
       const k = `${r.y}-${String(r.m).padStart(2,'0')}`
-      monthlyMap[k] = { ...(monthlyMap[k] || { gm: 0 }), volume_mt: Number(r.volume_mt||0) }
+      const cur = monthlyMap[k] || { volume_mt: 0, gm: 0 }
+      monthlyMap[k] = { volume_mt: cur.volume_mt + Number(r.volume_mt||0), gm: cur.gm }
     }
     // Build last 7 months ending with current month (descending-build, reversed to ascending order)
     const monthly_perf = []
@@ -365,7 +389,8 @@ module.exports = async (req, res) => {
     }
 
     // --- Quarterly performance (CY 4 quarters + LY same 4) — OINV only ---
-    const quarterlyRaw = await query(`
+    // Window starts in LY-Jan → spans cutoff → union historical + current.
+    const quarterlyRaw = await queryBoth(`
       SELECT
         YEAR(T0.DocDate)                                                  AS y,
         DATEPART(QUARTER, T0.DocDate)                                     AS q,
@@ -380,7 +405,7 @@ module.exports = async (req, res) => {
     `)
 
     // Volume for quarterly chart comes from ODLN; gm stays OINV.
-    const quarterlyOdln = await query(`
+    const quarterlyOdln = await queryBoth(`
       SELECT
         YEAR(T0.DocDate)                                                  AS y,
         DATEPART(QUARTER, T0.DocDate)                                     AS q,
@@ -394,12 +419,16 @@ module.exports = async (req, res) => {
     `)
 
     const qMap = {}
+    // Sum across both DBs (defensive — Vienovo_Live should have only 2026+, Vienovo_Old only 2017–2025)
     for (const r of quarterlyRaw) {
-      qMap[`${r.y}-Q${r.q}`] = { volume_mt: 0, gm: Number(r.gross_margin||0) }
+      const k = `${r.y}-Q${r.q}`
+      const cur = qMap[k] || { volume_mt: 0, gm: 0 }
+      qMap[k] = { volume_mt: cur.volume_mt, gm: cur.gm + Number(r.gross_margin||0) }
     }
     for (const r of quarterlyOdln) {
       const k = `${r.y}-Q${r.q}`
-      qMap[k] = { ...(qMap[k] || { gm: 0 }), volume_mt: Number(r.volume_mt||0) }
+      const cur = qMap[k] || { volume_mt: 0, gm: 0 }
+      qMap[k] = { volume_mt: cur.volume_mt + Number(r.volume_mt||0), gm: cur.gm }
     }
     const quarterly_perf = []
     for (let q = 1; q <= 4; q++) {
@@ -433,8 +462,24 @@ module.exports = async (req, res) => {
       ) sub
     `, { dateFrom, dateTo })
 
-    const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}, ly = lyKpis[0] || {}
-    const dOdln = odlnCur[0] || {}, pOdln = prevOdln[0] || {}, yOdln = ytdOdln[0] || {}, lyOdlnRow = lyOdln[0] || {}
+    // Defensive aggregation: queryDateRange may return 2 rows (one per DB) when range
+    // spans cutoff. Sum the SUM-aggregate columns; recompute gmt from totals.
+    function sumKpis(rows) {
+      if (!rows.length) return {}
+      if (rows.length === 1) return rows[0]
+      const acc = { revenue: 0, volume_mt_invoiced: 0, gross_margin: 0, volume_mt: 0 }
+      for (const r of rows) {
+        acc.revenue += Number(r.revenue || 0)
+        acc.volume_mt_invoiced += Number(r.volume_mt_invoiced || 0)
+        acc.gross_margin += Number(r.gross_margin || 0)
+        acc.volume_mt += Number(r.volume_mt || 0)
+      }
+      acc.gmt = acc.volume_mt_invoiced > 0 ? acc.gross_margin / acc.volume_mt_invoiced : 0
+      return acc
+    }
+
+    const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}, ly = sumKpis(lyKpis)
+    const dOdln = odlnCur[0] || {}, pOdln = prevOdln[0] || {}, yOdln = ytdOdln[0] || {}, lyOdlnRow = sumKpis(lyOdln)
     const pb = pendingBilling[0] || {}
 
     // Delta vs previous period (pct)

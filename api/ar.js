@@ -1,4 +1,4 @@
-const { query } = require('./_db')
+const { query, queryH } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
@@ -176,7 +176,21 @@ module.exports = async (req, res) => {
         CASE WHEN @sales_90d_7ago > 0 THEN @ar_7d_ago / (@sales_90d_7ago/90.0) ELSE 0 END AS dso_7d_ago
     `)
 
+    // -------------------- 7. AR SNAPSHOT 1 YEAR AGO (historical DB) --------------------
+    // Rebuild the same "as-of-date" calculation against Vienovo_Old: open AR as of LY-today.
+    const arLyRows = await queryH(`
+      SELECT
+        ISNULL(SUM(O.DocTotal - O.PaidToDate), 0) AS ar_ly,
+        ISNULL(SUM(CASE WHEN DATEDIFF(DAY,O.DocDueDate,DATEADD(YEAR,-1,GETDATE())) > 0
+                         THEN O.DocTotal - O.PaidToDate ELSE 0 END), 0) AS overdue_ly
+      FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+      WHERE O.CANCELED='N'
+        AND O.DocDate <= DATEADD(YEAR,-1,GETDATE())
+        AND O.DocTotal > O.PaidToDate
+    `).catch(e => { console.warn('[ar] LY snapshot failed:', e.message); return [{}] })
+
     const d = arDso[0], s = statusCounts[0], a = aging[0], cmp = comparison[0]
+    const lyAr = arLyRows[0] || {}
 
     const result = {
       // --- Hero numbers (Home + AR page) ---
@@ -191,6 +205,12 @@ module.exports = async (req, res) => {
       delinquent_balance: d?.delinquent_balance || 0,
       ar_7d_ago:      cmp?.ar_7d_ago || 0,
       ar_variation:   (d?.active_balance || 0) - (cmp?.ar_7d_ago || 0),
+      ar_ly:          lyAr.ar_ly || 0,
+      ar_ly_variation: (d?.total_balance || 0) - (lyAr.ar_ly || 0),
+      ar_ly_variation_pct: lyAr.ar_ly > 0
+        ? Math.round((((d?.total_balance || 0) - lyAr.ar_ly) / lyAr.ar_ly) * 1000) / 10
+        : null,
+      overdue_ly:     lyAr.overdue_ly || 0,
 
       // Account status (matches Finance Dashboard tiles)
       account_status: {

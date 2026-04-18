@@ -3794,10 +3794,17 @@ function initApp(s) {
   var saved = localStorage.getItem('vf_theme');
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
   syncFilterUI();
-  // Device-aware role routing (Sprint B-EVP Day 1):
+  // ROUTING HIDDEN: Pivoting DSM/RSM mobile experience to Patrol app.
+  // Keeping HQ mobile dashboards (pg-dsm-home + pg-rsm-home) in the repo as
+  // future desktop option + component reference. Users land on pg-home for
+  // both DSM and RSM on both mobile and desktop.
+  // See CRM_360_MASTER_PLAN.md for pivot details.
+  //
+  // Active routing (2026-04-18):
   //   mobile + exec/ceo/evp/admin → pg-evp-home (mobile-first hero)
-  //   desktop + exec             → pg-home (National) + EVP link revealed in sidebar
-  //   everyone else              → pg-home
+  //   desktop + exec              → pg-home (National) + EVP link revealed in sidebar
+  //   dsm / rsm / tsr             → pg-home (National) — mobile RSM/DSM paths disabled
+  //   everyone else               → pg-home
   var _r = (s.role||'').toLowerCase();
   var _isExec   = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
   var _isDsm    = (_r==='dsm');
@@ -3813,67 +3820,21 @@ function initApp(s) {
 
   if(_isDsm){
     document.body.classList.add('role-dsm');
-    var _navDsm = document.getElementById('nav-dsm');
-    if(_navDsm) _navDsm.style.display = '';   // reveal the DSM Dashboard sidebar link
+    // Sidebar "DSM Dashboard" link hidden — pivot to Patrol hub. Link element stays in DOM
+    // at id="nav-dsm" with its default style="display:none" for future reactivation.
   }
 
   if(_isRsm){
     document.body.classList.add('role-rsm');
-    var _navRsm = document.getElementById('nav-rsm');
-    if(_navRsm) _navRsm.style.display = '';   // reveal the RSM Dashboard sidebar link
+    // Sidebar "RSM Dashboard" link hidden — pivot to Patrol hub. Link element stays in DOM
+    // at id="nav-rsm" with its default style="display:none" for future reactivation.
   }
 
-  if(_isRsm && _isMobile){
-    // Mobile RSM → land on RSM home directly
-    var _allPagesRsm = document.querySelectorAll('.page');
-    for(var _k=0;_k<_allPagesRsm.length;_k++){
-      _allPagesRsm[_k].classList.remove('active');
-      _allPagesRsm[_k].style.display = 'none';
-    }
-    var _rsmPage = document.getElementById('pg-rsm-home');
-    if(_rsmPage){ _rsmPage.classList.add('active'); _rsmPage.style.display = 'block'; }
-    var _navRsm2 = document.getElementById('nav-rsm');
-    if(_navRsm2){
-      document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
-      _navRsm2.classList.add('active');
-    }
-    if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'RSM';
-    if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'Regional Overview';
-    PG = 'pg-rsm-home';
-    document.body.classList.add('on-rsm-home');
-    if(typeof updateRsmNavActive==='function') updateRsmNavActive('pg-rsm-home');
-    if(typeof loadRsmHome==='function') { try { loadRsmHome(); } catch(e){ console.error('[RSM] loadRsmHome failed:', e); } }
-    setTimeout(injectExportButtons, 400);
-    setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
-    stampRefresh();
-    return;   // skip the EVP / pg-home branches below
-  }
+  // DSM/RSM mobile routing branches removed — pivot to Patrol hub.
+  // pg-rsm-home and pg-dsm-home remain in app.html but are unreachable via role routing.
+  // To re-enable: restore the `if(_isRsm && _isMobile)` / `if(_isDsm && _isMobile)` blocks
+  // from git history (commit 5c97b4c).
 
-  if(_isDsm && _isMobile){
-    // Mobile DSM → land on DSM home directly, hide all other pages
-    var _allPagesDsm = document.querySelectorAll('.page');
-    for(var _j=0;_j<_allPagesDsm.length;_j++){
-      _allPagesDsm[_j].classList.remove('active');
-      _allPagesDsm[_j].style.display = 'none';
-    }
-    var _dsmPage = document.getElementById('pg-dsm-home');
-    if(_dsmPage){ _dsmPage.classList.add('active'); _dsmPage.style.display = 'block'; }
-    var _navDsm2 = document.getElementById('nav-dsm');
-    if(_navDsm2){
-      document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
-      _navDsm2.classList.add('active');
-    }
-    if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'DSM';
-    if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'District Overview';
-    PG = 'pg-dsm-home';
-    document.body.classList.add('on-dsm-home');
-    if(typeof updateDsmNavActive==='function') updateDsmNavActive('pg-dsm-home');
-    if(typeof loadDsmHome==='function') { try { loadDsmHome(); } catch(e){ console.error('[DSM] loadDsmHome failed:', e); } }
-    setTimeout(injectExportButtons, 400);
-    setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
-    stampRefresh();
-    return;   // skip the EVP / pg-home branches below
-  }
 
   if(_isExec && _isMobile){
     // Mobile exec → land on EVP home immediately, inline-style override so pg-home cannot leak

@@ -1,4 +1,4 @@
-const { query } = require('./_db')
+const { query, queryH } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
@@ -107,6 +107,37 @@ module.exports = async (req, res) => {
       ${filteredWhere}
     `, { ytdStart })
 
+    // --- LY YTD Actual (from historical DB: Jan 1 of prior year → same (M,D)) ---
+    const now = new Date()
+    const lyYtdStart = new Date(now.getFullYear() - 1, 0, 1)
+    const lyYtdEnd   = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+    const lyYtdActual = await queryH(`
+      SELECT
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS ly_vol,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS ly_sales,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS ly_gm
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
+    `, { lyStart: lyYtdStart, lyEnd: lyYtdEnd }).catch(e => {
+      console.warn('[budget] LY YTD query failed:', e.message); return [{}]
+    })
+
+    // --- LY full-year actual (for FY vs FY26 budget comparison) ---
+    const lyFullYearActual = await queryH(`
+      SELECT
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS fy_vol,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS fy_sales,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS fy_gm
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE YEAR(T0.DocDate) = @ly AND T0.CANCELED = 'N'
+    `, { ly: now.getFullYear() - 1 }).catch(e => {
+      console.warn('[budget] LY FY query failed:', e.message); return [{}]
+    })
+
     // --- Monthly actual ---
     const monthlyActual = await query(`
       SELECT
@@ -171,7 +202,6 @@ module.exports = async (req, res) => {
     }
 
     // Achievement by region
-    const now = new Date()
     const quarter = Math.floor(now.getMonth() / 3)
     const achievement_by_region = ['Visayas', 'Mindanao', 'Luzon'].map(region => {
       const budgetData = BUDGET.regions[region]
@@ -288,6 +318,10 @@ module.exports = async (req, res) => {
       ]
     }
 
+    const lyYtd = lyYtdActual[0] || {}
+    const lyFy  = lyFullYearActual[0] || {}
+    const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0
+
     const result = {
       hero: {
         fy_target_mt: BUDGET.fy_target_mt,
@@ -295,7 +329,13 @@ module.exports = async (req, res) => {
         fy_target_gm: BUDGET.fy_target_gm,
         ytd_actual: Math.round(ytd.ytd_vol),
         ytd_budget: ytdBudget,
-        achievement_pct
+        achievement_pct,
+        // LY comparisons
+        ytd_ly_actual:  Math.round(lyYtd.ly_vol || 0),
+        ytd_vs_ly_pct:  pct(ytd.ytd_vol, lyYtd.ly_vol || 0),
+        ly_fy_vol:      Math.round(lyFy.fy_vol || 0),
+        ly_fy_sales:    Math.round(lyFy.fy_sales || 0),
+        ly_fy_gm:       Math.round(lyFy.fy_gm || 0)
       },
       volume_history: BUDGET.volume_history,
       budgeted_volume,
