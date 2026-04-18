@@ -1000,6 +1000,9 @@ body{
     </div>
     <nav class="sidebar-nav">
       <div class="sidebar-section-title">Dashboard</div>
+      <div class="nav-item" id="nav-evp" onclick="navTo('pg-evp-home',this)" style="display:none">
+        <span class="nav-icon">👔</span><span class="nav-label">EVP Dashboard</span>
+      </div>
       <div class="nav-item active" onclick="navTo('pg-home',this)">
         <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
       </div>
@@ -1351,7 +1354,7 @@ body{
               <div class="evp-hdr-time" id="evp-hdr-time">Good morning, Mat 🌅</div>
               <div class="evp-hdr-sub" id="evp-hdr-sub">● LIVE · loading…</div>
             </div>
-            <div class="evp-hdr-badge">👔 EVP</div>
+            <div class="evp-hdr-badge" style="cursor:pointer" onclick="navTo('pg-evp-home')" title="EVP Dashboard">👔 EVP</div>
           </div>
 
           <!-- 2033 Journey Hero -->
@@ -3503,13 +3506,23 @@ function initApp(s) {
   var saved = localStorage.getItem('vf_theme');
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
   syncFilterUI();
-  // Role-based landing (Sprint B-EVP Day 1): CEO / EVP / exec / admin → EVP mobile home
+  // Device-aware role routing (Sprint B-EVP Day 1):
+  //   mobile + exec/ceo/evp/admin → pg-evp-home (mobile-first hero)
+  //   desktop + exec             → pg-home (National) + EVP link revealed in sidebar
+  //   everyone else              → pg-home
   var _r = (s.role||'').toLowerCase();
-  var _isExec = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
-  console.log('[EVP] role routing:', _r, '→ isExec:', _isExec);
+  var _isExec   = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
+  var _isMobile = window.innerWidth < 900;
+  console.log('[EVP] role routing:', _r, '→ isExec:', _isExec, '· isMobile:', _isMobile);
+
   if(_isExec){
     document.body.classList.add('role-evp');
-    // Robust page swap — bypass CSS specificity: force inline styles so pg-home cannot leak
+    var _navEvp = document.getElementById('nav-evp');
+    if(_navEvp) _navEvp.style.display = '';   // reveal the EVP Dashboard sidebar link
+  }
+
+  if(_isExec && _isMobile){
+    // Mobile exec → land on EVP home immediately, inline-style override so pg-home cannot leak
     var _allPages = document.querySelectorAll('.page');
     for(var _i=0;_i<_allPages.length;_i++){
       _allPages[_i].classList.remove('active');
@@ -3520,13 +3533,18 @@ function initApp(s) {
       _evp.classList.add('active');
       _evp.style.display = 'block';
     }
-    // Titles + state
+    // Also set the EVP sidebar link active (desktop users who later resize down won't see stale highlighting)
+    if(_navEvp){
+      document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+      _navEvp.classList.add('active');
+    }
     if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'EVP';
     if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'Executive Overview';
     PG = 'pg-evp-home';
-    // Kick data load directly (redundant with loadPage but guarantees it runs even if navTo path has issues)
     if(typeof loadEvpHome==='function') { try { loadEvpHome(); } catch(e){ console.error('[EVP] loadEvpHome failed:', e); } }
   } else {
+    // Desktop or non-exec → National Dashboard. Both pg-home and pg-evp-home remain
+    // reachable via sidebar for exec users.
     loadPage('pg-home');
   }
   setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
