@@ -1,0 +1,271 @@
+/* ============================================================================
+   EVP MOBILE HOME — Sprint B-EVP Day 1
+   Target device: iPhone Safari (Mat's primary); desktop upgrades to 2-col grid.
+   Scoped to #pg-evp-home and body.role-evp overrides.
+   ============================================================================ */
+
+#pg-evp-home{
+  background:#0B1929;
+  color:#fff;
+  font-family:'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  min-height:100vh;
+  padding:0;
+}
+
+.evp-shell{
+  max-width:500px;
+  margin:0 auto;
+  padding:16px 12px 88px;
+}
+
+/* Hide the HQ sidebar + topbar on mobile when role-evp is active */
+@media (max-width:899px){
+  body.role-evp .sidebar,
+  body.role-evp .topbar,
+  body.role-evp .collapse-btn{ display:none !important; }
+  body.role-evp .content{ padding:0; overflow-y:auto; }
+  body.role-evp .shell{ grid-template-columns:1fr; }
+}
+
+/* ===== Mobile header ===== */
+.evp-mobile-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:16px;padding:8px 4px;
+}
+.evp-hdr-greet{flex:1}
+.evp-hdr-time{font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px}
+.evp-hdr-sub{font-size:12px;color:#95C93D;font-weight:600;margin-top:2px;letter-spacing:0.2px}
+.evp-hdr-badge{
+  background:linear-gradient(135deg,#FFC72C,#F59E0B);
+  color:#00263A;padding:6px 12px;border-radius:10px;
+  font-weight:900;font-size:12px;letter-spacing:0.5px;
+  box-shadow:0 2px 8px rgba(245,158,11,0.3);
+}
+
+/* ===== 2033 Journey Hero ===== */
+.evp-hero{
+  background:linear-gradient(135deg,#00263A,#004A64);
+  border-radius:20px;padding:20px 18px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+.evp-hero::before{
+  content:'';position:absolute;top:-50%;right:-30%;
+  width:80%;height:200%;
+  background:radial-gradient(circle,rgba(149,201,61,0.15),transparent 60%);
+  pointer-events:none;
+}
+.evp-hero-label{
+  font-size:10px;font-weight:800;letter-spacing:1.5px;
+  color:#95C93D;margin-bottom:6px;position:relative;
+}
+.evp-hero-title{
+  font-size:22px;font-weight:900;margin-bottom:14px;color:#fff;
+  letter-spacing:-0.3px;position:relative;
+}
+.evp-journey-bar{
+  height:12px;background:rgba(255,255,255,0.15);border-radius:6px;
+  overflow:hidden;margin-bottom:8px;position:relative;
+}
+.evp-journey-fill{
+  height:100%;background:linear-gradient(90deg,#95C93D,#B4E154);
+  border-radius:6px;width:0;
+  transition:width 1s cubic-bezier(0.34,1.56,0.64,1);
+}
+.evp-journey-pace{
+  position:absolute;top:-4px;bottom:-4px;width:2px;
+  background:#FFC72C;left:0;
+  box-shadow:0 0 6px rgba(255,199,44,0.6);
+}
+.evp-journey-meta{
+  display:flex;justify-content:space-between;
+  font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);
+  font-variant-numeric:tabular-nums;position:relative;
+}
+.evp-journey-meta b{font-size:13px;color:#fff}
+.evp-journey-warning{
+  color:#FFC72C;margin-top:10px;
+  font-size:12px;font-weight:700;position:relative;
+}
+
+/* ===== Standard EVP card ===== */
+.evp-card{
+  background:linear-gradient(180deg,#152849,#1A2F5C);
+  border-radius:16px;padding:16px;margin-bottom:12px;
+  cursor:pointer;
+  transition:transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow:0 4px 16px rgba(0,0,0,0.2);
+  border:1px solid rgba(255,255,255,0.06);
+}
+.evp-card:active{transform:scale(0.98)}
+.evp-card.evp-risk{border-left:3px solid #FA383E}
+.evp-card.evp-opp{border-left:3px solid #31A24C}
+.evp-card.evp-decisions{
+  border-left:3px solid #FFC72C;
+  background:linear-gradient(180deg,#1F2F5C,#1A2F5C);
+}
+.evp-card-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px;
+}
+.evp-card-title{font-size:14px;font-weight:800;color:#fff;letter-spacing:-0.1px}
+.evp-card-sub{
+  font-size:10px;font-weight:700;color:rgba(255,255,255,0.6);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.evp-lock{
+  font-size:9px;background:#FFC72C;color:#00263A;
+  padding:2px 6px;border-radius:4px;font-weight:900;letter-spacing:0.5px;
+}
+.evp-badge-urgent{
+  background:#FA383E;color:#fff;
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:12px;
+  box-shadow:0 2px 8px rgba(250,56,62,0.4);
+}
+.evp-card-cta{
+  color:#0084FF;font-size:12px;font-weight:700;margin-top:10px;
+}
+
+/* ===== P&L Grid ===== */
+.evp-pnl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.evp-pnl-item{
+  background:rgba(255,255,255,0.05);border-radius:10px;padding:10px;
+}
+.evp-pnl-item.locked{border:1px solid rgba(255,199,44,0.3)}
+.evp-pnl-label{
+  font-size:10px;font-weight:700;color:rgba(255,255,255,0.6);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.evp-pnl-value{
+  font-size:20px;font-weight:900;color:#fff;margin:4px 0 2px;
+  font-family:'SF Mono','JetBrains Mono','Source Code Pro',monospace;
+  font-variant-numeric:tabular-nums;letter-spacing:-0.3px;
+}
+.evp-pnl-item.locked .evp-pnl-value::after{content:' 🔒';font-size:12px}
+.evp-pnl-trend{font-size:11px;font-weight:700}
+.evp-pnl-trend.up{color:#95C93D}
+.evp-pnl-trend.down{color:#FA383E}
+.evp-pnl-sub{font-size:10px;color:rgba(255,255,255,0.6);font-weight:600}
+
+/* ===== Decisions ===== */
+.evp-decision-list{display:flex;flex-direction:column;gap:8px}
+.evp-decision-item{
+  background:rgba(255,199,44,0.1);border-radius:10px;padding:12px;
+  display:flex;justify-content:space-between;align-items:center;
+  cursor:pointer;transition:background 0.15s;
+}
+.evp-decision-item:hover{background:rgba(255,199,44,0.15)}
+.evp-decision-text{font-size:13px;color:#fff;flex:1;line-height:1.35}
+.evp-decision-cta{
+  background:#FFC72C;color:#00263A;padding:4px 10px;border-radius:6px;
+  font-weight:800;font-size:11px;margin-left:10px;flex-shrink:0;
+}
+
+/* ===== Regions ===== */
+.evp-regions{display:flex;flex-direction:column;gap:10px}
+.evp-region-row{
+  display:grid;grid-template-columns:110px 1fr 52px;gap:10px;
+  align-items:center;font-size:13px;
+}
+.evp-region-name{font-weight:700;color:#fff}
+.evp-region-bar{
+  height:8px;background:rgba(255,255,255,0.1);
+  border-radius:4px;overflow:hidden;
+}
+.evp-region-fill{
+  height:100%;border-radius:4px;
+  transition:width 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.evp-region-pct{
+  font-weight:900;text-align:right;font-size:13px;
+  font-family:'SF Mono','JetBrains Mono',monospace;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ===== Radar (risk + opp) ===== */
+.evp-radar-list{display:flex;flex-direction:column;gap:10px}
+.evp-radar-item{
+  display:flex;gap:10px;padding:10px;
+  background:rgba(255,255,255,0.04);border-radius:10px;
+  font-size:12px;line-height:1.4;align-items:flex-start;
+}
+.evp-radar-num{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:11px;flex-shrink:0;
+}
+.evp-risk .evp-radar-num{background:rgba(250,56,62,0.2);color:#FA383E}
+.evp-opp  .evp-radar-num{background:rgba(49,162,76,0.2);color:#31A24C}
+.evp-radar-item b{color:#fff}
+
+/* ===== Performers ===== */
+.evp-performers{display:flex;flex-direction:column;gap:8px}
+.evp-performer-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+  font-size:13px;
+}
+.evp-performer-row:last-child{border:none}
+.evp-performer-label{color:rgba(255,255,255,0.7);font-weight:600}
+.evp-performer-value{color:#fff;font-weight:800;text-align:right}
+
+/* ===== Agenda ===== */
+.evp-agenda{display:flex;flex-direction:column;gap:10px}
+.evp-agenda-item{
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.evp-agenda-item:last-child{border:none}
+.evp-agenda-when{
+  font-size:11px;color:#95C93D;font-weight:700;
+  letter-spacing:0.3px;
+}
+.evp-agenda-what{font-size:14px;color:#fff;font-weight:600;margin-top:2px}
+
+/* ===== Mobile bottom nav ===== */
+.evp-mobile-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(10,20,35,0.95);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  border-top:1px solid rgba(255,255,255,0.1);
+  display:flex;padding:8px 4px;padding-bottom:max(8px,env(safe-area-inset-bottom));
+  z-index:100;
+}
+.evp-nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 4px;border-radius:10px;cursor:pointer;
+  transition:background 0.15s;color:rgba(255,255,255,0.5);
+}
+.evp-nav-item.active{background:rgba(255,199,44,0.15);color:#FFC72C}
+.evp-nav-ico{font-size:20px;line-height:1}
+.evp-nav-lbl{font-size:10px;font-weight:700;letter-spacing:0.2px}
+
+/* ===== Desktop upgrade (>=900px): 2-col grid, keep sidebar ===== */
+@media (min-width:900px){
+  .evp-shell{
+    max-width:1200px;
+    padding:24px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+  .evp-hero{grid-column:1 / -1}
+  .evp-mobile-hdr{grid-column:1 / -1}
+  .evp-mobile-nav{display:none}
+  /* Keep sidebar + topbar visible on desktop — even for role-evp users */
+  body.role-evp .sidebar{display:flex}
+  body.role-evp .topbar{display:flex}
+}
+
+/* Light theme variant (muted — EVP home is opinionated dark by default) */
+[data-theme="light"] #pg-evp-home{background:#F5F5F5;color:#1A1A1A}
+[data-theme="light"] .evp-card{
+  background:linear-gradient(180deg,#fff,#F5F5F5);
+  color:#1A1A1A;border-color:rgba(0,0,0,0.06);
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+}
+[data-theme="light"] .evp-card-title{color:#1A1A1A}
+[data-theme="light"] .evp-pnl-value{color:#1A1A1A}
