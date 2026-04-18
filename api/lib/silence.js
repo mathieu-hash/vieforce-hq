@@ -28,9 +28,11 @@ async function getActiveSilences(userId) {
       .or(`silenced_until.is.null,silenced_until.gt.${new Date().toISOString()}`)
     if (error) {
       // 42P01 = table does not exist — log and return empty (non-fatal)
-      if (!/relation .* does not exist/i.test(error.message || '')) {
-        console.warn('[silence] read error:', error.message)
-      }
+      const msg = error.message || ''
+      const tableMissing = /relation .* does not exist/i.test(msg) ||
+                           /could not find the table/i.test(msg) ||
+                           /schema cache/i.test(msg)
+      if (!tableMissing) console.warn('[silence] read error:', msg)
       return []
     }
     return data || []
