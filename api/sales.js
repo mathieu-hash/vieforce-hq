@@ -1,5 +1,6 @@
 const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
+const { scopeForUser, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = require('./_scope')
 const cache = require('../lib/cache')
 
 module.exports = async (req, res) => {
@@ -13,8 +14,31 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Cache check
-  const cacheKey = `sales_${req.url}_${session.role}_${session.region || 'ALL'}`
+  // Parse optional scope=user:<uuid> — Patrol passes this to get user-scoped data.
+  // When absent, behavior is identical to the pre-scope implementation.
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      scope = await scopeForUser(uuid).catch(err => {
+        console.warn('[sales] scopeForUser failed:', err.message)
+        return { userId: uuid, error: 'scope_resolve_failed', is_empty: true, slpCodes: [], districtCodes: [] }
+      })
+    }
+  }
+
+  const scopeFilter = buildScopeWhere(scope, 'T0')
+
+  // Short-circuit: empty scope returns zero-state payload so Patrol UI can
+  // render a consistent "no data" view without branching on error paths.
+  if (scopeFilter.isEmpty) {
+    return res.json(emptySalesPayload(scopeResponseMeta(scope)))
+  }
+
+  // Cache check — include scope in key so user A's cached rows don't leak to user B.
+  const scopeKey = scope ? `_scope:${scope.userId}:${scope.role}` : ''
+  const cacheKey = `sales_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -22,7 +46,8 @@ module.exports = async (req, res) => {
     const { period = 'MTD', region = 'ALL' } = req.query
     const { dateFrom, dateTo } = getPeriodDates(period)
 
-    const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
+    const scopeSql = scopeFilter.sql    // '' when ALL or no scope
+    const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'` + scopeSql
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
     const filteredWhere = applyRoleFilter(session, baseWhere)
 
@@ -64,7 +89,7 @@ module.exports = async (req, res) => {
     `, { dateFrom, dateTo })
 
     // --- Monthly Trend (last 12 months, ignores period filter) ---
-    const trendWhere = `WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE()) AND T0.CANCELED = 'N'`
+    const trendWhere = `WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE()) AND T0.CANCELED = 'N'` + scopeSql
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
     const trendFiltered = applyRoleFilter(session, trendWhere)
 
@@ -110,7 +135,7 @@ module.exports = async (req, res) => {
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
+      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${scopeSql}
       ORDER BY T0.DocDate ASC
     `)
 
@@ -122,7 +147,7 @@ module.exports = async (req, res) => {
         T0.Confirmed,
         ISNULL(T0.SlpCode, 0) AS slp
       FROM ORDR T0
-      WHERE T0.DocStatus='O' AND T0.CANCELED='N'
+      WHERE T0.DocStatus='O' AND T0.CANCELED='N'${scopeSql}
       ORDER BY T0.DocDate DESC
     `)
 
@@ -220,7 +245,7 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${scopeSql}
     `, { pFrom: prevFrom, pTo: prevTo })
 
     // YTD (Jan 1 → today)
@@ -233,7 +258,7 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= @ytdFrom AND T0.CANCELED='N'
+      WHERE T0.DocDate >= @ytdFrom AND T0.CANCELED='N'${scopeSql}
     `, { ytdFrom })
 
     // LY same period (current period -1y) and LY YTD — pulls from historical when pre-cutoff
@@ -250,7 +275,7 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}
     `, {}, lyFrom, lyTo)
 
     const ytdLyFrom = new Date(new Date().getFullYear() - 1, 0, 1)
@@ -262,7 +287,7 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}
     `, {}, ytdLyFrom, ytdLyTo)
 
     const sumRows = (rows, ...cols) => {
@@ -312,6 +337,10 @@ module.exports = async (req, res) => {
                      volume_mt: kpis.volume_mt, volume_bags: kpis.volume_bags,
                      revenue: kpis.revenue, gmt: kpis.gmt,
                      ytd_volume_mt: kpis.ytd_volume_mt, ytd_revenue: kpis.ytd_revenue }
+
+    // Include scope metadata only when the caller asked for it.
+    // Keeps the existing no-scope response shape byte-identical for web dashboard.
+    if (scope) result.scope = scopeResponseMeta(scope)
 
     cache.set(cacheKey, result, 300)
     res.json(result)
