@@ -50,6 +50,7 @@ const searchHandler = require('./api/search')
 const silenceHandler = require('./api/silence')
 const unsilenceHandler = require('./api/unsilence')
 const silencedHandler = require('./api/silenced')
+const dsmHomeHandler = require('./api/dsm-home')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -71,6 +72,7 @@ app.get('/api/search', searchHandler)
 app.post('/api/silence', silenceHandler)
 app.post('/api/unsilence', unsilenceHandler)
 app.get('/api/silenced', silencedHandler)
+app.get('/api/dsm/home', dsmHomeHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
