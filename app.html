@@ -235,6 +235,29 @@ body,html[data-theme="light"] body{transition:background-color 0.4s,color 0.4s}
   display:flex;align-items:center;justify-content:center;transition:all 0.2s;
 }
 .theme-btn:hover{border-color:var(--glass-border-hover);color:var(--text)}
+
+/* Refresh button — matches theme-btn but with spin-on-active */
+.refresh-btn{
+  width:32px;height:32px;border-radius:8px;border:1px solid var(--divider);
+  background:var(--bg3);color:var(--text2);font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;
+  position:relative;
+}
+.refresh-btn:hover{border-color:rgba(0,174,239,0.4);color:var(--blue);background:rgba(0,174,239,0.05)}
+.refresh-btn.refreshing{color:var(--blue);border-color:rgba(0,174,239,0.5);background:rgba(0,174,239,0.08)}
+.refresh-btn.refreshing .refresh-icon{animation:spin 0.8s linear infinite}
+.refresh-icon{display:inline-block;transition:transform 0.3s}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* Last-refresh tooltip */
+.refresh-btn .refresh-ts{
+  position:absolute;top:calc(100% + 6px);right:0;
+  font-size:10px;color:var(--text3);font-family:var(--mono);
+  white-space:nowrap;background:var(--bg3);padding:4px 8px;border-radius:6px;
+  border:1px solid var(--divider);opacity:0;transform:translateY(-4px);
+  transition:opacity 0.2s,transform 0.2s;pointer-events:none;z-index:50;
+}
+.refresh-btn:hover .refresh-ts{opacity:1;transform:translateY(0)}
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
@@ -984,6 +1007,10 @@ body{
         <input placeholder="Search customers, SKUs..." id="global-search" type="text" onkeydown="if(event.key==='Enter')doSearch()">
       </div>
       <div class="tb-clock" id="clock">14:32</div>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshNow()" title="Refresh data">
+        <span class="refresh-icon">⟳</span>
+        <span class="refresh-ts" id="refresh-ts">Last: —</span>
+      </button>
       <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </header>
 
@@ -2895,7 +2922,8 @@ function initApp(s) {
   loadPage('pg-home');
   setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
   // Auto-refresh every 60s
-  setInterval(function(){ DC = {}; loadPage(PG); }, 60000);
+  setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
+  stampRefresh();  // initial stamp
   // Re-inject whenever a page's tables refresh (debounced)
   var exportInjectTimer;
   var origNavTo = window.navTo;
@@ -3148,6 +3176,29 @@ function loadPage(id){
     case 'pg-itemized': loadItemized(); break;
   }
   initCharts(id);
+}
+
+/* ===== MANUAL REFRESH ===== */
+function stampRefresh(){
+  var el = document.getElementById('refresh-ts');
+  if(!el) return;
+  var d = new Date();
+  var hh = String(d.getHours()).padStart(2,'0');
+  var mm = String(d.getMinutes()).padStart(2,'0');
+  var ss = String(d.getSeconds()).padStart(2,'0');
+  el.textContent = 'Last: ' + hh + ':' + mm + ':' + ss;
+}
+function refreshNow(){
+  var btn = document.getElementById('refresh-btn');
+  if(btn && btn.classList.contains('refreshing')) return;  // debounce
+  if(btn) btn.classList.add('refreshing');
+  DC = {};            // clear frontend page cache
+  loadPage(PG);       // re-run current page loader
+  // minimum spinner duration for visual feedback
+  setTimeout(function(){
+    if(btn) btn.classList.remove('refreshing');
+    stampRefresh();
+  }, 800);
 }
 
 /* ===== HOME — wired to /api/dashboard + /api/sales + /api/ar + /api/speed ===== */
