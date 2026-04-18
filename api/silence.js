@@ -45,8 +45,10 @@ module.exports = async (req, res) => {
     customerName:  customer_name
   })
   if (result.error) {
-    // Table might not exist yet (pre-migration)
-    if (/relation .* does not exist/i.test(result.error)) {
+    // Table might not exist yet (pre-migration) — detect both Postgres and PostgREST wording
+    if (/relation .* does not exist/i.test(result.error) ||
+        /could not find the table/i.test(result.error) ||
+        /schema cache/i.test(result.error)) {
       return res.status(503).json({
         error: 'Silence table not provisioned',
         hint: 'Run migrations/supabase_silenced_alerts.sql in Supabase SQL Editor first.'
