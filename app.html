@@ -1802,7 +1802,7 @@ body{
         <!-- CHART + MATRICES ROW -->
         <div class="grid-23" style="margin-bottom:16px">
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Daily Pullout (Last 14 Days)</div></div>
+            <div class="card-hdr"><div class="card-title" id="speed-daily-title">Daily Pullout · MTD</div></div>
             <div class="card-body"><div class="chart-wrap"><canvas id="speedChart"></canvas></div></div>
           </div>
           <div>
@@ -3989,6 +3989,12 @@ async function loadSpeed(){
     }
     // Chart — destroy & recreate from real API data (bypasses categorical axis caching from any prototype init)
     if(d.daily && d.daily.length){
+      // Dynamic chart title — reflects current period
+      var titleEl = document.getElementById('speed-daily-title');
+      if(titleEl){
+        var titleMap = {'7D':'Daily Pullout · Last 7 Days','MTD':'Daily Pullout · MTD','QTD':'Weekly Pullout · QTD','YTD':'Monthly Pullout · YTD'};
+        titleEl.textContent = titleMap[PD] || ('Daily Pullout · ' + PD);
+      }
       var ctxS = document.getElementById('speedChart');
       if(ctxS){
         var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
@@ -4311,16 +4317,40 @@ async function openCust(code){
     // Breadcrumb
     var bc=pg.querySelectorAll('.breadcrumb span');
     if(bc.length>=3) bc[2].textContent = info.CardName || code;
-    // CY vs LY chart
-    if(d.cy_vs_ly && d.cy_vs_ly.length && charts.custVolBar){
-      var months=d.cy_vs_ly.map(function(m){return m.month_label||m.month||''});
-      var cy=d.cy_vs_ly.map(function(m){return m.cy_volume||0});
-      var ly=d.cy_vs_ly.map(function(m){return m.ly_volume||0});
-      charts.custVolBar.data.labels=months;
-      charts.custVolBar.data.datasets[0].data=cy;
-      charts.custVolBar.data.datasets[1].data=ly;
-      charts.custVolBar.update();
-    }
+    // CY vs LY chart — API returns {months:[], cy_vol:[], ly_vol:[]} (object, not array).
+    // Destroy & recreate pattern (same as speed chart) so categorical axis resets cleanly
+    // between customer selections.
+    (function(){
+      var cv = d.cy_vs_ly;
+      if(!cv) return;
+      var months = Array.isArray(cv) ? cv.map(function(m){return m.month_label||m.month||''}) : (cv.months||[]);
+      var cy     = Array.isArray(cv) ? cv.map(function(m){return +m.cy_volume||0})            : (cv.cy_vol||[]);
+      var ly     = Array.isArray(cv) ? cv.map(function(m){return +m.ly_volume||0})            : (cv.ly_vol||[]);
+      if(!months.length) return;
+      var ctxCv = document.getElementById('custVolBarChart');
+      if(!ctxCv) return;
+      if(charts.custVolBar){ try{charts.custVolBar.destroy();}catch(e){} charts.custVolBar=null; }
+      charts.custVolBar = new Chart(ctxCv,{type:'bar',data:{
+        labels:months,
+        datasets:[
+          {label:'2026 (CY)',data:cy,backgroundColor:'rgba(0,174,239,0.55)',hoverBackgroundColor:'rgba(0,174,239,0.8)',borderRadius:4,borderSkipped:false},
+          {label:'2025 (LY)',data:ly,backgroundColor:'rgba(255,255,255,0.1)',hoverBackgroundColor:'rgba(255,255,255,0.2)',borderRadius:4,borderSkipped:false}
+        ]
+      },options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{afterBody:function(items){
+          if(!items.length) return '';
+          var i=items[0].dataIndex;
+          var diff=(cy[i]||0)-(ly[i]||0);
+          var pct=(ly[i]>0)?((diff/ly[i])*100).toFixed(1):'—';
+          return 'vs LY: '+(diff>=0?'+':'')+Math.round(diff)+' MT'+(ly[i]>0?' ('+(diff>=0?'+':'')+pct+'%)':'');
+        }}}},
+        scales:{
+          y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:function(v){return v+' MT'}}},
+          x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.3)',font:{size:10,weight:600}}}
+        }
+      }});
+    })();
     // Monthly breakdown table
     if(d.monthly_table && d.monthly_table.length){
       var mhtml='';
@@ -4331,7 +4361,7 @@ async function openCust(code){
         mhtml+='<td class="num">'+fcn(Math.round(m.vol_cy||0))+'</td>';
         mhtml+='<td class="num" style="color:var(--text3)">'+fcn(Math.round(m.vol_ly||0))+'</td>';
         mhtml+='<td class="num '+deltaCls+'">'+(delta!=null?(delta>=0?'+':'')+delta.toFixed(1)+'%':'--')+'</td>';
-        mhtml+='<td class="num">'+fc(m.sales_cy||m.revenue_cy||0)+'</td></tr>';
+        mhtml+='<td class="num">'+fc(m.sales||m.sales_cy||m.revenue_cy||0)+'</td></tr>';
       });
       seth('cust-monthly-tbody',mhtml);
     } else {
@@ -5512,42 +5542,8 @@ function initCharts(pageId){
       }
     }
     if(pageId==='pg-custdetail'){
-      // CY vs LY volume bar chart
-      if(!charts.custVolBar){
-        const ctx = document.getElementById('custVolBarChart');
-        if(!ctx) return;
-        const months = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
-        const cy = [320,340,380,360,400,390,420,450,410,440,460,420];
-        const ly = [300,310,340,350,360,370,390,420,380,400,410,365];
-        charts.custVolBar = new Chart(ctx,{type:'bar',data:{
-          labels:months,
-          datasets:[
-            {label:'2026 (CY)',data:cy,backgroundColor:'rgba(0,174,239,0.55)',hoverBackgroundColor:'rgba(0,174,239,0.8)',borderRadius:4,borderSkipped:false},
-            {label:'2025 (LY)',data:ly,backgroundColor:'rgba(255,255,255,0.1)',hoverBackgroundColor:'rgba(255,255,255,0.2)',borderRadius:4,borderSkipped:false}
-          ]
-        },options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{
-            legend:{display:false},
-            tooltip:{
-              callbacks:{
-                afterBody:function(items){
-                  if(items.length>=1){
-                    const i=items[0].dataIndex;
-                    const diff=cy[i]-ly[i];
-                    const pct=((diff/ly[i])*100).toFixed(1);
-                    return 'vs LY: '+(diff>0?'+':'')+diff+' MT ('+(diff>0?'+':'')+pct+'%)';
-                  }
-                }
-              }
-            }
-          },
-          scales:{
-            y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:v=>v+' MT'}},
-            x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.3)',font:{size:10,weight:600}}}
-          }
-        }});
-      }
+      // custVolBar chart is created inside openCust() → loadCustDetail() from real API data (cy_vs_ly).
+      // No prototype init here — prevents categorical axis caching when switching customers.
       // Sales & GM/Ton trend line
       if(!charts.custSalesGm){
         const ctx2 = document.getElementById('custSalesGmChart');
