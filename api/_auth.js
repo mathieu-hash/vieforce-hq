@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 
 const supabase = createClient(
@@ -17,6 +18,36 @@ async function verifySession(req) {
     .single()
 
   return user || null
+}
+
+// Service-to-service auth via shared bearer token.
+// Used by Patrol backend (and any future internal consumer) to call HQ endpoints
+// without a Supabase user. No DB round-trip on the hot path.
+async function verifyServiceToken(req) {
+  const auth = req.headers.authorization || ''
+  if (!auth.startsWith('Bearer ')) return null
+  const token = auth.slice(7).trim()
+  const expected = process.env.HQ_SERVICE_TOKEN
+  if (!expected || token.length !== expected.length) return null
+
+  const ok = crypto.timingSafeEqual(
+    Buffer.from(token),
+    Buffer.from(expected)
+  )
+  if (!ok) return null
+
+  console.log('[svc-auth] request authenticated:', req.url)
+
+  // Synthetic session — applyRoleFilter treats role='service' as full-scope.
+  return {
+    id: 'svc:patrol',
+    name: 'Patrol Service',
+    role: 'service',
+    region: 'ALL',
+    district: 'ALL',
+    territory: null,
+    is_service: true
+  }
 }
 
 function getPeriodDates(period) {
@@ -40,6 +71,11 @@ function getPeriodDates(period) {
 function applyRoleFilter(session, baseWhere) {
   if (!session) return baseWhere + ' AND 1=0'
   switch (session.role) {
+    case 'service':
+      // Service role — Patrol proxy will re-scope downstream.
+      // Equivalent to exec/ceo scope at the SAP boundary; the calling service
+      // is responsible for filtering per-user before returning to its own clients.
+      return baseWhere
     case 'admin':
     case 'ceo':
     case 'evp':
@@ -55,4 +91,4 @@ function applyRoleFilter(session, baseWhere) {
   }
 }
 
-module.exports = { verifySession, getPeriodDates, applyRoleFilter }
+module.exports = { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter }
