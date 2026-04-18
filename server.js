@@ -45,6 +45,8 @@ const teamHandler = require('./api/team')
 const budgetHandler = require('./api/budget')
 const itemizedHandler = require('./api/itemized')
 const itemizedMetaHandler = require('./api/itemized-meta')
+const customerSoaHandler = require('./api/customer-soa')
+const searchHandler = require('./api/search')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -61,6 +63,8 @@ app.get('/api/team', teamHandler)
 app.get('/api/budget', budgetHandler)
 app.get('/api/itemized', itemizedHandler)
 app.get('/api/itemized/meta', itemizedMetaHandler)
+app.get('/api/customer/soa', customerSoaHandler)
+app.get('/api/search', searchHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
