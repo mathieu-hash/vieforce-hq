@@ -238,6 +238,77 @@ module.exports = async (req, res) => {
       ORDER BY vol DESC
     `, { dateFrom, dateTo })
 
+    // --- Monthly performance (last 7 months, CY + LY volume + GM) — OINV only ---
+    const monthlyRaw = await query(`
+      SELECT
+        YEAR(T0.DocDate)                                                  AS y,
+        MONTH(T0.DocDate)                                                 AS m,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gross_margin
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= DATEADD(MONTH, -19, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+        AND T0.CANCELED = 'N'
+      GROUP BY YEAR(T0.DocDate), MONTH(T0.DocDate)
+    `)
+
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const monthlyMap = {}  // 'YYYY-MM' -> { volume_mt, gm }
+    for (const r of monthlyRaw) {
+      const k = `${r.y}-${String(r.m).padStart(2,'0')}`
+      monthlyMap[k] = { volume_mt: Number(r.volume_mt||0), gm: Number(r.gross_margin||0) }
+    }
+    // Build last 7 months ending with current month (descending-build, reversed to ascending order)
+    const monthly_perf = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(year, monthIdx - i, 1)
+      const cyKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+      const lyKey = `${d.getFullYear()-1}-${String(d.getMonth()+1).padStart(2,'0')}`
+      const cy = monthlyMap[cyKey] || { volume_mt: 0, gm: 0 }
+      const ly = monthlyMap[lyKey] || { volume_mt: 0, gm: 0 }
+      monthly_perf.push({
+        month:     monthShort[d.getMonth()],
+        year:      d.getFullYear(),
+        cy_volume: Math.round(cy.volume_mt),
+        ly_volume: Math.round(ly.volume_mt),
+        cy_gm:     Math.round(cy.gm),
+        ly_gm:     Math.round(ly.gm)
+      })
+    }
+
+    // --- Quarterly performance (CY 4 quarters + LY same 4) — OINV only ---
+    const quarterlyRaw = await query(`
+      SELECT
+        YEAR(T0.DocDate)                                                  AS y,
+        DATEPART(QUARTER, T0.DocDate)                                     AS q,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gross_margin
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= DATEFROMPARTS(YEAR(GETDATE()) - 1, 1, 1)
+        AND T0.CANCELED = 'N'
+      GROUP BY YEAR(T0.DocDate), DATEPART(QUARTER, T0.DocDate)
+    `)
+
+    const qMap = {}
+    for (const r of quarterlyRaw) {
+      qMap[`${r.y}-Q${r.q}`] = { volume_mt: Number(r.volume_mt||0), gm: Number(r.gross_margin||0) }
+    }
+    const quarterly_perf = []
+    for (let q = 1; q <= 4; q++) {
+      const cy = qMap[`${year}-Q${q}`]     || { volume_mt: 0, gm: 0 }
+      const ly = qMap[`${year-1}-Q${q}`]   || { volume_mt: 0, gm: 0 }
+      quarterly_perf.push({
+        quarter:   `Q${q}`,
+        cy_volume: Math.round(cy.volume_mt),
+        ly_volume: Math.round(ly.volume_mt),
+        cy_gm:     Math.round(cy.gm),
+        ly_gm:     Math.round(ly.gm)
+      })
+    }
+
     // --- Margin alert counts ---
     const marginCounts = await query(`
       SELECT
@@ -325,6 +396,8 @@ module.exports = async (req, res) => {
       },
       region_performance: regionPerf,
       top_customers: topCust,
+      monthly_perf,
+      quarterly_perf,
       margin_alerts: {
         critical: marginCounts[0]?.critical || 0,
         warning: marginCounts[0]?.warning || 0,

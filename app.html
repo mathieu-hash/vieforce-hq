@@ -1125,8 +1125,8 @@ body{
             <div class="kpi-enr-status ok" id="hk-sales-pct">93% YTD</div>
           </div>
           <!-- 2. Volume -->
-          <div class="kpi kpi-sm kpi-enr">
-            <div class="kpi-label">Volume</div>
+          <div class="kpi kpi-sm kpi-enr" title="Based on invoiced data (OINV). Delivery volume may differ — see Speed Monitor for operational MT shipped.">
+            <div class="kpi-label">Volume <span style="font-size:9px;color:var(--text4);font-weight:500;letter-spacing:0.3px">(INVOICED)</span></div>
             <div class="kpi-val" style="font-size:20px" id="hk-vol">14.2K<span style="font-size:11px;color:var(--text3)"> MT</span></div>
             <div class="kpi-delta up" id="hk-vol-d">▲ 12.1%</div>
             <div class="kpi-enr-div"></div>
@@ -3518,6 +3518,11 @@ async function loadHome(){
         }
       }
     }
+    // Monthly & Quarterly Performance combo charts — real OINV data from /api/dashboard
+    if(d && (d.monthly_perf || d.quarterly_perf)){
+      try { renderHomeCombos({ monthly_perf: d.monthly_perf || [], quarterly_perf: d.quarterly_perf || [] }); }
+      catch(e){ console.error('[HOME] combo charts:', e); }
+    }
     pulseRefresh('pg-home');
   } catch(e) { console.error('Home:', e); showError('pg-home','Unable to load live data'); }
 }
@@ -5603,21 +5608,30 @@ function buildHomeComboChart(canvasId, chartKey, labels, cyVol, lyVol, gm, gmLY)
   });
 }
 
-// Public: (re)build both home charts from mock data (until backend monthly/quarterly series arrive)
-function renderHomeCombos(){
-  var mLabels = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
-  var mCY = [9100,10100,10400,10200,11400,12500,14200];
-  var mLY = [7800,8400,8600,8900,9200,10100,11800];
-  var mGM = [60,66,68,67,75,82,93];
-  var mGMLY = [52,56,57,60,62,67,75];
-  buildHomeComboChart('homeMonthlyChart','homeMonthly', mLabels, mCY, mLY, mGM, mGMLY);
+// Public: (re)build both home charts from API data if available, else fall back to zeros.
+// Called from loadHome() (with real data) and from theme toggle (cached globals).
+var HOME_COMBO_DATA = null;  // { monthly_perf:[], quarterly_perf:[] } cached across theme rebuilds
+function renderHomeCombos(apiData){
+  if(apiData) HOME_COMBO_DATA = apiData;
+  var src = HOME_COMBO_DATA || {};
+  var mp = Array.isArray(src.monthly_perf)   ? src.monthly_perf   : [];
+  var qp = Array.isArray(src.quarterly_perf) ? src.quarterly_perf : [];
+  // GM converted from PHP to millions for the right-axis scale
+  var toM = function(v){ return Math.round((+v||0)/1000000); };
 
-  var qLabels = ['Q1','Q2','Q3','Q4'];
-  var qCY = [29600,24800,33400,40200];
-  var qLY = [24800,21200,26200,29500];
-  var qGM = [194,162,219,263];
-  var qGMLY = [165,142,175,198];
-  buildHomeComboChart('homeQuarterlyChart','homeQuarterly', qLabels, qCY, qLY, qGM, qGMLY);
+  var mLabels = mp.map(function(r){return r.month});
+  var mCY     = mp.map(function(r){return +r.cy_volume||0});
+  var mLY     = mp.map(function(r){return +r.ly_volume||0});
+  var mGM     = mp.map(function(r){return toM(r.cy_gm)});
+  var mGMLY   = mp.map(function(r){return toM(r.ly_gm)});
+  if(mLabels.length) buildHomeComboChart('homeMonthlyChart','homeMonthly', mLabels, mCY, mLY, mGM, mGMLY);
+
+  var qLabels = qp.map(function(r){return r.quarter});
+  var qCY     = qp.map(function(r){return +r.cy_volume||0});
+  var qLY     = qp.map(function(r){return +r.ly_volume||0});
+  var qGM     = qp.map(function(r){return toM(r.cy_gm)});
+  var qGMLY   = qp.map(function(r){return toM(r.ly_gm)});
+  if(qLabels.length) buildHomeComboChart('homeQuarterlyChart','homeQuarterly', qLabels, qCY, qLY, qGM, qGMLY);
 }
 function initCharts(pageId){
   setTimeout(()=>{
