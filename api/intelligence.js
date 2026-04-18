@@ -430,22 +430,26 @@ module.exports = async (req, res) => {
     const early_warning = warningFiltered.kept.slice(0, 15)
 
     // ============== LISTS 4/5 — DORMANT ACTIVE vs LEGACY AR ==============
-    // Split criteria (refined from Mat 2026-04-18 brief — SAP migrates OB as
-    // ordinary OINV with 2024+ DocDate, so strict "zero OINV since 2024" under-
-    // counts. We classify single-invoice + long-silent as legacy too.):
+    // Split criteria (refined 2x from Mat 2026-04-18 brief — SAP migrates OB
+    // as ordinary 2024+ OINV, so strict "zero post-2024 invoices" under-counts.
+    // Combining invoice-count AND silence duration produces the right split.):
     //
     //   legacy_ar:       ar_balance > 0 AND (
-    //                      orders_since_2024 == 0
-    //                      OR (orders_since_2024 == 1 AND days_silent >= 90)
-    //                    )   — no real activity → Finance reconciliation
+    //                      orders_since_2024 == 0                — pure legacy
+    //                      OR days_silent >= 120                  — 4mo+ silent → likely stale
+    //                      OR (orders_since_2024 <= 2 AND days_silent >= 90)
+    //                                                             — 1-2 invoices + 90d silent
+    //                    )
     //   dormant_active:  days_silent >= 60 AND orders_since_2024 > 0
-    //                    AND NOT legacy                 — winback target
+    //                    AND NOT legacy                           — winback-viable
     //
-    // Buckets are mutually exclusive (legacy takes priority on overlap).
+    // Buckets are mutually exclusive. Mat can tune the thresholds in
+    // intelligence.js if the split still doesn't match his mental model.
     const legacyArAll = allCustomers.filter(c => {
       if (c.ar_balance <= 0) return false
       if (c.orders_since_2024 === 0) return true
-      if (c.orders_since_2024 <= 1 && c.days_silent >= 90) return true
+      if (c.days_silent >= 120) return true
+      if (c.orders_since_2024 <= 2 && c.days_silent >= 90) return true
       return false
     })
     const legacySet = new Set(legacyArAll.map(c => c.card_code))
