@@ -1672,7 +1672,7 @@ body{
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Floor</div><div class="kpi-val" style="font-size:20px" id="inv-k-floor">—</div><div class="kpi-src" id="inv-k-floor-sub">bags</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="inv-k-po">—</div><div class="kpi-src">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src">bags · not in SAP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src" id="inv-k-prod-src">bags · OWOR + WOR1</div><div id="inv-k-prod-stale" style="display:none;margin-top:6px;padding:3px 6px;border-radius:4px;background:rgba(241,177,29,0.12);border:1px solid rgba(241,177,29,0.25);color:var(--gold);font-size:9px;font-weight:600;letter-spacing:0.3px;cursor:help" title=""></div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src">bags (floor − PO)</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Cover Days</div><div class="kpi-val" style="font-size:20px"><span id="inv-k-cover">—</span><span style="font-size:10px;color:var(--text3)"> d</span></div><div class="kpi-src">at current speed</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Negative Avail.</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="inv-k-neg">—</div><div class="kpi-src">plants short</div></div>
@@ -3806,7 +3806,23 @@ function renderInv(){
     animateNumber(sel('inv-k-po'),    s.pending_po_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
     animateNumber(sel('inv-k-avail'), s.available_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
   }
-  sett('inv-k-prod',  s.on_production != null ? fcn(s.on_production) : '—');
+  // ON PRODUCTION — shows REAL (DueDate within 30d). Stale WOs surface as a gold badge.
+  var prod = d.production || {};
+  var prodVal = isBags ? (prod.on_production_bags != null ? prod.on_production_bags : s.on_production)
+                       : (prod.on_production_mt != null ? prod.on_production_mt : s.on_production_mt);
+  sett('inv-k-prod', prodVal != null ? (fcn(Math.round(prodVal)) + (isBags ? '' : ' MT')) : '—');
+  var prodSrc = sel('inv-k-prod-src');
+  if(prodSrc) prodSrc.textContent = (isBags ? 'bags' : 'MT') + ' · OWOR + WOR1';
+  var staleEl = sel('inv-k-prod-stale');
+  if(staleEl){
+    if(prod.stale_wo_count > 0){
+      staleEl.style.display = 'inline-block';
+      staleEl.textContent = '⚠ ' + prod.stale_wo_count + ' stale WO' + (prod.stale_wo_count===1?'':'s') + ' · ' + fcn(Math.round(prod.stale_wo_mt||0)) + ' MT';
+      staleEl.title = 'Released work orders with DueDate > 30 days ago. Oldest is ' + (prod.oldest_stale_days||0) + ' days past due. Flag Production team for cleanup.';
+    } else {
+      staleEl.style.display = 'none';
+    }
+  }
   sett('inv-k-cover', s.cover_days != null ? s.cover_days : '—');
   sett('inv-k-neg',   s.negative_avail_count != null ? s.negative_avail_count : '—');
 

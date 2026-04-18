@@ -145,38 +145,53 @@ module.exports = async (req, res) => {
         AND UPPER(IW.ItemCode) LIKE 'FG%'
     `)
 
-    // --- ON PRODUCTION (from OWOR work orders, Status = 'R' = Released/in-progress) ---
-    // OWOR.Warehouse is the target warehouse where FG will be deposited.
-    // bags_in_production = PlannedQty - CmpltQty for each open work order.
-    // Status: P=Planned (not yet started), R=Released (active), L=Closed, C=Cancelled.
-    // We count only 'R' (actively running). If Mat wants to include 'P' (Planned), flip below.
+    // --- ON PRODUCTION (OWOR work orders, Status='R' = Released/in-progress) ---
+    // Split into REAL (DueDate within 30 days) vs STALE (DueDate > 30 days ago — abandoned).
+    // Status codes: P=Planned, R=Released (active), L=Closed, C=Cancelled. VPI uses 'R' only.
+    // Per-plant, per-region merge uses REAL production only (stale shown as a global badge).
     const production = await query(`
       SELECT
         W.Warehouse                                        AS plant_code,
-        ISNULL(SUM(W.PlannedQty - W.CmpltQty), 0)          AS bags_in_production,
-        ISNULL(SUM((W.PlannedQty - W.CmpltQty) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt_in_production
+        CASE WHEN W.DueDate >= DATEADD(DAY, -30, GETDATE()) THEN 'real' ELSE 'stale' END AS bucket,
+        COUNT(*)                                           AS wo_count,
+        ISNULL(SUM(W.PlannedQty - W.CmpltQty), 0)          AS bags,
+        ISNULL(SUM((W.PlannedQty - W.CmpltQty) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt,
+        MIN(W.DueDate)                                     AS oldest_due_date
       FROM OWOR W
       LEFT JOIN OITM I ON W.ItemCode = I.ItemCode
       WHERE W.Status = 'R'
         AND UPPER(W.ItemCode) LIKE 'FG%'
         AND W.PlannedQty > W.CmpltQty
-      GROUP BY W.Warehouse
+      GROUP BY W.Warehouse, CASE WHEN W.DueDate >= DATEADD(DAY, -30, GETDATE()) THEN 'real' ELSE 'stale' END
     `).catch(e => { console.warn('[inventory] OWOR query failed:', e.message); return [] })
 
-    const prodMap = {}
+    const prodMap = {}   // plant_code -> { bags, mt }  (REAL only, for card merge)
+    let totalInProductionBags = 0, totalInProductionMt = 0
+    let staleBags = 0, staleMt = 0, staleCount = 0, oldestStaleDays = 0
+    const now = Date.now()
     for (const row of production) {
-      prodMap[row.plant_code] = {
-        bags: Number(row.bags_in_production || 0),
-        mt:   Number(row.mt_in_production || 0)
+      const bags = Number(row.bags || 0), mt = Number(row.mt || 0)
+      if (row.bucket === 'real') {
+        prodMap[row.plant_code] = { bags, mt }
+        totalInProductionBags += bags
+        totalInProductionMt   += mt
+      } else {
+        staleBags  += bags
+        staleMt    += mt
+        staleCount += Number(row.wo_count || 0)
+        if (row.oldest_due_date) {
+          const ageDays = Math.floor((now - new Date(row.oldest_due_date).getTime()) / 86400000)
+          if (ageDays > oldestStaleDays) oldestStaleDays = ageDays
+        }
       }
     }
-    // Merge production into each plant row
+    // Merge REAL production into each plant row
     for (const p of plants) {
       const prod = prodMap[p.plant_code] || { bags: 0, mt: 0 }
       p.in_production_bags = Math.round(prod.bags)
       p.in_production_mt   = Math.round(prod.mt * 10) / 10
     }
-    // Merge production into by_region
+    // Merge REAL production into by_region
     const regionOf = (wh) => {
       if (['AC','ACEXT','BAC'].includes(wh)) return 'Luzon'
       if (['HOREB','ARGAO','ALAE'].includes(wh)) return 'Visayas'
@@ -195,8 +210,14 @@ module.exports = async (req, res) => {
       r.in_production_bags = Math.round(prod.bags)
       r.in_production_mt   = Math.round(prod.mt * 10) / 10
     }
-    const totalInProductionBags = Object.values(prodMap).reduce((s, v) => s + v.bags, 0)
-    const totalInProductionMt   = Object.values(prodMap).reduce((s, v) => s + v.mt, 0)
+    const productionSummary = {
+      on_production_bags: Math.round(totalInProductionBags),
+      on_production_mt:   Math.round(totalInProductionMt * 10) / 10,
+      stale_wo_bags:      Math.round(staleBags),
+      stale_wo_mt:        Math.round(staleMt * 10) / 10,
+      stale_wo_count:     staleCount,
+      oldest_stale_days:  oldestStaleDays
+    }
 
     // --- Cover days (national: total on-hand / avg daily shipment last 30d) ---
     const dailyShip = await query(`
@@ -238,6 +259,7 @@ module.exports = async (req, res) => {
 
     const result = {
       summary,
+      production: productionSummary,
       plants,
       items,
       by_region,
