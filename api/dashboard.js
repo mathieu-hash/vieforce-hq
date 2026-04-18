@@ -1,7 +1,7 @@
 const { query } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
-const { isNonCustomer } = require('./lib/non-customer-codes')
+const { isNonCustomerRow } = require('./lib/non-customer-codes')
 
 // 2026 Budget targets (mirrors api/speed.js + api/budget.js)
 const BUDGET_2026 = {
@@ -303,7 +303,7 @@ module.exports = async (req, res) => {
     `, { dateFrom, dateTo })
     const revByCust = Object.fromEntries(topCustInvRaw.map(r => [r.code, r.revenue]))
     const topCust = topCustDLN
-      .filter(c => !isNonCustomer(c.code))
+      .filter(c => !isNonCustomerRow(c.code, c.name))
       .slice(0, 5)
       .map(c => ({ code: c.code, name: c.name, vol: c.vol, revenue: revByCust[c.code] || 0 }))
 

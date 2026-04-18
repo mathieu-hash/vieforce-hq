@@ -1,7 +1,7 @@
 const { query } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
-const { isNonCustomer, excludeNonCustomers } = require('./lib/non-customer-codes')
+const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 
 // --- Scoring helpers (deterministic, explainable) ---
@@ -190,7 +190,7 @@ module.exports = async (req, res) => {
     const custMap = new Map()
     for (const row of actBase) {
       const cc = row.CardCode
-      if (isNonCustomer(cc)) continue    // Part A: plant codes out
+      if (isNonCustomerRow(cc, row.CardName)) continue    // Part A: plant codes + plant-named customers out
       const last = lastMap.get(cc) || {}
       custMap.set(cc, {
         card_code:         cc,
@@ -248,6 +248,11 @@ module.exports = async (req, res) => {
         c.frozen_for = r.frozenFor || 'N'
         c.bp_status = r.U_BpStatus || ''
       }
+    }
+
+    // Secondary pass: now that names are populated, drop any plant-named rows
+    for (const [cc, c] of custMap.entries()) {
+      if (isNonCustomerRow(cc, c.name)) custMap.delete(cc)
     }
 
     const allCustomers = [...custMap.values()]
@@ -425,20 +430,27 @@ module.exports = async (req, res) => {
     const early_warning = warningFiltered.kept.slice(0, 15)
 
     // ============== LISTS 4/5 — DORMANT ACTIVE vs LEGACY AR ==============
-    // Split criteria (per Mat 2026-04-18 brief):
-    //   dormant_active: days_silent >= 60 AND orders_since_2024 > 0
-    //                   (stopped recently — winback target)
-    //   legacy_ar:      ar_balance > 0 AND orders_since_2024 == 0
-    //                   (no post-2024 activity — likely opening-balance migration)
+    // Split criteria (refined from Mat 2026-04-18 brief — SAP migrates OB as
+    // ordinary OINV with 2024+ DocDate, so strict "zero OINV since 2024" under-
+    // counts. We classify single-invoice + long-silent as legacy too.):
     //
-    // A customer can be in legacy_ar without being dormant_active (AR-only
-    // orphan). A customer can be dormant_active without being legacy_ar (has
-    // recent orders, just silent for 60+d now).
+    //   legacy_ar:       ar_balance > 0 AND (
+    //                      orders_since_2024 == 0
+    //                      OR (orders_since_2024 == 1 AND days_silent >= 90)
+    //                    )   — no real activity → Finance reconciliation
+    //   dormant_active:  days_silent >= 60 AND orders_since_2024 > 0
+    //                    AND NOT legacy                 — winback target
+    //
+    // Buckets are mutually exclusive (legacy takes priority on overlap).
+    const legacyArAll = allCustomers.filter(c => {
+      if (c.ar_balance <= 0) return false
+      if (c.orders_since_2024 === 0) return true
+      if (c.orders_since_2024 <= 1 && c.days_silent >= 90) return true
+      return false
+    })
+    const legacySet = new Set(legacyArAll.map(c => c.card_code))
     const dormantActiveAll = allCustomers.filter(c =>
-      c.days_silent >= 60 && c.orders_since_2024 > 0
-    )
-    const legacyArAll = allCustomers.filter(c =>
-      c.ar_balance > 0 && c.orders_since_2024 === 0
+      c.days_silent >= 60 && c.orders_since_2024 > 0 && !legacySet.has(c.card_code)
     )
 
     // Summary for dormant_active

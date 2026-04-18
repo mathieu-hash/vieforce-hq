@@ -34,10 +34,35 @@ function isNonCustomer(code) {
   return false
 }
 
+/**
+ * Some internal-transfer "customers" were given normal CA-prefixed codes
+ * at SAP setup (e.g. CCPC is CardCode=CA000125). These leak into alerts
+ * even after isNonCustomer(CardCode) passes. Check the CardName against
+ * the same warehouse vocabulary.
+ */
+function isNonCustomerByName(name) {
+  if (!name) return false
+  const n = String(name).toUpperCase().trim()
+  // Exact match against the code list (e.g. "CCPC", "HOREB")
+  if (NON_CUSTOMER_CODES.has(n)) return true
+  // Name starts with a known warehouse token + separator
+  for (const c of NON_CUSTOMER_CODES) {
+    if (n === c) return true
+    if (n.startsWith(c + ' ') || n.startsWith(c + '-') || n.startsWith(c + '_')) return true
+  }
+  return false
+}
+
+/** True if either the CardCode or CardName matches a warehouse/internal pattern. */
+function isNonCustomerRow(code, name) {
+  return isNonCustomer(code) || isNonCustomerByName(name)
+}
+
 // Filter an array of row-like objects using a code extractor.
-function excludeNonCustomers(rows, keyFn) {
+function excludeNonCustomers(rows, keyFn, nameFn) {
   const k = keyFn || (r => r.card_code || r.CardCode || r.customer_code || r.code)
-  return rows.filter(r => !isNonCustomer(k(r)))
+  const n = nameFn || (r => r.name || r.CardName || r.customer_name || r.customer)
+  return rows.filter(r => !isNonCustomerRow(k(r), n(r)))
 }
 
 // Merge any additional codes (typically from `SELECT WhsCode FROM OWHS`) into
@@ -60,6 +85,8 @@ function sqlNotInClause(column) {
 module.exports = {
   NON_CUSTOMER_CODES,
   isNonCustomer,
+  isNonCustomerByName,
+  isNonCustomerRow,
   excludeNonCustomers,
   mergeDynamicWhsCodes,
   sqlNotInClause

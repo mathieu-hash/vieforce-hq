@@ -1,7 +1,7 @@
 const { query } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
-const { isNonCustomer } = require('./lib/non-customer-codes')
+const { isNonCustomerRow } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 
 module.exports = async (req, res) => {
@@ -56,8 +56,8 @@ module.exports = async (req, res) => {
       ORDER BY gp_pct ASC
     `, { dateFrom, dateTo })
 
-    // Drop warehouse/internal-transfer codes before classifying
-    const custMarginClean = custMargin.filter(c => !isNonCustomer(c.code))
+    // Drop warehouse/internal-transfer codes/names before classifying
+    const custMarginClean = custMargin.filter(c => !isNonCustomerRow(c.code, c.customer))
 
     // Classify customers (operate on cleaned list)
     const criticalRaw = custMarginClean.filter(c => c.gp_pct < 0)
