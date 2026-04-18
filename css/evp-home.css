@@ -385,8 +385,18 @@
   /* Hide anything marked desktop-only */
   body.role-evp .desktop-only{display:none !important}
 
-  /* Prevent body scroll when sheet is open (iOS rubber-band bleed) */
-  body.evp-sheet-open{overflow:hidden;position:relative}
+  /* Body must stay scrollable on mobile EVP (iOS momentum scrolling) */
+  body.role-evp,
+  html:has(body.role-evp){
+    overflow-y:auto;
+    min-height:100vh;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  /* Scroll lock ONLY while the More sheet is actually open.
+     Scoped to role-evp so it can never leak to other app states.
+     Released inline + via releaseScrollLock() in JS. */
+  body.role-evp.evp-sheet-open{overflow:hidden;touch-action:none}
 }
 
 /* Desktop role-evp: never show global EVP widgets (they're mobile-only) */

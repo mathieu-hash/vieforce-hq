@@ -3820,6 +3820,9 @@ var pageTitles = {
 };
 
 function navTo(id, navItem){
+  // Release any stuck body-scroll lock from a previously-open sheet so
+  // navigating between pages never leaves iOS Safari in a scroll-frozen state.
+  if(typeof releaseScrollLock==='function') releaseScrollLock();
   document.querySelectorAll('.page').forEach(function(p){
     p.classList.remove('active');
     p.style.display = '';   // clear any inline display so .page/.page.active CSS rules apply cleanly
