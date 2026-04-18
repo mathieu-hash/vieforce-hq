@@ -1,7 +1,7 @@
 const { query } = require('./_db')
 const { verifySession } = require('./_auth')
 const cache = require('../lib/cache')
-const { isNonCustomer } = require('./lib/non-customer-codes')
+const { isNonCustomerRow } = require('./lib/non-customer-codes')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
     `, { q: clean })
 
     const results = rows
-      .filter(r => !isNonCustomer(r.CardCode))
+      .filter(r => !isNonCustomerRow(r.CardCode, r.CardName))
       .map(r => ({
         code:       r.CardCode,
         name:       r.CardName,
