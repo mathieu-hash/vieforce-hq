@@ -19,7 +19,7 @@ app.use(cors({
     callback(new Error('CORS not allowed from ' + origin));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['x-session-id', 'content-type']
+  allowedHeaders: ['x-session-id', 'authorization', 'content-type']
 }))
 
 app.use(express.json())

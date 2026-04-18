@@ -1,16 +1,16 @@
 const { query, queryBoth, queryDateRange } = require('./_db')
-const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
+const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
-  const session = await verifySession(req)
+  // Auth — try service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   // Cache check
