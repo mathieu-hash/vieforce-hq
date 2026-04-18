@@ -12,6 +12,7 @@
 <meta name="theme-color" content="#00293A">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/evp-home.css">
+<link rel="stylesheet" href="/css/dsm-home.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -1003,6 +1004,9 @@ body{
       <div class="nav-item" id="nav-evp" onclick="navTo('pg-evp-home',this)" style="display:none">
         <span class="nav-icon">👔</span><span class="nav-label">EVP Dashboard</span>
       </div>
+      <div class="nav-item" id="nav-dsm" onclick="navTo('pg-dsm-home',this)" style="display:none">
+        <span class="nav-icon">📊</span><span class="nav-label">DSM Dashboard</span>
+      </div>
       <div class="nav-item active" onclick="navTo('pg-home',this)">
         <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
       </div>
@@ -1472,6 +1476,103 @@ body{
           </div>
 
           <div style="height:80px"></div>
+        </div>
+      </div>
+
+      <!-- ===== DSM MOBILE HOME ===== -->
+      <div class="page" id="pg-dsm-home">
+        <div class="dsm-shell">
+
+          <!-- Mobile header -->
+          <div class="dsm-hdr">
+            <div class="dsm-hdr-info">
+              <div class="dsm-hdr-name" id="dsm-hdr-name">—</div>
+              <div class="dsm-hdr-sub"  id="dsm-hdr-sub">DSM · loading…</div>
+            </div>
+            <div class="dsm-hdr-badge">📊 DSM</div>
+          </div>
+
+          <!-- Attention strip -->
+          <div class="dsm-alert" id="dsm-alert" style="display:none"></div>
+
+          <!-- KPI Hero -->
+          <div class="dsm-hero">
+            <div class="dsm-hero-label">💰 DISTRIBUTOR SALES · MTD</div>
+            <div class="dsm-hero-value" id="dsm-hero-value">—</div>
+            <div class="dsm-hero-trend" id="dsm-hero-trend">— vs PP</div>
+            <div class="dsm-hero-targets" id="dsm-hero-targets">
+              <span id="dsm-hero-ach">—</span> of <span id="dsm-hero-target">—</span>  ·  <span id="dsm-hero-pct">—</span>
+            </div>
+            <div class="dsm-hero-bar"><div class="dsm-hero-bar-fill" id="dsm-hero-bar"></div></div>
+          </div>
+
+          <!-- 2×2 KPI grid -->
+          <div class="dsm-kpi-grid">
+            <div class="dsm-kpi" onclick="navTo('pg-customers')">
+              <div class="dsm-kpi-icon">🏪</div>
+              <div class="dsm-kpi-val" id="dsm-kpi-dist">—</div>
+              <div class="dsm-kpi-lbl">Distributors</div>
+            </div>
+            <div class="dsm-kpi">
+              <div class="dsm-kpi-icon">🏃</div>
+              <div class="dsm-kpi-val" id="dsm-kpi-tsr">—</div>
+              <div class="dsm-kpi-lbl">Active TSRs today</div>
+            </div>
+            <div class="dsm-kpi" onclick="navTo('pg-ar')">
+              <div class="dsm-kpi-icon">💳</div>
+              <div class="dsm-kpi-val" id="dsm-kpi-ar">—</div>
+              <div class="dsm-kpi-lbl">AR overdue</div>
+            </div>
+            <div class="dsm-kpi">
+              <div class="dsm-kpi-icon">🎯</div>
+              <div class="dsm-kpi-val" id="dsm-kpi-conv">—</div>
+              <div class="dsm-kpi-lbl">Conversions · MTD</div>
+            </div>
+          </div>
+
+          <!-- Distributors (SAP) -->
+          <div class="dsm-card">
+            <div class="dsm-card-hdr">
+              <div class="dsm-card-title">🏢 My Distributors</div>
+              <div class="dsm-card-cta" onclick="navTo('pg-customers')">View all →</div>
+            </div>
+            <div class="dsm-distributor-list" id="dsm-dist-list">
+              <div class="dsm-empty">Loading…</div>
+            </div>
+          </div>
+
+          <!-- TSR team (Patrol) -->
+          <div class="dsm-card">
+            <div class="dsm-card-hdr">
+              <div class="dsm-card-title">👥 My TSRs</div>
+              <div class="dsm-card-cta" onclick="openPatrolApp()">Open Patrol →</div>
+            </div>
+            <div class="dsm-tsr-list" id="dsm-tsr-list">
+              <div class="dsm-empty">Loading…</div>
+            </div>
+          </div>
+
+          <!-- Coaching moments -->
+          <div class="dsm-card dsm-coaching">
+            <div class="dsm-card-hdr">
+              <div class="dsm-card-title">🎯 Coaching Moments</div>
+            </div>
+            <div id="dsm-coaching-body">
+              <div class="dsm-empty">No coaching needed — all TSRs on track.</div>
+            </div>
+          </div>
+
+          <!-- Critical alerts -->
+          <div class="dsm-card dsm-critical">
+            <div class="dsm-card-hdr">
+              <div class="dsm-card-title">🚨 Critical Today</div>
+            </div>
+            <div id="dsm-critical-body">
+              <div class="dsm-empty">All clear.</div>
+            </div>
+          </div>
+
+          <div style="height:100px"></div>
         </div>
       </div>
 
@@ -3460,6 +3561,7 @@ body{
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
 <script src="js/evp-home.js"></script>
+<script src="js/dsm-home.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -3488,13 +3590,46 @@ function initApp(s) {
   //   everyone else              → pg-home
   var _r = (s.role||'').toLowerCase();
   var _isExec   = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
+  var _isDsm    = (_r==='dsm');
   var _isMobile = window.innerWidth < 900;
-  console.log('[EVP] role routing:', _r, '→ isExec:', _isExec, '· isMobile:', _isMobile);
+  console.log('[ROLE] routing:', _r, '→ isExec:', _isExec, '· isDsm:', _isDsm, '· isMobile:', _isMobile);
 
   if(_isExec){
     document.body.classList.add('role-evp');
     var _navEvp = document.getElementById('nav-evp');
     if(_navEvp) _navEvp.style.display = '';   // reveal the EVP Dashboard sidebar link
+  }
+
+  if(_isDsm){
+    document.body.classList.add('role-dsm');
+    var _navDsm = document.getElementById('nav-dsm');
+    if(_navDsm) _navDsm.style.display = '';   // reveal the DSM Dashboard sidebar link
+  }
+
+  if(_isDsm && _isMobile){
+    // Mobile DSM → land on DSM home directly, hide all other pages
+    var _allPagesDsm = document.querySelectorAll('.page');
+    for(var _j=0;_j<_allPagesDsm.length;_j++){
+      _allPagesDsm[_j].classList.remove('active');
+      _allPagesDsm[_j].style.display = 'none';
+    }
+    var _dsmPage = document.getElementById('pg-dsm-home');
+    if(_dsmPage){ _dsmPage.classList.add('active'); _dsmPage.style.display = 'block'; }
+    var _navDsm2 = document.getElementById('nav-dsm');
+    if(_navDsm2){
+      document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+      _navDsm2.classList.add('active');
+    }
+    if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'DSM';
+    if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'District Overview';
+    PG = 'pg-dsm-home';
+    document.body.classList.add('on-dsm-home');
+    if(typeof updateDsmNavActive==='function') updateDsmNavActive('pg-dsm-home');
+    if(typeof loadDsmHome==='function') { try { loadDsmHome(); } catch(e){ console.error('[DSM] loadDsmHome failed:', e); } }
+    setTimeout(injectExportButtons, 400);
+    setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
+    stampRefresh();
+    return;   // skip the EVP / pg-home branches below
   }
 
   if(_isExec && _isMobile){
@@ -3669,6 +3804,7 @@ function injectExportButtons(){
 /* ===== NAV ===== */
 var pageTitles = {
   'pg-evp-home':['EVP','Executive Overview'],
+  'pg-dsm-home':['DSM','District Overview'],
   'pg-home':['Dashboard','National Overview'],
   'pg-sales':['Sales','Rankings & Trends'],
   'pg-ar':['Accounts Receivable','National · Live'],
@@ -3777,8 +3913,11 @@ function doSearch(){var q=document.getElementById('global-search').value.trim();
 
 /* ===== LOAD ROUTER ===== */
 function loadPage(id){
+  // Keep bottom-nav active state in sync for DSM mobile
+  if(typeof updateDsmNavActive==='function') updateDsmNavActive(id);
   switch(id){
     case 'pg-evp-home': if(typeof loadEvpHome==='function') loadEvpHome(); break;
+    case 'pg-dsm-home': if(typeof loadDsmHome==='function') loadDsmHome(); break;
     case 'pg-home': loadHome(); break;
     case 'pg-sales': loadSales(); break;
     case 'pg-ar': loadAR(); break;
@@ -7615,6 +7754,46 @@ setTimeout(renderInvFilterBar, 400);
   <div class="evp-nav-item" data-evp-nav="more" onclick="openEvpMore()">
     <span class="evp-nav-ico">≡</span>
     <span class="evp-nav-lbl">More</span>
+  </div>
+</div>
+
+<!-- ===== DSM GLOBAL MOBILE UI (visible only when body.role-dsm + mobile) ===== -->
+<div id="dsm-mobile-nav-global" class="dsm-mobile-nav dsm-mobile-nav-global">
+  <div class="dsm-nav-item" data-dsm-nav="pg-dsm-home" onclick="navTo('pg-dsm-home')">
+    <span class="dsm-nav-ico">📊</span>
+    <span class="dsm-nav-lbl">Home</span>
+  </div>
+  <div class="dsm-nav-item" data-dsm-nav="pg-ar" onclick="navTo('pg-ar')">
+    <span class="dsm-nav-ico">💰</span>
+    <span class="dsm-nav-lbl">AR</span>
+  </div>
+  <div class="dsm-nav-item" data-dsm-nav="patrol" onclick="openPatrolApp()">
+    <span class="dsm-nav-ico">🏃</span>
+    <span class="dsm-nav-lbl">Patrol</span>
+  </div>
+  <div class="dsm-nav-item" data-dsm-nav="pg-customers" onclick="navTo('pg-customers')">
+    <span class="dsm-nav-ico">🏢</span>
+    <span class="dsm-nav-lbl">Clients</span>
+  </div>
+  <div class="dsm-nav-item" data-dsm-nav="more" onclick="openDsmMore()">
+    <span class="dsm-nav-ico">≡</span>
+    <span class="dsm-nav-lbl">More</span>
+  </div>
+</div>
+
+<div id="dsm-sheet-backdrop" onclick="closeDsmSheet()"></div>
+<div id="dsm-more-sheet" class="dsm-sheet" role="dialog" aria-label="More menu">
+  <div class="dsm-sheet-handle"></div>
+  <div class="dsm-sheet-title">More</div>
+  <div class="dsm-sheet-items">
+    <div class="dsm-sheet-item" onclick="navTo('pg-home');closeDsmSheet()">🏠 National Dashboard</div>
+    <div class="dsm-sheet-item" onclick="navTo('pg-sales');closeDsmSheet()">📊 Sales Detail</div>
+    <div class="dsm-sheet-item" onclick="navTo('pg-inv');closeDsmSheet()">📦 Inventory</div>
+    <div class="dsm-sheet-item" onclick="navTo('pg-speed');closeDsmSheet()">⚡ Speed Monitor</div>
+    <div class="dsm-sheet-item" onclick="navTo('pg-insights');closeDsmSheet()">🧠 Customer Intelligence</div>
+    <div class="dsm-sheet-item" onclick="navTo('pg-itemized');closeDsmSheet()">🗂 Itemized Sales</div>
+    <hr class="dsm-sheet-divider">
+    <div class="dsm-sheet-item" onclick="logout()">🚪 Logout</div>
   </div>
 </div>
 

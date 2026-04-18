@@ -76,3 +76,4 @@ async function apiPost(endpoint, body) {
 function silenceAlert(payload)   { return apiPost('silence',   payload); }
 function unsilenceAlert(payload) { return apiPost('unsilence', payload); }
 function getSilenced()           { return apiFetch('silenced'); }
+function getDsmHome()            { return apiFetch('dsm/home'); }
