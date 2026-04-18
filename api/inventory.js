@@ -145,6 +145,59 @@ module.exports = async (req, res) => {
         AND UPPER(IW.ItemCode) LIKE 'FG%'
     `)
 
+    // --- ON PRODUCTION (from OWOR work orders, Status = 'R' = Released/in-progress) ---
+    // OWOR.Warehouse is the target warehouse where FG will be deposited.
+    // bags_in_production = PlannedQty - CmpltQty for each open work order.
+    // Status: P=Planned (not yet started), R=Released (active), L=Closed, C=Cancelled.
+    // We count only 'R' (actively running). If Mat wants to include 'P' (Planned), flip below.
+    const production = await query(`
+      SELECT
+        W.Warehouse                                        AS plant_code,
+        ISNULL(SUM(W.PlannedQty - W.CmpltQty), 0)          AS bags_in_production,
+        ISNULL(SUM((W.PlannedQty - W.CmpltQty) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt_in_production
+      FROM OWOR W
+      LEFT JOIN OITM I ON W.ItemCode = I.ItemCode
+      WHERE W.Status = 'R'
+        AND UPPER(W.ItemCode) LIKE 'FG%'
+        AND W.PlannedQty > W.CmpltQty
+      GROUP BY W.Warehouse
+    `).catch(e => { console.warn('[inventory] OWOR query failed:', e.message); return [] })
+
+    const prodMap = {}
+    for (const row of production) {
+      prodMap[row.plant_code] = {
+        bags: Number(row.bags_in_production || 0),
+        mt:   Number(row.mt_in_production || 0)
+      }
+    }
+    // Merge production into each plant row
+    for (const p of plants) {
+      const prod = prodMap[p.plant_code] || { bags: 0, mt: 0 }
+      p.in_production_bags = Math.round(prod.bags)
+      p.in_production_mt   = Math.round(prod.mt * 10) / 10
+    }
+    // Merge production into by_region
+    const regionOf = (wh) => {
+      if (['AC','ACEXT','BAC'].includes(wh)) return 'Luzon'
+      if (['HOREB','ARGAO','ALAE'].includes(wh)) return 'Visayas'
+      if (['BUKID','CCPC'].includes(wh)) return 'Mindanao'
+      return 'Other'
+    }
+    const regionProdMap = {}
+    for (const [wh, v] of Object.entries(prodMap)) {
+      const r = regionOf(wh)
+      regionProdMap[r] = regionProdMap[r] || { bags: 0, mt: 0 }
+      regionProdMap[r].bags += v.bags
+      regionProdMap[r].mt   += v.mt
+    }
+    for (const r of by_region) {
+      const prod = regionProdMap[r.region] || { bags: 0, mt: 0 }
+      r.in_production_bags = Math.round(prod.bags)
+      r.in_production_mt   = Math.round(prod.mt * 10) / 10
+    }
+    const totalInProductionBags = Object.values(prodMap).reduce((s, v) => s + v.bags, 0)
+    const totalInProductionMt   = Object.values(prodMap).reduce((s, v) => s + v.mt, 0)
+
     // --- Cover days (national: total on-hand / avg daily shipment last 30d) ---
     const dailyShip = await query(`
       SELECT
@@ -164,18 +217,23 @@ module.exports = async (req, res) => {
     const nationalCoverDays = Math.round(totalOnHand / avgDaily)
     const plantsNegative = plants.filter(p => Number(p.available_bags || 0) < 0).length
 
+    // Grand-total available clamps to 0 (can't sell less than nothing on aggregate).
+    // Per-plant / per-region keep negatives — they're actionable shortage signals.
+    const aggAvailBags = Math.max(0, Math.round(totalAvailBags))
+    const aggAvailMt   = Math.max(0, Math.round(plants.reduce((s, p) => s + Number(p.total_available || 0), 0) * 10) / 10)
     const summary = {
       // Bags (the UI's default display unit)
       on_floor:        Math.round(totalOnHandBags),
       pending_po:      Math.round(totalPoBags),
-      on_production:   0,                         // Not modelled in SAP B1 standard — TODO via production order query
-      available:       Math.round(totalAvailBags),
+      on_production:   Math.round(totalInProductionBags),
+      available:       aggAvailBags,
       cover_days:      nationalCoverDays,
       negative_avail_count: plantsNegative,
       // MT equivalents for unit toggle
       on_floor_mt:     Math.round(totalOnHand * 10) / 10,
       pending_po_mt:   Math.round(plants.reduce((s, p) => s + Number(p.total_on_order || 0), 0) * 10) / 10,
-      available_mt:    Math.round(plants.reduce((s, p) => s + Number(p.total_available || 0), 0) * 10) / 10
+      on_production_mt:Math.round(totalInProductionMt * 10) / 10,
+      available_mt:    aggAvailMt
     }
 
     const result = {
