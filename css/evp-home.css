@@ -269,3 +269,130 @@
 }
 [data-theme="light"] .evp-card-title{color:#1A1A1A}
 [data-theme="light"] .evp-pnl-value{color:#1A1A1A}
+
+/* ============================================================================
+   EVP GLOBAL MOBILE UI — bottom nav visible on EVERY page, back button,
+   More sheet, and responsive rules that flatten HQ pages for iPhone.
+   Only active when body.role-evp is set AND viewport is mobile (<900px).
+   ============================================================================ */
+
+/* --- Default (desktop or non-evp): hide all global EVP widgets --- */
+#evp-back-btn,
+.evp-mobile-nav-global,
+#evp-more-sheet,
+#evp-sheet-backdrop{display:none}
+
+/* --- Back-to-EVP floating button --- */
+#evp-back-btn{
+  position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;z-index:1000;
+  background:rgba(0,38,58,0.95);color:#fff;
+  border:1px solid rgba(255,199,44,0.4);
+  padding:8px 14px;border-radius:100px;
+  font-weight:700;font-size:12px;letter-spacing:0.2px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  cursor:pointer;font-family:'Inter',-apple-system,system-ui,sans-serif;
+}
+#evp-back-btn:active{transform:scale(0.96);background:rgba(255,199,44,0.95);color:#00263A}
+
+/* --- Bottom sheet (for More menu) --- */
+#evp-sheet-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;
+  opacity:0;transition:opacity 0.25s ease;
+}
+#evp-sheet-backdrop.open{opacity:1}
+.evp-sheet{
+  position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(180deg,#1F2F5C,#152849);
+  border-radius:20px 20px 0 0;
+  padding:8px 16px max(20px,env(safe-area-inset-bottom));
+  z-index:200;max-height:75vh;overflow-y:auto;
+  font-family:'Inter',-apple-system,system-ui,sans-serif;
+  transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow:0 -8px 24px rgba(0,0,0,0.4);
+}
+.evp-sheet.open{transform:translateY(0)}
+.evp-sheet-handle{
+  width:40px;height:4px;background:rgba(255,255,255,0.3);
+  border-radius:2px;margin:8px auto 12px;
+}
+.evp-sheet-title{color:#fff;font-size:18px;font-weight:800;margin-bottom:14px;letter-spacing:-0.3px}
+.evp-sheet-items{display:flex;flex-direction:column}
+.evp-sheet-item{
+  color:#fff;padding:14px;border-radius:10px;
+  font-size:15px;font-weight:600;cursor:pointer;
+  transition:background 0.15s;
+}
+.evp-sheet-item:active{background:rgba(255,255,255,0.08);transform:scale(0.995)}
+.evp-sheet-divider{
+  border:none;border-top:1px solid rgba(255,255,255,0.08);margin:8px 0;
+}
+
+/* --- Mobile overrides (<900px) + body.role-evp --- */
+@media (max-width:899px){
+  /* Show the global EVP widgets */
+  body.role-evp #evp-back-btn             { display:block; }
+  body.role-evp.on-evp-home #evp-back-btn { display:none; }   /* hide on EVP home itself */
+  body.role-evp #evp-mobile-nav-global    { display:flex !important; }
+  body.role-evp #evp-more-sheet           { display:block; }   /* rendered but translated off-screen */
+  body.role-evp #evp-sheet-backdrop       { display:block; opacity:0; pointer-events:none; }
+  body.role-evp #evp-sheet-backdrop.open  { pointer-events:auto; }
+
+  /* Hide the page-embedded mobile nav clone (only the global one should be visible) */
+  body.role-evp #pg-evp-home > .evp-mobile-nav:not(.evp-mobile-nav-global){ display:none; }
+
+  /* Hide HQ sidebar + topbar when role-evp on mobile (EVP uses its own shell) */
+  body.role-evp .sidebar,
+  body.role-evp .topbar{display:none !important}
+  body.role-evp .shell{display:block;height:auto}
+  body.role-evp .content{padding:0;overflow-y:visible;flex:unset}
+
+  /* Pages get uniform padding + bottom-nav clearance */
+  body.role-evp .page{padding:12px;padding-bottom:88px;min-height:100vh}
+  body.role-evp #pg-evp-home{padding:0}   /* EVP home manages its own padding via .evp-shell */
+
+  /* Tables: allow horizontal scroll rather than crashing layout */
+  body.role-evp .page table,
+  body.role-evp .page .tbl{
+    display:block;overflow-x:auto;white-space:nowrap;
+    -webkit-overflow-scrolling:touch;font-size:12px;max-width:100%;
+  }
+
+  /* Collapse multi-column grids to 2-up or 1-up */
+  body.role-evp .page [style*="grid-template-columns:repeat(7"],
+  body.role-evp .page [style*="grid-template-columns:repeat(6"],
+  body.role-evp .page [style*="grid-template-columns:repeat(5"],
+  body.role-evp .page [style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:repeat(2,1fr) !important;gap:8px !important;
+  }
+  body.role-evp .page [style*="grid-template-columns:repeat(3"]{
+    grid-template-columns:repeat(2,1fr) !important;gap:8px !important;
+  }
+  /* Generic 2-col splits stack */
+  body.role-evp .page [style*="grid-template-columns:1fr 1.4fr"],
+  body.role-evp .page [style*="grid-template-columns:1fr 1fr"],
+  body.role-evp .page .two-col,
+  body.role-evp .page .split-grid{
+    grid-template-columns:1fr !important;gap:12px !important;
+  }
+
+  /* KPI card font shrink so big numbers fit on small screens */
+  body.role-evp .page .kpi-val{font-size:16px !important}
+  body.role-evp .page .kpi-label{font-size:9px !important}
+  body.role-evp .page .card-hdr{padding:10px 12px !important}
+  body.role-evp .page .card-body{padding:10px 12px !important}
+
+  /* Hide anything marked desktop-only */
+  body.role-evp .desktop-only{display:none !important}
+
+  /* Prevent body scroll when sheet is open (iOS rubber-band bleed) */
+  body.evp-sheet-open{overflow:hidden;position:relative}
+}
+
+/* Desktop role-evp: never show global EVP widgets (they're mobile-only) */
+@media (min-width:900px){
+  body.role-evp #evp-back-btn,
+  body.role-evp #evp-mobile-nav-global,
+  body.role-evp #evp-more-sheet,
+  body.role-evp #evp-sheet-backdrop{display:none !important}
+}

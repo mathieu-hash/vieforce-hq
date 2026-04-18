@@ -1473,30 +1473,6 @@ body{
 
           <div style="height:80px"></div>
         </div>
-
-        <!-- Mobile bottom nav -->
-        <div class="evp-mobile-nav">
-          <div class="evp-nav-item active" onclick="navTo('pg-evp-home')">
-            <span class="evp-nav-ico">📊</span>
-            <span class="evp-nav-lbl">Home</span>
-          </div>
-          <div class="evp-nav-item" onclick="navTo('pg-budget')">
-            <span class="evp-nav-ico">💰</span>
-            <span class="evp-nav-lbl">P&amp;L</span>
-          </div>
-          <div class="evp-nav-item" onclick="navTo('pg-margin')">
-            <span class="evp-nav-ico">🔒</span>
-            <span class="evp-nav-lbl">Margin</span>
-          </div>
-          <div class="evp-nav-item" onclick="navTo('pg-team')">
-            <span class="evp-nav-ico">🏆</span>
-            <span class="evp-nav-lbl">Team</span>
-          </div>
-          <div class="evp-nav-item" onclick="openEvpMore()">
-            <span class="evp-nav-ico">≡</span>
-            <span class="evp-nav-lbl">More</span>
-          </div>
-        </div>
       </div>
 
       <!-- ===== SALES ===== -->
@@ -3541,6 +3517,8 @@ function initApp(s) {
     if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'EVP';
     if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'Executive Overview';
     PG = 'pg-evp-home';
+    document.body.classList.add('on-evp-home');
+    if(typeof updateEvpNavActive==='function') updateEvpNavActive('pg-evp-home');
     if(typeof loadEvpHome==='function') { try { loadEvpHome(); } catch(e){ console.error('[EVP] loadEvpHome failed:', e); } }
   } else {
     // Desktop or non-exec → National Dashboard. Both pg-home and pg-evp-home remain
@@ -3728,7 +3706,12 @@ function navTo(id, navItem){
   document.getElementById('topbar-title').textContent = titles[0];
   document.getElementById('topbar-sub').textContent = titles[1];
   document.querySelector('.content').scrollTop = 0;
+  window.scrollTo(0, 0);   // mobile: reset viewport scroll too
   PG = id;
+  // EVP hooks — toggle body.on-evp-home (gates back-button visibility) + sync bottom nav
+  if(id === 'pg-evp-home') document.body.classList.add('on-evp-home');
+  else                     document.body.classList.remove('on-evp-home');
+  if(typeof updateEvpNavActive === 'function') updateEvpNavActive(id);
   loadPage(id);
 }
 
@@ -7606,5 +7589,52 @@ loadInvFromHash();
 setTimeout(renderInvFilterBar, 400);
 
 </script>
+
+<!-- ===== EVP GLOBAL MOBILE UI (visible only when body.role-evp + mobile) ===== -->
+<button id="evp-back-btn" type="button" onclick="navTo('pg-evp-home')" aria-label="Back to EVP Home">
+  ← Back to EVP
+</button>
+
+<div id="evp-mobile-nav-global" class="evp-mobile-nav evp-mobile-nav-global">
+  <div class="evp-nav-item" data-evp-nav="pg-evp-home" onclick="navTo('pg-evp-home')">
+    <span class="evp-nav-ico">📊</span>
+    <span class="evp-nav-lbl">Home</span>
+  </div>
+  <div class="evp-nav-item" data-evp-nav="pg-budget" onclick="navTo('pg-budget')">
+    <span class="evp-nav-ico">💰</span>
+    <span class="evp-nav-lbl">P&amp;L</span>
+  </div>
+  <div class="evp-nav-item" data-evp-nav="pg-margin" onclick="navTo('pg-margin')">
+    <span class="evp-nav-ico">🔒</span>
+    <span class="evp-nav-lbl">Margin</span>
+  </div>
+  <div class="evp-nav-item" data-evp-nav="pg-team" onclick="navTo('pg-team')">
+    <span class="evp-nav-ico">🏆</span>
+    <span class="evp-nav-lbl">Team</span>
+  </div>
+  <div class="evp-nav-item" data-evp-nav="more" onclick="openEvpMore()">
+    <span class="evp-nav-ico">≡</span>
+    <span class="evp-nav-lbl">More</span>
+  </div>
+</div>
+
+<div id="evp-sheet-backdrop" onclick="closeEvpSheet()"></div>
+<div id="evp-more-sheet" class="evp-sheet" role="dialog" aria-label="More menu">
+  <div class="evp-sheet-handle"></div>
+  <div class="evp-sheet-title">More</div>
+  <div class="evp-sheet-items">
+    <div class="evp-sheet-item" onclick="navTo('pg-home');closeEvpSheet()">🏠 National Dashboard</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-sales');closeEvpSheet()">📊 Sales Detail</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-ar');closeEvpSheet()">💰 Accounts Receivable</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-inv');closeEvpSheet()">📦 Inventory</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-speed');closeEvpSheet()">⚡ Speed Monitor</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-customers');closeEvpSheet()">🏢 Customers</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-insights');closeEvpSheet()">🧠 Customer Intelligence</div>
+    <div class="evp-sheet-item" onclick="navTo('pg-itemized');closeEvpSheet()">🗂 Itemized Sales</div>
+    <hr class="evp-sheet-divider">
+    <div class="evp-sheet-item" onclick="logout()">🚪 Logout</div>
+  </div>
+</div>
+
 </body>
 </html>
