@@ -13,7 +13,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
@@ -427,8 +429,89 @@ body{
   display:flex;align-items:center;gap:6px;
   padding:6px 14px;border-radius:var(--r);
   background:var(--bg3);border:1px solid var(--divider);
-  transition:all 0.25s;
+  transition:all 0.25s;position:relative;
 }
+/* Global search dropdown */
+.gs-dropdown{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:360px;
+  background:var(--surface-solid);border:1px solid var(--divider);
+  border-radius:var(--r);box-shadow:0 12px 40px rgba(0,0,0,0.45);
+  max-height:420px;overflow-y:auto;z-index:9999;
+  display:none;
+}
+.gs-dropdown.open{display:block}
+.gs-row{
+  padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);
+  transition:background 0.15s;
+}
+.gs-row:last-child{border-bottom:none}
+.gs-row:hover,.gs-row.active{background:rgba(0,174,239,0.08)}
+.gs-row-name{font-size:12px;font-weight:700;color:var(--text);letter-spacing:-0.1px}
+.gs-row-name mark{background:rgba(0,174,239,0.25);color:var(--blue);padding:0 2px;border-radius:2px}
+.gs-row-sub{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.gs-empty,.gs-loading{padding:18px;text-align:center;color:var(--text3);font-size:11px}
+.gs-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--text4);border-top-color:var(--blue);border-radius:50%;animation:gs-spin 0.6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes gs-spin{to{transform:rotate(360deg)}}
+
+/* ===== SOA MODAL ===== */
+.soa-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  z-index:10000;display:none;align-items:center;justify-content:center;
+  animation:soa-fade 0.2s ease-out;
+}
+.soa-backdrop.open{display:flex}
+@keyframes soa-fade{from{opacity:0}to{opacity:1}}
+.soa-modal{
+  background:var(--surface-solid);border:1px solid var(--glass-border);
+  border-radius:var(--r-lg);width:460px;max-width:90vw;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  animation:soa-pop 0.25s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes soa-pop{from{transform:scale(0.92);opacity:0}to{transform:scale(1);opacity:1}}
+.soa-hdr{padding:20px 24px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center}
+.soa-title{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.3px}
+.soa-sub{font-size:11px;color:var(--text3);margin-top:3px;font-weight:500}
+.soa-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;line-height:1;width:24px;height:24px;border-radius:4px;transition:all 0.15s}
+.soa-close:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+.soa-body{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.soa-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:20px 12px;border-radius:var(--r);
+  background:var(--bg3);border:1px solid var(--divider);
+  cursor:pointer;transition:all 0.2s;font-family:var(--font);
+}
+.soa-btn:hover{border-color:var(--blue);background:rgba(0,174,239,0.06);transform:translateY(-1px)}
+.soa-btn:disabled{opacity:0.5;cursor:wait;transform:none}
+.soa-btn-icon{font-size:28px}
+.soa-btn-label{font-size:12px;font-weight:800;color:var(--text);letter-spacing:-0.2px}
+.soa-btn-sub{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.3px;text-transform:uppercase}
+.soa-status{padding:0 24px 20px;min-height:20px;text-align:center;font-size:11px;color:var(--text3)}
+.soa-status.error{color:var(--red);font-weight:700}
+.soa-status.success{color:var(--green);font-weight:700}
+
+/* ===== INVENTORY DRILL-DOWN ===== */
+.inv-filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;min-height:28px}
+.inv-filter-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 10px;
+  background:rgba(0,174,239,0.1);border:1px solid rgba(0,174,239,0.3);
+  border-radius:20px;font-size:10px;font-weight:700;color:var(--blue);
+  letter-spacing:0.3px;
+}
+.inv-filter-pill button{
+  background:none;border:none;color:var(--blue);font-size:13px;cursor:pointer;
+  padding:0 2px;line-height:1;opacity:0.7;transition:opacity 0.15s;
+}
+.inv-filter-pill button:hover{opacity:1}
+.inv-clear{
+  padding:4px 10px;background:transparent;border:1px solid var(--divider);
+  border-radius:20px;font-size:10px;font-weight:700;color:var(--text3);
+  cursor:pointer;letter-spacing:0.3px;text-transform:uppercase;
+  transition:all 0.15s;font-family:var(--font);
+}
+.inv-clear:hover{border-color:var(--red);color:var(--red)}
+.inv-tbl tr.drill-clickable{cursor:pointer}
+.inv-tbl tr.drill-clickable:hover td{background:rgba(0,174,239,0.04) !important}
+.inv-tbl tr.drill-active td{background:rgba(0,174,239,0.08) !important;box-shadow:inset 3px 0 0 var(--blue)}
 .tb-search:focus-within{border-color:rgba(0,174,239,0.25);box-shadow:0 0 0 3px rgba(0,174,239,0.06)}
 .tb-search-icon{color:var(--text3);font-size:13px}
 .tb-search input{
@@ -1003,8 +1086,10 @@ body{
       </div>
 
       <div class="tb-search">
-        <span class="tb-search-icon">🔍</span>
-        <input placeholder="Search customers, SKUs..." id="global-search" type="text" onkeydown="if(event.key==='Enter')doSearch()">
+        <span class="tb-search-icon" id="gs-icon">🔍</span>
+        <input placeholder="Search customers, SKUs..." id="global-search" type="text" autocomplete="off"
+               oninput="gsOnInput()" onkeydown="gsOnKeydown(event)" onfocus="gsOnFocus()" onblur="gsOnBlur()">
+        <div class="gs-dropdown" id="gs-dropdown"></div>
       </div>
       <div class="tb-clock" id="clock">14:32</div>
       <button class="refresh-btn" id="refresh-btn" onclick="refreshNow()" title="Refresh data">
@@ -1667,6 +1752,8 @@ body{
           <div style="flex:1"></div>
           <div style="font-size:10px;color:var(--text4)" id="inv-last-updated">Loading…</div>
         </div>
+        <!-- DRILL-DOWN FILTER BAR -->
+        <div class="inv-filter-bar" id="inv-filter-bar"></div>
 
         <!-- KPIs -->
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
@@ -2042,7 +2129,7 @@ body{
               <div class="card-hdr">
                 <div class="card-title">AR Aging</div>
                 <div style="display:flex;gap:6px">
-                  <button style="padding:5px 14px;border-radius:20px;border:1px solid rgba(0,174,239,0.25);background:transparent;color:var(--blue);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Issue SOA</button>
+                  <button style="padding:5px 14px;border-radius:20px;border:1px solid rgba(0,174,239,0.25);background:transparent;color:var(--blue);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)" onclick="openSOAModal()">Issue SOA</button>
                   <button style="padding:5px 14px;border-radius:20px;border:1px solid var(--divider);background:transparent;color:var(--text3);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">History</button>
                 </div>
               </div>
@@ -2893,6 +2980,32 @@ body{
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
+
+<!-- ===== SOA MODAL ===== -->
+<div class="soa-backdrop" id="soa-backdrop" onclick="if(event.target===this)closeSOAModal()">
+  <div class="soa-modal" role="dialog" aria-modal="true" aria-labelledby="soa-modal-title">
+    <div class="soa-hdr">
+      <div>
+        <div class="soa-title" id="soa-modal-title">Generate Statement of Account</div>
+        <div class="soa-sub" id="soa-modal-sub">for —</div>
+      </div>
+      <button class="soa-close" onclick="closeSOAModal()" aria-label="Close">×</button>
+    </div>
+    <div class="soa-body">
+      <button class="soa-btn" id="soa-pdf-btn" onclick="generateSOAPDF()">
+        <div class="soa-btn-icon">📄</div>
+        <div class="soa-btn-label">PDF</div>
+        <div class="soa-btn-sub">Professional</div>
+      </button>
+      <button class="soa-btn" id="soa-xlsx-btn" onclick="generateSOAExcel()">
+        <div class="soa-btn-icon">📊</div>
+        <div class="soa-btn-label">Excel</div>
+        <div class="soa-btn-sub">Editable</div>
+      </button>
+    </div>
+    <div class="soa-status" id="soa-status">Real-time AR from SAP · 60s cache</div>
+  </div>
+</div>
 
 <script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
@@ -3754,6 +3867,8 @@ async function loadAR(){
 
 /* ===== INVENTORY — wired to /api/inventory ===== */
 var INV_STATE = { data: null, unit: 'BAGS' }; // bags default
+var INV_FILTER = { region: null, plant: null };  // drill-down state
+var CURRENT_CUSTOMER = { code: null, name: null };  // set by openCust() for Issue SOA
 
 function setInvUnit(el, unit){
   if(el) addClickAnimation(el);
@@ -3836,7 +3951,9 @@ function renderInv(){
       var avail  = isBags ? r.available_bags : r.available;
       totOnHand+=onHand||0; totPo+=po||0; totCom+=com||0; totAvail+=avail||0;
       var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
-      return '<tr><td>'+esc((r.region||'').toUpperCase())+'</td>'
+      var isActive = INV_FILTER.region === r.region;
+      var cls = 'drill-clickable' + (isActive ? ' drill-active' : '');
+      return '<tr class="'+cls+'" onclick="applyInvFilter(\'region\',\''+esc(r.region||'')+'\')"><td>'+esc((r.region||'').toUpperCase())+'</td>'
         + '<td>'+fcn(Math.round(onHand||0))+'</td>'
         + '<td>'+fcn(Math.round(po||0))+'</td>'
         + '<td>'+fcn(Math.round(com||0))+'</td>'
@@ -3850,9 +3967,12 @@ function renderInv(){
     seth('inv-region-tbody', rhtml);
   }
 
-  // --- By Plant (up to 20 plants with volume) ---
+  // --- By Plant (filtered by region if INV_FILTER.region set) ---
   if(d.plants && d.plants.length){
     var plants = d.plants.slice().sort(function(a,b){return (b.on_hand_bags||0)-(a.on_hand_bags||0)});
+    if(INV_FILTER.region){
+      plants = plants.filter(function(p){ return plantRegionOf(p.plant_code) === INV_FILTER.region });
+    }
     var totOH=0, totPO=0, totCM=0, totAV=0;
     var phtml = plants.map(function(p){
       var onHand = isBags ? p.on_hand_bags : p.total_on_hand;
@@ -3861,13 +3981,16 @@ function renderInv(){
       var avail  = isBags ? p.available_bags : p.total_available;
       totOH+=onHand||0; totPO+=po||0; totCM+=com||0; totAV+=avail||0;
       var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
-      return '<tr><td>'+esc(p.plant_code)+'</td>'
+      var isActive = INV_FILTER.plant === p.plant_code;
+      var cls = 'drill-clickable' + (isActive ? ' drill-active' : '');
+      return '<tr class="'+cls+'" onclick="applyInvFilter(\'plant\',\''+esc(p.plant_code)+'\')"><td>'+esc(p.plant_code)+'</td>'
         + '<td>'+fcn(Math.round(onHand||0))+'</td>'
         + '<td>'+fcn(Math.round(po||0))+'</td>'
         + '<td>'+fcn(Math.round(com||0))+'</td>'
         + '<td '+availSty+'>'+fcn(Math.round(avail||0))+'</td></tr>';
     }).join('');
-    phtml += '<tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800">Grand total</td>'
+    if(!phtml) phtml = '<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px;padding:20px">No plants in this region</td></tr>';
+    else phtml += '<tr style="background:rgba(0,174,239,0.04)"><td style="font-weight:800">Subtotal</td>'
       + '<td style="font-weight:700">'+fcn(Math.round(totOH))+'</td>'
       + '<td style="font-weight:700">'+fcn(Math.round(totPO))+'</td>'
       + '<td style="font-weight:700">'+fcn(Math.round(totCM))+'</td>'
@@ -3907,10 +4030,12 @@ function renderInvProducts(){
   var q = (sel('inv-search') || {value:''}).value.toLowerCase().trim();
   var isBags = INV_STATE.unit === 'BAGS';
 
-  // Aggregate by item_code across plants
+  // Aggregate by item_code across plants — honor INV_FILTER
   var byItem = {};
   d.items.forEach(function(it){
     if(q && !(it.item_name||'').toLowerCase().includes(q) && !(it.item_code||'').toLowerCase().includes(q)) return;
+    if(INV_FILTER.plant && it.plant_code !== INV_FILTER.plant) return;
+    if(INV_FILTER.region && plantRegionOf(it.plant_code) !== INV_FILTER.region) return;
     var k = it.item_code;
     if(!byItem[k]) byItem[k] = { item_code:k, item_name:it.item_name, plants:[],
       on_hand_bags:0, on_order_bags:0, committed_bags:0, available_bags:0,
@@ -4171,6 +4296,8 @@ async function openCust(code){
     console.log('[CUSTDETAIL] Rendering:', code, Object.keys(d));
     var pg=sel('pg-custdetail');
     var info = d.info || {};
+    // Track for Issue SOA button
+    CURRENT_CUSTOMER = { code: info.CardCode || code, name: info.CardName || code };
     // Hero — wire explicit IDs
     sett('cd-name', info.CardName || code);
     var metaParts = [info.CardCode, info.City, info.rsm].filter(function(x){return x});
@@ -5695,6 +5822,710 @@ setInterval(tick,1000);tick();
 
 // Init home charts on page load
 setTimeout(function(){initCharts('pg-home')},300);
+
+/* =========================================================================
+   TRACK 2 — SOA generation, Global customer search, Inventory drill-down
+   ========================================================================= */
+
+/* ---------- Vienovo brand palette (shared) ---------- */
+var VN_NAVY  = [0, 74, 100];    // #004A64
+var VN_BLUE  = [0, 174, 239];   // #00AEEF
+var VN_GREEN = [151, 215, 0];   // #97D700
+var VN_GOLD  = [255, 199, 44];  // #FFC72C
+var VN_RED   = [239, 68, 68];
+var VN_ORANGE= [245, 158, 11];
+var VN_GRAY  = [110, 110, 110];
+
+/* ========== SOA MODAL ========== */
+var SOA_CACHE = { id: null, data: null, fetchedAt: 0 };
+
+function openSOAModal(){
+  if(!CURRENT_CUSTOMER.code){ alert('No customer selected. Open a customer detail page first.'); return; }
+  document.getElementById('soa-modal-sub').textContent = 'for ' + (CURRENT_CUSTOMER.name || CURRENT_CUSTOMER.code);
+  document.getElementById('soa-status').textContent = 'Real-time AR from SAP · 60s cache';
+  document.getElementById('soa-status').className = 'soa-status';
+  document.getElementById('soa-pdf-btn').disabled = false;
+  document.getElementById('soa-xlsx-btn').disabled = false;
+  document.getElementById('soa-backdrop').classList.add('open');
+  document.addEventListener('keydown', soaEscHandler);
+}
+function closeSOAModal(){
+  document.getElementById('soa-backdrop').classList.remove('open');
+  document.removeEventListener('keydown', soaEscHandler);
+}
+function soaEscHandler(e){ if(e.key === 'Escape') closeSOAModal(); }
+
+async function fetchSOAData(){
+  var code = CURRENT_CUSTOMER.code;
+  if(!code) throw new Error('No customer selected');
+  // Reuse in-memory cache for 55s (API caches 60s; stay below that)
+  if(SOA_CACHE.id === code && (Date.now() - SOA_CACHE.fetchedAt) < 55000){
+    return SOA_CACHE.data;
+  }
+  var d = await getCustomerSOA({ id: code });
+  if(!d || d.error) throw new Error(d && d.error ? d.error : 'No data');
+  SOA_CACHE = { id: code, data: d, fetchedAt: Date.now() };
+  return d;
+}
+
+function soaFilename(code, name, ext){
+  var clean = (name || code || 'CUSTOMER').toString()
+    .replace(/[^\w\s-]/g,'').replace(/\s+/g,'_').toUpperCase().slice(0, 50);
+  var today = new Date();
+  var ymd = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
+  return 'SOA_' + code + '_' + clean + '_' + ymd + '.' + ext;
+}
+
+function fmtPHP(n){
+  var num = Number(n || 0);
+  return 'PHP ' + num.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtPHPShort(n){
+  var num = Number(n || 0);
+  return num.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtDate(d){
+  if(!d) return '—';
+  var dt = new Date(d);
+  if(isNaN(dt)) return '—';
+  return dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+/* ========== SOA PDF ========== */
+async function generateSOAPDF(){
+  var btn = document.getElementById('soa-pdf-btn');
+  var status = document.getElementById('soa-status');
+  btn.disabled = true;
+  status.className = 'soa-status';
+  status.innerHTML = '<span class="gs-spin"></span> Generating PDF…';
+  var t0 = performance.now();
+  try {
+    if(!window.jspdf || !window.jspdf.jsPDF){
+      throw new Error('jsPDF library not loaded');
+    }
+    var d = await fetchSOAData();
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    buildSOAPDFLayout(doc, d);
+    var fname = soaFilename(d.customer.CardCode, d.customer.CardName, 'pdf');
+    doc.save(fname);
+    var elapsed = Math.round(performance.now() - t0);
+    status.className = 'soa-status success';
+    status.textContent = '✓ PDF downloaded (' + elapsed + 'ms) — ' + fname;
+  } catch(e){
+    console.error('[SOA PDF]', e);
+    status.className = 'soa-status error';
+    status.textContent = '✗ ' + (e.message || 'Failed to generate PDF');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function buildSOAPDFLayout(doc, d){
+  var cust = d.customer, sum = d.summary, aging = d.aging, invoices = d.invoices || [];
+  var pageW = 210, marginL = 14, marginR = 14, contentW = pageW - marginL - marginR;
+
+  // ===== HEADER (Deep Navy band) =====
+  doc.setFillColor.apply(doc, VN_NAVY);
+  doc.rect(0, 0, pageW, 26, 'F');
+  // Left: VPI logo box (placeholder white square) + company name
+  doc.setFillColor(255,255,255);
+  doc.rect(marginL, 6, 14, 14, 'F');
+  doc.setTextColor.apply(doc, VN_NAVY);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('VPI', marginL + 7, 14.5, { align: 'center' });
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('VIENOVO PHILIPPINES INC.', marginL + 20, 13);
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('Animal Feed Manufacturing', marginL + 20, 18);
+  // Right: SOA title + date
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text('STATEMENT OF ACCOUNT', pageW - marginR, 12, { align: 'right' });
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text('As of: ' + fmtDate(new Date()), pageW - marginR, 18, { align: 'right' });
+
+  // ===== CUSTOMER INFO BLOCK =====
+  var y = 34;
+  doc.setTextColor(20,20,20);
+  // Customer name (bold, 12pt)
+  doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text(cust.CardName || cust.CardCode || '—', marginL, y);
+  y += 6;
+  // Two columns
+  var colL = marginL, colR = pageW / 2 + 4;
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  var rowY = y;
+  var leftLines = [
+    ['Code:',         cust.CardCode || '—'],
+    ['Address:',      cust.Address ? (cust.Address + (cust.City ? ', ' + cust.City : '')) : (cust.City || '—')],
+    ['Telephone:',    cust.Phone || '—']
+  ];
+  var rightLines = [
+    ['Sales Rep:',     cust.sales_rep || '—'],
+    ['Credit Terms:',  cust.payment_terms || '—'],
+    ['Credit Limit:',  cust.CreditLimit ? fmtPHP(cust.CreditLimit) : '—'],
+    ['Status:',        cust.account_status || 'Active']
+  ];
+  for (var i = 0; i < Math.max(leftLines.length, rightLines.length); i++) {
+    if (leftLines[i]){
+      doc.setFont('helvetica','bold'); doc.setTextColor(110,110,110);
+      doc.text(leftLines[i][0], colL, rowY);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
+      doc.text(String(leftLines[i][1]), colL + 24, rowY);
+    }
+    if (rightLines[i]){
+      doc.setFont('helvetica','bold'); doc.setTextColor(110,110,110);
+      doc.text(rightLines[i][0], colR, rowY);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
+      doc.text(String(rightLines[i][1]), colR + 26, rowY);
+    }
+    rowY += 5;
+  }
+  y = rowY + 4;
+
+  // ===== SUMMARY STRIP (5 cards) =====
+  var cardW = (contentW - 12) / 5, cardH = 17;
+  var cards = [
+    { lbl: 'TOTAL AR',           val: fmtPHP(sum.total_ar), color: VN_NAVY },
+    { lbl: 'CREDIT USED',        val: sum.credit_used_pct != null ? sum.credit_used_pct.toFixed(1) + '%' : '—',
+      color: sum.credit_used_pct > 95 ? VN_RED : (sum.credit_used_pct > 80 ? VN_GOLD : VN_GREEN) },
+    { lbl: 'DSO',                val: (sum.dso || 0) + ' days', color: sum.dso > 60 ? VN_RED : (sum.dso > 45 ? VN_GOLD : VN_GREEN) },
+    { lbl: 'LAST PAYMENT',       val: fmtDate(sum.last_payment_date), color: VN_NAVY },
+    { lbl: 'LAST PAYMENT AMT.',  val: fmtPHP(sum.last_payment_amount), color: VN_NAVY }
+  ];
+  cards.forEach(function(c, idx){
+    var x = marginL + idx * (cardW + 3);
+    doc.setDrawColor.apply(doc, VN_NAVY); doc.setLineWidth(0.3);
+    doc.rect(x, y, cardW, cardH);
+    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(110,110,110);
+    doc.text(c.lbl, x + 2, y + 4);
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor.apply(doc, c.color);
+    doc.text(c.val, x + 2, y + 11);
+  });
+  y += cardH + 6;
+
+  // ===== AGING TABLE =====
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
+  doc.text('AGING BREAKDOWN', marginL, y);
+  y += 3;
+  var agingCols = [
+    { lbl: 'Current',  v: aging.current,  p: aging.current_pct },
+    { lbl: '1–30 d',   v: aging.d1_30,    p: aging.d1_30_pct },
+    { lbl: '31–60 d',  v: aging.d31_60,   p: aging.d31_60_pct },
+    { lbl: '61–90 d',  v: aging.d61_90,   p: aging.d61_90_pct },
+    { lbl: '91–120 d', v: aging.d91_120,  p: aging.d91_120_pct },
+    { lbl: '121–365',  v: aging.d121_365, p: aging.d121_365_pct },
+    { lbl: 'Over 1Y',  v: aging.over_1y,  p: aging.over_1y_pct }
+  ];
+  var agingColW = contentW / agingCols.length;
+  // Header row
+  doc.setFillColor.apply(doc, VN_NAVY);
+  doc.rect(marginL, y, contentW, 6, 'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+  agingCols.forEach(function(c, i){
+    doc.text(c.lbl, marginL + i * agingColW + agingColW / 2, y + 4, { align: 'center' });
+  });
+  y += 6;
+  // Amount row
+  doc.setFillColor(245,245,245);
+  doc.rect(marginL, y, contentW, 6, 'F');
+  doc.setTextColor(20,20,20); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  agingCols.forEach(function(c, i){
+    doc.text(fmtPHPShort(c.v), marginL + i * agingColW + agingColW - 2, y + 4, { align: 'right' });
+  });
+  y += 6;
+  // Percentage row
+  doc.setTextColor(110,110,110); doc.setFontSize(7); doc.setFont('helvetica','normal');
+  agingCols.forEach(function(c, i){
+    doc.text((c.p || 0).toFixed(1) + '%', marginL + i * agingColW + agingColW - 2, y + 4, { align: 'right' });
+  });
+  y += 8;
+
+  // ===== INVOICE TABLE (autoTable) =====
+  var totalBal = invoices.reduce(function(s, inv){ return s + inv.balance; }, 0);
+  var head = [['Doc Date','Doc #','Type','Doc Total','Paid to Date','Balance','Days Old','Status']];
+  var body = invoices
+    .slice()
+    .sort(function(a, b){ return b.days_old - a.days_old; })  // oldest unpaid first
+    .map(function(inv){
+      return [
+        fmtDate(inv.doc_date),
+        String(inv.doc_num),
+        inv.doc_type,
+        fmtPHPShort(inv.doc_total),
+        fmtPHPShort(inv.paid_to_date),
+        fmtPHPShort(inv.balance),
+        String(inv.days_old),
+        inv.status
+      ];
+    });
+  var foot = [[
+    { content: 'TOTAL OUTSTANDING', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+    { content: fmtPHPShort(totalBal), styles: { halign: 'right', fontStyle: 'bold' } },
+    '', ''
+  ]];
+  var generatedAt = new Date().toLocaleString('en-PH',{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+  doc.autoTable({
+    head: head,
+    body: body,
+    foot: foot,
+    startY: y,
+    margin: { left: marginL, right: marginR, bottom: 20 },
+    theme: 'striped',
+    styles: { fontSize: 7.5, cellPadding: 1.6, overflow: 'linebreak' },
+    headStyles: { fillColor: VN_NAVY, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7.5, halign: 'center' },
+    footStyles: { fillColor: [230,240,245], textColor: VN_NAVY, fontStyle: 'bold', fontSize: 8.5 },
+    alternateRowStyles: { fillColor: [250,250,250] },
+    columnStyles: {
+      0: { halign: 'left',  cellWidth: 22 },
+      1: { halign: 'left',  cellWidth: 20 },
+      2: { halign: 'left',  cellWidth: 22 },
+      3: { halign: 'right', cellWidth: 26 },
+      4: { halign: 'right', cellWidth: 26 },
+      5: { halign: 'right', cellWidth: 26, fontStyle: 'bold' },
+      6: { halign: 'right', cellWidth: 15 },
+      7: { halign: 'center', cellWidth: 21 }
+    },
+    didParseCell: function(data){
+      if(data.section === 'body' && data.column.index === 7){
+        var st = data.cell.raw;
+        if(st === 'Current')      data.cell.styles.textColor = VN_GREEN;
+        else if(st === 'Watch')   data.cell.styles.textColor = VN_GOLD;
+        else if(st === 'Overdue') data.cell.styles.textColor = VN_ORANGE;
+        else if(st === 'Critical'){ data.cell.styles.textColor = VN_RED; data.cell.styles.fontStyle = 'bold'; }
+      }
+      if(data.section === 'body' && data.column.index === 6){
+        var dy = Number(data.cell.raw || 0);
+        if(dy > 60) data.cell.styles.textColor = VN_RED;
+        else if(dy > 30) data.cell.styles.textColor = VN_ORANGE;
+      }
+    },
+    didDrawPage: function(data){
+      var pageH = doc.internal.pageSize.getHeight();
+      var pageW2 = doc.internal.pageSize.getWidth();
+      // Footer band
+      doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+      doc.line(marginL, pageH - 16, pageW2 - marginR, pageH - 16);
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
+      doc.text('Remit to: BPI Account 123-45678-90  ·  Acct Name: VIENOVO PHILIPPINES INC.', marginL, pageH - 11);
+      doc.text('Generated by VieForce HQ · ' + generatedAt, pageW2 / 2, pageH - 11, { align: 'center' });
+      var pageNum = doc.internal.getNumberOfPages();
+      doc.text('Page ' + data.pageNumber + ' of ' + pageNum, pageW2 - marginR, pageH - 11, { align: 'right' });
+      doc.setFontSize(6.5); doc.setTextColor(150,150,150);
+      doc.text('This statement reflects outstanding balances as of the generation date. Please verify all entries and report discrepancies within 7 days.', marginL, pageH - 6);
+    }
+  });
+}
+
+/* ========== SOA EXCEL ========== */
+async function generateSOAExcel(){
+  var btn = document.getElementById('soa-xlsx-btn');
+  var status = document.getElementById('soa-status');
+  btn.disabled = true;
+  status.className = 'soa-status';
+  status.innerHTML = '<span class="gs-spin"></span> Generating Excel…';
+  var t0 = performance.now();
+  try {
+    if(!window.XLSX){ throw new Error('XLSX library not loaded'); }
+    var d = await fetchSOAData();
+    var wb = buildSOAExcelWorkbook(d);
+    var fname = soaFilename(d.customer.CardCode, d.customer.CardName, 'xlsx');
+    XLSX.writeFile(wb, fname);
+    var elapsed = Math.round(performance.now() - t0);
+    status.className = 'soa-status success';
+    status.textContent = '✓ Excel downloaded (' + elapsed + 'ms) — ' + fname;
+  } catch(e){
+    console.error('[SOA XLSX]', e);
+    status.className = 'soa-status error';
+    status.textContent = '✗ ' + (e.message || 'Failed to generate Excel');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function buildSOAExcelWorkbook(d){
+  var cust = d.customer, sum = d.summary, aging = d.aging, invoices = d.invoices || [];
+
+  // ---------- SHEET 1: Summary ----------
+  var S = {};
+  var sNavy = { fill:{fgColor:{rgb:'004A64'}}, font:{color:{rgb:'FFFFFF'},bold:true,sz:14,name:'Calibri'}, alignment:{horizontal:'center',vertical:'center'} };
+  var sBlue = { fill:{fgColor:{rgb:'00AEEF'}}, font:{color:{rgb:'FFFFFF'},bold:true,sz:11,name:'Calibri'}, alignment:{horizontal:'center',vertical:'center'} };
+  var sHdr  = { fill:{fgColor:{rgb:'004A64'}}, font:{color:{rgb:'FFFFFF'},bold:true,sz:10,name:'Calibri'}, alignment:{horizontal:'center',vertical:'center'} };
+  var sBktH = { fill:{fgColor:{rgb:'00AEEF'}}, font:{color:{rgb:'FFFFFF'},bold:true,sz:10,name:'Calibri'}, alignment:{horizontal:'center'} };
+  var sLblR = { font:{bold:true,color:{rgb:'555555'},sz:10,name:'Calibri'}, alignment:{horizontal:'right',vertical:'center'} };
+  var sVal  = { font:{sz:10,name:'Calibri'}, alignment:{horizontal:'left',vertical:'center'} };
+  var sNum  = { numFmt:'_(PHP* #,##0.00_);_(PHP* (#,##0.00);_(PHP* "-"_);_(@_)', font:{sz:10,name:'Calibri'} };
+  var sNumB = { numFmt:'_(PHP* #,##0.00_);_(PHP* (#,##0.00);_(PHP* "-"_);_(@_)', font:{bold:true,sz:11,name:'Calibri'}, fill:{fgColor:{rgb:'E8F5D8'}} };
+  var sPct  = { numFmt:'0.0%', font:{italic:true,color:{rgb:'777777'},sz:9,name:'Calibri'}, alignment:{horizontal:'center'} };
+
+  function put(ws, addr, v, s){
+    ws[addr] = { v: v, s: s || sVal };
+    if(typeof v === 'number') ws[addr].t = 'n'; else ws[addr].t = 's';
+  }
+
+  var ws1 = {};
+  put(ws1, 'A1', 'VIENOVO PHILIPPINES INC.', sNavy);
+  put(ws1, 'A2', 'STATEMENT OF ACCOUNT · As of ' + fmtDate(new Date()), sBlue);
+
+  // Customer info block (rows 4-9)
+  var infoRows = [
+    ['Customer Name', cust.CardName || ''],
+    ['Customer Code', cust.CardCode || ''],
+    ['Address',       (cust.Address || '') + (cust.City ? ', ' + cust.City : '')],
+    ['Telephone',     cust.Phone || ''],
+    ['Sales Rep',     cust.sales_rep || ''],
+    ['Credit Terms',  cust.payment_terms || ''],
+    ['Credit Limit',  cust.CreditLimit ? Number(cust.CreditLimit) : 0],
+    ['Status',        cust.account_status || 'Active']
+  ];
+  infoRows.forEach(function(r, i){
+    var row = 4 + i;
+    put(ws1, 'A'+row, r[0], sLblR);
+    put(ws1, 'B'+row, r[1], r[0] === 'Credit Limit' ? sNum : sVal);
+  });
+
+  // Summary KPIs (row 14)
+  put(ws1, 'A13', 'SUMMARY', sHdr);
+  put(ws1, 'A14', 'Total AR',           sLblR); put(ws1, 'B14', Number(sum.total_ar || 0), sNum);
+  put(ws1, 'A15', 'Credit Used %',      sLblR); put(ws1, 'B15', (sum.credit_used_pct || 0)/100, sPct);
+  put(ws1, 'A16', 'DSO (days)',         sLblR); put(ws1, 'B16', Number(sum.dso || 0), sVal);
+  put(ws1, 'A17', 'Last Payment Date',  sLblR); put(ws1, 'B17', fmtDate(sum.last_payment_date), sVal);
+  put(ws1, 'A18', 'Last Payment Amount',sLblR); put(ws1, 'B18', Number(sum.last_payment_amount || 0), sNum);
+  put(ws1, 'A19', 'Open Invoices',      sLblR); put(ws1, 'B19', invoices.length, sVal);
+
+  // Aging header (row 21)
+  put(ws1, 'A21', 'AGING BREAKDOWN', sHdr);
+  var buckets = [
+    ['Current',   aging.current,   aging.current_pct],
+    ['1–30 d',    aging.d1_30,     aging.d1_30_pct],
+    ['31–60 d',   aging.d31_60,    aging.d31_60_pct],
+    ['61–90 d',   aging.d61_90,    aging.d61_90_pct],
+    ['91–120 d',  aging.d91_120,   aging.d91_120_pct],
+    ['121–365',   aging.d121_365,  aging.d121_365_pct],
+    ['Over 1Y',   aging.over_1y,   aging.over_1y_pct]
+  ];
+  var cols = ['A','B','C','D','E','F','G'];
+  cols.forEach(function(c, i){ put(ws1, c+'22', buckets[i][0], sBktH); });
+  cols.forEach(function(c, i){ put(ws1, c+'23', Number(buckets[i][1]||0), sNum); });
+  cols.forEach(function(c, i){ put(ws1, c+'24', (buckets[i][2]||0)/100, sPct); });
+
+  ws1['!ref'] = 'A1:H24';
+  ws1['!merges'] = [
+    { s:{r:0,c:0}, e:{r:0,c:7} }, // A1:H1
+    { s:{r:1,c:0}, e:{r:1,c:7} }, // A2:H2
+    { s:{r:12,c:0}, e:{r:12,c:1} }, // A13:B13
+    { s:{r:20,c:0}, e:{r:20,c:6} }  // A21:G21
+  ];
+  ws1['!cols'] = [
+    { wch: 22 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
+  ];
+  ws1['!rows'] = [{ hpt: 26 }, { hpt: 20 }];
+
+  // ---------- SHEET 2: Invoices ----------
+  var invHeader = ['Doc Date','Doc #','Type','PO Ref','Doc Total','Paid to Date','Balance','Due Date','Days Old','Status'];
+  var invSort = invoices.slice().sort(function(a,b){ return b.days_old - a.days_old; });
+  var aoa = [invHeader];
+  invSort.forEach(function(inv){
+    aoa.push([
+      fmtDate(inv.doc_date),
+      String(inv.doc_num),
+      inv.doc_type,
+      inv.po_ref || '',
+      Number(inv.doc_total || 0),
+      Number(inv.paid_to_date || 0),
+      Number(inv.balance || 0),
+      fmtDate(inv.due_date),
+      Number(inv.days_old || 0),
+      inv.status
+    ]);
+  });
+  var totalBal = invSort.reduce(function(s,inv){ return s + inv.balance; }, 0);
+  aoa.push(['', '', '', 'TOTAL OUTSTANDING', '', '', totalBal, '', '', '']);
+
+  var ws2 = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Style header row
+  for (var ci = 0; ci < invHeader.length; ci++){
+    var addr = XLSX.utils.encode_cell({ r:0, c: ci });
+    if(ws2[addr]) ws2[addr].s = sHdr;
+  }
+  // Style body numeric cols + status color
+  var statusColor = { Current:'97D700', Watch:'FFC72C', Overdue:'F59E0B', Critical:'EF4444' };
+  for (var ri = 1; ri <= invSort.length; ri++){
+    // numeric cols 4,5,6,8
+    ;[4,5,6].forEach(function(c){
+      var a = XLSX.utils.encode_cell({r:ri,c:c});
+      if(ws2[a]){ ws2[a].t = 'n'; ws2[a].s = sNum; }
+    });
+    var daysA = XLSX.utils.encode_cell({r:ri,c:8});
+    if(ws2[daysA]){ ws2[daysA].t = 'n'; ws2[daysA].s = { font:{sz:10,name:'Calibri'}, alignment:{horizontal:'right'} }; }
+    var stA = XLSX.utils.encode_cell({r:ri,c:9});
+    if(ws2[stA]){
+      var st = ws2[stA].v;
+      ws2[stA].s = {
+        font:{ bold:true, sz:10, color:{rgb: statusColor[st] || '555555'}, name:'Calibri' },
+        alignment:{horizontal:'center'}
+      };
+    }
+  }
+  // Total row formatting
+  var totalRow = invSort.length + 1;
+  var labelA = XLSX.utils.encode_cell({r:totalRow,c:3});
+  if(ws2[labelA]) ws2[labelA].s = { font:{bold:true,sz:11,color:{rgb:'004A64'},name:'Calibri'}, alignment:{horizontal:'right'} };
+  var totalA = XLSX.utils.encode_cell({r:totalRow,c:6});
+  if(ws2[totalA]){ ws2[totalA].t = 'n'; ws2[totalA].s = sNumB; }
+
+  ws2['!cols'] = [
+    { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
+    { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 12 }
+  ];
+  ws2['!rows'] = [{ hpt: 22 }];
+  ws2['!autofilter'] = { ref: 'A1:J' + (invSort.length + 1) };
+  ws2['!freeze'] = { xSplit: 0, ySplit: 1 };
+  // xlsx-js-style freeze via !views
+  ws2['!views'] = [{ state: 'frozen', ySplit: 1, xSplit: 0 }];
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Invoices');
+  wb.Props = {
+    Title: 'Statement of Account — ' + (cust.CardName || cust.CardCode),
+    Author: 'VieForce HQ',
+    Company: 'Vienovo Philippines Inc.',
+    CreatedDate: new Date()
+  };
+  return wb;
+}
+
+/* =================================================================
+   GLOBAL CUSTOMER SEARCH
+   ================================================================= */
+var GS_STATE = {
+  results: [],
+  active: -1,
+  debounceTimer: null,
+  lastQuery: '',
+  blurTimer: null
+};
+
+function gsOnInput(){
+  var q = document.getElementById('global-search').value.trim();
+  if(GS_STATE.debounceTimer) clearTimeout(GS_STATE.debounceTimer);
+  if(q.length < 2){
+    GS_STATE.results = []; GS_STATE.active = -1;
+    gsRender(q.length === 0 ? null : '<div class="gs-empty">Type 2+ characters…</div>');
+    return;
+  }
+  gsRender('<div class="gs-loading"><span class="gs-spin"></span>Searching…</div>');
+  GS_STATE.debounceTimer = setTimeout(async function(){
+    try {
+      var d = await searchGlobal({ q: q, type: 'customer' });
+      if(document.getElementById('global-search').value.trim() !== q) return; // stale
+      GS_STATE.results = d && d.results ? d.results : [];
+      GS_STATE.active = GS_STATE.results.length > 0 ? 0 : -1;
+      GS_STATE.lastQuery = q;
+      gsRender();
+    } catch(e){
+      console.error('[search]', e);
+      gsRender('<div class="gs-empty" style="color:var(--red)">Search error</div>');
+    }
+  }, 300);
+}
+
+function gsOnKeydown(e){
+  var dd = document.getElementById('gs-dropdown');
+  var open = dd.classList.contains('open');
+  if(e.key === 'Escape'){
+    gsClose(); e.preventDefault(); return;
+  }
+  if(e.key === 'Enter'){
+    if(open && GS_STATE.active >= 0 && GS_STATE.results[GS_STATE.active]){
+      gsSelect(GS_STATE.results[GS_STATE.active].code);
+      e.preventDefault();
+    } else if(GS_STATE.results.length > 0){
+      gsSelect(GS_STATE.results[0].code);
+      e.preventDefault();
+    }
+    return;
+  }
+  if(e.key === 'ArrowDown'){
+    if(GS_STATE.results.length === 0) return;
+    GS_STATE.active = (GS_STATE.active + 1) % GS_STATE.results.length;
+    gsRender(); e.preventDefault();
+  } else if(e.key === 'ArrowUp'){
+    if(GS_STATE.results.length === 0) return;
+    GS_STATE.active = (GS_STATE.active - 1 + GS_STATE.results.length) % GS_STATE.results.length;
+    gsRender(); e.preventDefault();
+  }
+}
+
+function gsOnFocus(){
+  var q = document.getElementById('global-search').value.trim();
+  if(q.length >= 2 && GS_STATE.results.length > 0) gsRender();
+}
+function gsOnBlur(){
+  // Delay close so a click on a row can fire
+  if(GS_STATE.blurTimer) clearTimeout(GS_STATE.blurTimer);
+  GS_STATE.blurTimer = setTimeout(gsClose, 160);
+}
+function gsClose(){
+  document.getElementById('gs-dropdown').classList.remove('open');
+}
+
+function gsRender(htmlOverride){
+  var dd = document.getElementById('gs-dropdown');
+  if(htmlOverride){
+    dd.innerHTML = htmlOverride;
+    dd.classList.add('open');
+    return;
+  }
+  var q = GS_STATE.lastQuery || document.getElementById('global-search').value.trim();
+  if(GS_STATE.results.length === 0){
+    dd.innerHTML = '<div class="gs-empty">No matches for "'+esc(q)+'"</div>';
+    dd.classList.add('open');
+    return;
+  }
+  var qLower = q.toLowerCase();
+  var html = GS_STATE.results.map(function(r, i){
+    var name = r.name || r.code;
+    var highlighted = name;
+    var idx = name.toLowerCase().indexOf(qLower);
+    if(idx >= 0){
+      highlighted = esc(name.slice(0, idx)) + '<mark>' + esc(name.slice(idx, idx + q.length)) + '</mark>' + esc(name.slice(idx + q.length));
+    } else {
+      highlighted = esc(name);
+    }
+    var cls = 'gs-row' + (i === GS_STATE.active ? ' active' : '');
+    var sub = [r.code, r.region || '—', (r.ytd_volume||0).toFixed(1)+' MT YTD', r.sales_rep || 'No rep'].join(' · ');
+    return '<div class="'+cls+'" onmousedown="gsSelect(\''+esc(r.code)+'\')" onmouseenter="GS_STATE.active='+i+';gsRender()">'
+      + '<div class="gs-row-name">'+highlighted+'</div>'
+      + '<div class="gs-row-sub">'+esc(sub)+'</div>'
+      + '</div>';
+  }).join('');
+  dd.innerHTML = html;
+  dd.classList.add('open');
+}
+
+function gsSelect(code){
+  if(!code) return;
+  gsClose();
+  document.getElementById('global-search').value = '';
+  GS_STATE.results = []; GS_STATE.active = -1;
+  openCust(code);
+}
+
+/* =================================================================
+   INVENTORY DRILL-DOWN
+   ================================================================= */
+function plantRegionOf(wh){
+  if(!wh) return 'Other';
+  var w = String(wh).toUpperCase();
+  if(w === 'AC' || w === 'ACEXT' || w === 'BAC') return 'Luzon';
+  if(w === 'HOREB' || w === 'ARGAO' || w === 'ALAE') return 'Visayas';
+  if(w === 'BUKID' || w === 'CCPC') return 'Mindanao';
+  return 'Other';
+}
+
+function applyInvFilter(type, value){
+  if(type === 'region'){
+    // Toggle: clicking same region clears it
+    if(INV_FILTER.region === value){
+      INV_FILTER.region = null;
+    } else {
+      INV_FILTER.region = value;
+      // Clear plant if it's not in this region
+      if(INV_FILTER.plant && plantRegionOf(INV_FILTER.plant) !== value) INV_FILTER.plant = null;
+    }
+  } else if(type === 'plant'){
+    if(INV_FILTER.plant === value){
+      INV_FILTER.plant = null;
+    } else {
+      INV_FILTER.plant = value;
+      // Auto-set region to match the plant's region
+      var r = plantRegionOf(value);
+      if(r !== 'Other') INV_FILTER.region = r;
+    }
+  }
+  renderInv();
+  renderInvFilterBar();
+  syncInvHash();
+}
+
+function removeInvFilter(type){
+  INV_FILTER[type] = null;
+  renderInv();
+  renderInvFilterBar();
+  syncInvHash();
+}
+
+function clearInvFilters(){
+  INV_FILTER.region = null;
+  INV_FILTER.plant = null;
+  renderInv();
+  renderInvFilterBar();
+  syncInvHash();
+}
+
+function renderInvFilterBar(){
+  var bar = document.getElementById('inv-filter-bar');
+  if(!bar) return;
+  var pills = [];
+  if(INV_FILTER.region){
+    pills.push('<span class="inv-filter-pill">Region: '+esc(INV_FILTER.region.toUpperCase())+' <button onclick="removeInvFilter(\'region\')" aria-label="Remove region filter">×</button></span>');
+  }
+  if(INV_FILTER.plant){
+    pills.push('<span class="inv-filter-pill">Plant: '+esc(INV_FILTER.plant)+' <button onclick="removeInvFilter(\'plant\')" aria-label="Remove plant filter">×</button></span>');
+  }
+  if(pills.length >= 2){
+    pills.push('<button class="inv-clear" onclick="clearInvFilters()">Clear all</button>');
+  }
+  bar.innerHTML = pills.join('');
+}
+
+function syncInvHash(){
+  var parts = [];
+  if(INV_FILTER.region) parts.push('region='+encodeURIComponent(INV_FILTER.region));
+  if(INV_FILTER.plant)  parts.push('plant='+encodeURIComponent(INV_FILTER.plant));
+  var newHash = parts.length ? '#pg-inv?' + parts.join('&') : '#pg-inv';
+  if(history.replaceState){
+    try { history.replaceState(null, '', newHash); } catch(e){}
+  }
+}
+
+function loadInvFromHash(){
+  // Parse hash like #pg-inv?region=Visayas&plant=HOREB
+  var h = window.location.hash || '';
+  if(!/^#pg-inv/.test(h)) return;
+  var q = h.split('?')[1] || '';
+  if(!q) return;
+  var params = {};
+  q.split('&').forEach(function(pair){
+    var kv = pair.split('=');
+    if(kv.length === 2) params[kv[0]] = decodeURIComponent(kv[1]);
+  });
+  INV_FILTER.region = params.region || null;
+  INV_FILTER.plant  = params.plant || null;
+}
+
+// On page nav to inv, read hash + render bar
+(function wrapNavForInv(){
+  var origNav = window.navTo;
+  if(typeof origNav !== 'function') return;
+  window.navTo = function(id, navItem){
+    origNav.apply(this, arguments);
+    if(id === 'pg-inv'){
+      // Render filter bar (data may already be loaded)
+      setTimeout(function(){ renderInvFilterBar(); if(INV_STATE.data) renderInv(); }, 50);
+    }
+  };
+})();
+
+// Initial hash load (when arriving via shared URL)
+loadInvFromHash();
+setTimeout(renderInvFilterBar, 400);
+
 </script>
 </body>
 </html>
