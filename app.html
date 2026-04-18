@@ -2453,8 +2453,8 @@ body{
         <!-- WARNING TABLE -->
         <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">🟡 Warning — Low Gross Profit (0-10%)</div><div class="sec-line"></div><div class="sec-count" id="margin-warn-count">Loading…</div></div>
         <div class="card" style="margin-bottom:20px"><div class="card-body" style="padding-top:8px"><table class="tbl">
-          <thead><tr><th>Customer</th><th>Code</th><th>Rep</th><th class="num">Sales</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
-          <tbody id="margin-warn-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
+          <thead><tr><th>Customer</th><th>Code</th><th>Rep</th><th class="num">Sales</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th><th style="width:28px"></th></tr></thead>
+          <tbody id="margin-warn-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
         </table></div></div>
 
         <!-- BY REGION + BY GROUP -->
@@ -2511,6 +2511,34 @@ body{
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(0,212,255,0.2)"></span>&gt;25%</span>
             </div>
           </div></div>
+        </div>
+
+        <!-- SILENCED ITEMS DRAWER (margin page) -->
+        <div class="card ci-drawer-card" id="sec-silenced-margin" style="margin-top:18px">
+          <div class="card-hdr" style="cursor:pointer" onclick="ciToggleDrawer('margin')">
+            <div class="card-title" style="color:var(--text2);display:flex;align-items:center;gap:10px">
+              🔕 SILENCED MARGIN ALERTS — <span id="ci-drawer-count-margin" style="font-family:var(--mono);color:var(--text)">0</span>
+              <span style="font-size:10px;color:var(--text3);font-weight:500">(click to <span id="ci-drawer-state-margin">expand</span>)</span>
+            </div>
+            <span id="ci-drawer-arrow-margin" style="font-size:11px;color:var(--text3);font-weight:700">▶</span>
+          </div>
+          <div id="ci-drawer-body-margin" style="display:none">
+            <div class="card-body" style="padding-top:10px;overflow-x:auto">
+              <table class="tbl ci-tbl">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Alert Type</th>
+                    <th>Silenced</th>
+                    <th>Until</th>
+                    <th>Reason</th>
+                    <th style="width:110px">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="ci-drawer-tbody-margin"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:16px">No silenced margin alerts.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -2583,6 +2611,106 @@ body{
           .ci-modal-close{position:absolute;top:12px;right:14px;background:transparent;border:0;color:var(--text3);font-size:18px;cursor:pointer}
           .ci-modal-act{display:flex;gap:8px;justify-content:flex-end}
           [data-theme="light"] .ci-hero-card:hover{box-shadow:0 8px 20px rgba(0,74,100,0.1)}
+
+          /* Row ⋯ menu button + popup */
+          .ci-menu-btn{
+            background:transparent;border:1px solid transparent;color:var(--text3);
+            cursor:pointer;font-size:14px;line-height:1;padding:2px 6px;border-radius:6px;
+            transition:all 0.15s;font-weight:700;
+          }
+          .ci-menu-btn:hover{background:rgba(255,255,255,0.06);color:var(--text);border-color:var(--divider)}
+          .ci-menu-pop{
+            position:absolute;display:none;min-width:200px;
+            background:var(--surface-solid);border:1px solid var(--divider);
+            border-radius:8px;box-shadow:0 12px 34px rgba(0,0,0,0.5);
+            z-index:9999;padding:4px;
+          }
+          .ci-menu-pop.open{display:block}
+          .ci-menu-item{
+            display:block;width:100%;text-align:left;padding:9px 12px;
+            background:transparent;border:none;color:var(--text);font-family:var(--font);
+            font-size:12px;font-weight:500;cursor:pointer;border-radius:5px;
+            transition:background 0.12s;
+          }
+          .ci-menu-item:hover{background:rgba(0,174,239,0.08)}
+          .ci-menu-item.danger{color:var(--gold)}
+          .ci-menu-item.danger:hover{background:rgba(241,177,29,0.08)}
+
+          /* Silence modal */
+          .ci-silence-backdrop{
+            position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+            z-index:10000;display:none;align-items:center;justify-content:center;
+            animation:ci-fade 0.18s ease-out;
+          }
+          .ci-silence-backdrop.open{display:flex}
+          @keyframes ci-fade{from{opacity:0}to{opacity:1}}
+          .ci-silence-modal{
+            background:var(--surface-solid);border:1px solid var(--glass-border);
+            border-radius:var(--r-lg);width:440px;max-width:92vw;
+            box-shadow:0 20px 60px rgba(0,0,0,0.5);
+            animation:ci-pop 0.22s cubic-bezier(0.175,0.885,0.32,1.275);
+          }
+          @keyframes ci-pop{from{transform:scale(0.92);opacity:0}to{transform:scale(1);opacity:1}}
+          .ci-silence-hdr{padding:18px 22px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:flex-start}
+          .ci-silence-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-0.2px}
+          .ci-silence-sub{font-size:11px;color:var(--text3);margin-top:3px;font-weight:600}
+          .ci-silence-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0;line-height:1;width:24px;height:24px;border-radius:4px;transition:all 0.15s}
+          .ci-silence-close:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+          .ci-silence-body{padding:18px 22px}
+          .ci-silence-ctx{font-size:11px;color:var(--text2);margin-bottom:14px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px dashed var(--divider);border-radius:6px;line-height:1.5}
+          .ci-silence-radio-lbl{font-size:11px;font-weight:700;color:var(--text3);margin:10px 0 6px;letter-spacing:0.3px;text-transform:uppercase}
+          .ci-silence-radios{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+          .ci-silence-radios label{font-size:12px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--divider);border-radius:6px;transition:all 0.12s;font-weight:500}
+          .ci-silence-radios label:hover{background:rgba(0,174,239,0.04);border-color:rgba(0,174,239,0.25)}
+          .ci-silence-radios input[type="radio"]:checked + *{font-weight:700;color:var(--blue)}
+          .ci-silence-input{
+            width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;
+            background:var(--bg3);border:1px solid var(--divider);color:var(--text);
+            font-family:var(--font);font-size:12px;outline:none;transition:border-color 0.15s;
+          }
+          .ci-silence-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,174,239,0.08)}
+          .ci-silence-footer{padding:14px 22px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--divider)}
+          .ci-silence-btn{padding:8px 18px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:0.3px;cursor:pointer;border:1px solid;background:transparent;font-family:var(--font);transition:all 0.15s}
+          .ci-silence-btn-ghost{color:var(--text3);border-color:var(--divider)}
+          .ci-silence-btn-ghost:hover{color:var(--text);border-color:var(--text3)}
+          .ci-silence-btn-primary{color:var(--gold);border-color:rgba(241,177,29,0.4);background:rgba(241,177,29,0.05)}
+          .ci-silence-btn-primary:hover{background:rgba(241,177,29,0.12);border-color:var(--gold)}
+          .ci-silence-btn:disabled{opacity:0.5;cursor:wait}
+          .ci-silence-status{padding:0 22px 14px;min-height:14px;font-size:11px;text-align:center;color:var(--text3)}
+          .ci-silence-status.ok{color:var(--green);font-weight:700}
+          .ci-silence-status.err{color:var(--red);font-weight:700}
+
+          /* Toast wrapper */
+          .ci-toast-wrap{position:fixed;bottom:20px;right:20px;z-index:10050;display:flex;flex-direction:column-reverse;gap:10px;pointer-events:none}
+          .ci-toast{
+            min-width:280px;max-width:420px;padding:11px 14px;border-radius:10px;
+            background:var(--surface-solid);border:1px solid var(--glass-border);
+            box-shadow:0 10px 30px rgba(0,0,0,0.45);color:var(--text);
+            font-size:12px;font-weight:500;line-height:1.5;pointer-events:auto;
+            display:flex;align-items:center;gap:12px;
+            animation:ci-toast-in 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+          }
+          .ci-toast.out{animation:ci-toast-out 0.25s forwards}
+          @keyframes ci-toast-in{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
+          @keyframes ci-toast-out{to{transform:translateX(30px);opacity:0}}
+          .ci-toast-text{flex:1}
+          .ci-toast-undo{
+            background:transparent;border:1px solid rgba(0,174,239,0.35);color:var(--blue);
+            padding:4px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;
+            font-family:var(--font);letter-spacing:0.3px;transition:all 0.15s;
+          }
+          .ci-toast-undo:hover{background:rgba(0,174,239,0.1);border-color:var(--blue)}
+
+          /* Drawer table rows */
+          .ci-drawer-card .card-hdr:hover{background:rgba(255,255,255,0.02)}
+          .ci-drawer-card.open #ci-drawer-arrow,
+          .ci-drawer-card.open #ci-drawer-arrow-margin{transform:rotate(90deg);transition:transform 0.2s}
+          .ci-unsilence-btn{
+            padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:0.3px;
+            background:transparent;border:1px solid rgba(0,174,239,0.35);color:var(--blue);
+            cursor:pointer;font-family:var(--font);transition:all 0.15s;
+          }
+          .ci-unsilence-btn:hover{background:rgba(0,174,239,0.1);border-color:var(--blue)}
           [data-theme="light"] .ci-modal-back{background:rgba(0,30,50,0.45)}
         </style>
 
@@ -2632,9 +2760,10 @@ body{
                   <th>Sales Rep</th>
                   <th class="num" title="Priority = (AR / ₱1M) × log10(days_silent + 1) × 10, clamped 0-100">Priority</th>
                   <th style="width:84px">Action</th>
+                  <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-rescue-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-rescue-tbody"><tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2657,9 +2786,10 @@ body{
                   <th>Reason</th>
                   <th class="num" title="Priority = log10(upside / ₱100K) × 25, clamped 0-100">Priority</th>
                   <th style="width:84px">Action</th>
+                  <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-growth-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-growth-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2684,9 +2814,10 @@ body{
                   <th>Sales Rep</th>
                   <th class="num" title="Priority = (risk_millions × |Δ%|) ÷ 5, clamped 0-100">Priority</th>
                   <th style="width:84px">Action</th>
+                  <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-warning-tbody"><tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-warning-tbody"><tr><td colspan="11" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2735,6 +2866,75 @@ body{
                   </tr>
                 </thead>
                 <tbody id="ci-dormant-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- LEVEL 5.5 — LEGACY AR (opening-balance migration, muted gray) -->
+        <div class="card" id="sec-legacy-ar" style="border-left:3px solid var(--text3);margin-bottom:18px;opacity:0.96">
+          <div class="card-hdr">
+            <div class="card-title" style="color:var(--text2)">📋 LEGACY AR — <span id="ci-legacy-hdr">—</span></div>
+            <div style="display:flex;gap:6px">
+              <button class="export-btn" type="button" onclick="ciExport('legacy_ar')">⬇ Export List</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding-top:10px">
+            <div style="font-size:11px;color:var(--text3);line-height:1.65;margin-bottom:12px;padding:10px 14px;background:rgba(255,255,255,0.025);border-radius:6px;border:1px dashed var(--divider)">
+              <b style="color:var(--text2)">Reconciliation task, not a sales alert.</b>
+              Customers below carry open AR but have
+              <b>no invoices since 2024-01-01</b>. Most are opening-balance
+              migration artifacts from the SAP go-live cutover. Route to
+              Finance/Collections — do not pursue as dormancy.
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;margin-bottom:10px">
+              <div><span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Count:</span><span id="ci-legacy-count" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span></div>
+              <div><span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Total AR:</span><span id="ci-legacy-ar" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span></div>
+              <div><span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">By region:</span><span id="ci-legacy-regions">—</span></div>
+            </div>
+            <div style="overflow-x:auto;max-height:420px;overflow-y:auto">
+              <table class="tbl ci-tbl">
+                <thead>
+                  <tr>
+                    <th style="width:30px">#</th>
+                    <th>Customer</th>
+                    <th>Region</th>
+                    <th>Sales Rep</th>
+                    <th>Last Inv</th>
+                    <th class="num">Years Silent</th>
+                    <th class="num">AR Balance</th>
+                    <th style="width:28px"></th>
+                  </tr>
+                </thead>
+                <tbody id="ci-legacy-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SILENCED ITEMS DRAWER — end of pg-insights -->
+        <div class="card ci-drawer-card" id="sec-silenced" style="margin-bottom:18px">
+          <div class="card-hdr" style="cursor:pointer" onclick="ciToggleDrawer()">
+            <div class="card-title" style="color:var(--text2);display:flex;align-items:center;gap:10px">
+              🔕 SILENCED ITEMS — <span id="ci-drawer-count" style="font-family:var(--mono);color:var(--text)">0</span>
+              <span style="font-size:10px;color:var(--text3);font-weight:500">(click to <span id="ci-drawer-state">expand</span>)</span>
+            </div>
+            <span id="ci-drawer-arrow" style="font-size:11px;color:var(--text3);font-weight:700">▶</span>
+          </div>
+          <div id="ci-drawer-body" style="display:none">
+            <div class="card-body" style="padding-top:10px;overflow-x:auto">
+              <table class="tbl ci-tbl">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Alert Type</th>
+                    <th>Silenced</th>
+                    <th>Until</th>
+                    <th>Reason</th>
+                    <th style="width:110px">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="ci-drawer-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:16px">No silenced items.</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3242,6 +3442,39 @@ body{
     <div class="soa-status" id="soa-status">Real-time AR from SAP · 60s cache</div>
   </div>
 </div>
+
+<!-- ===== SILENCE SYSTEM — row menu, modal, toast container ===== -->
+<div class="ci-menu-pop" id="ci-menu-pop" role="menu"></div>
+
+<div class="ci-silence-backdrop" id="ci-silence-back" onclick="if(event.target===this)ciCloseSilenceModal()">
+  <div class="ci-silence-modal" role="dialog" aria-modal="true" aria-labelledby="ci-silence-title">
+    <div class="ci-silence-hdr">
+      <div>
+        <div class="ci-silence-title" id="ci-silence-title">Silence alert</div>
+        <div class="ci-silence-sub" id="ci-silence-sub">for —</div>
+      </div>
+      <button class="ci-silence-close" onclick="ciCloseSilenceModal()" aria-label="Close">×</button>
+    </div>
+    <div class="ci-silence-body">
+      <div class="ci-silence-ctx" id="ci-silence-ctx">Alert: —</div>
+      <div class="ci-silence-radio-lbl">Silence for:</div>
+      <div class="ci-silence-radios">
+        <label><input type="radio" name="ci-silence-dur" value="7" checked> 7 days</label>
+        <label><input type="radio" name="ci-silence-dur" value="30"> 30 days</label>
+        <label><input type="radio" name="ci-silence-dur" value="0"> Forever</label>
+      </div>
+      <label class="ci-silence-radio-lbl" for="ci-silence-note">Reason (optional):</label>
+      <input id="ci-silence-note" type="text" maxlength="250" placeholder="e.g. Joel handling · with Finance · known internal transfer" class="ci-silence-input">
+    </div>
+    <div class="ci-silence-footer">
+      <button type="button" class="ci-silence-btn ci-silence-btn-ghost" onclick="ciCloseSilenceModal()">Cancel</button>
+      <button type="button" class="ci-silence-btn ci-silence-btn-primary" id="ci-silence-submit" onclick="ciSubmitSilence()">🔕 Silence</button>
+    </div>
+    <div class="ci-silence-status" id="ci-silence-status"></div>
+  </div>
+</div>
+
+<div class="ci-toast-wrap" id="ci-toast-wrap"></div>
 
 <script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
@@ -4889,14 +5122,17 @@ async function loadMargin(){
         whtml+='<td class="num">'+fc(w.sales||0)+'</td>';
         whtml+='<td class="num">'+fcn(Math.round(w.vol||0))+' MT</td>';
         whtml+='<td class="num" style="color:var(--gold);font-weight:700">'+(w.gp_pct!=null?w.gp_pct.toFixed(1)+'%':'--')+'</td>';
-        whtml+='<td class="num" style="color:var(--gold)">'+(w.gm_ton!=null?'₱'+fcn(Math.round(w.gm_ton)):'--')+'</td></tr>';
+        whtml+='<td class="num" style="color:var(--gold)">'+(w.gm_ton!=null?'₱'+fcn(Math.round(w.gm_ton)):'--')+'</td>';
+        whtml+='<td>' + ciRowMenuBtn('margin_warning', w.code, w.customer, 'GP% ' + (w.gp_pct!=null?w.gp_pct.toFixed(1):'—') + '%') + '</td></tr>';
       });
       seth('margin-warn-tbody',whtml);
       sett('margin-warn-count', d.warning.length+' accounts');
     } else {
-      seth('margin-warn-tbody','<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px">No warning accounts</td></tr>');
+      seth('margin-warn-tbody','<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">No warning accounts</td></tr>');
       sett('margin-warn-count','0 accounts');
     }
+    // Drawer refresh (margin variant)
+    ciRefreshSilenced('margin');
 
     // By REGION table
     if(d.by_region && d.by_region.length){
@@ -5079,6 +5315,16 @@ function ciExport(section){
               r.last_order_date ? new Date(r.last_order_date) : '',
               Number(r.days_dormant||0), Number(r.historical_ar||0), Number(r.lifetime_volume_mt||0)];
     });
+  } else if(section === 'legacy_ar'){
+    filename = 'VPI_CustIntel_LegacyAR_' + today + '.xlsx';
+    title = 'LEGACY AR — Opening-balance migration (Finance reconciliation)';
+    headers = ['#','Customer Code','Customer Name','Region','Sales Rep','Last Invoice','Years Silent','AR Balance (PHP)'];
+    var legacyRows = (CI_DATA.legacy_ar && CI_DATA.legacy_ar.top_accounts) || [];
+    rows = legacyRows.map(function(r,i){
+      return [i+1, r.card_code, r.name, r.region, r.sales_rep||'',
+              r.last_inv_date ? new Date(r.last_inv_date) : '',
+              Number(r.years_silent||0), Number(r.ar_balance||0)];
+    });
   } else return;
 
   if(!rows.length){ alert('No rows in this section to export.'); return; }
@@ -5093,10 +5339,11 @@ function ciExport(section){
 
   // Totals row — only for numeric-amount columns
   var totalsRow = [], totalsIdx = -1;
-  if(section === 'rescue')        totalsIdx = 5;   // AR Balance
-  else if(section === 'growth')   totalsIdx = 9;   // Upside PHP
-  else if(section === 'warning')  totalsIdx = 8;   // Yearly Risk
-  else if(section === 'dormant')  totalsIdx = 7;   // Historical AR
+  if(section === 'rescue')         totalsIdx = 5;   // AR Balance
+  else if(section === 'growth')    totalsIdx = 9;   // Upside PHP
+  else if(section === 'warning')   totalsIdx = 8;   // Yearly Risk
+  else if(section === 'dormant')   totalsIdx = 7;   // Historical AR
+  else if(section === 'legacy_ar') totalsIdx = 7;   // AR Balance
   if(totalsIdx > -1){
     totalsRow = headers.map(function(_,i){
       if(i === 0) return 'TOTAL';
@@ -5244,11 +5491,12 @@ async function loadIntelligence(){
           + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
           + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(r.reason||'') +'">'+ (r.priority_score||0) +'</span></td>'
           + '<td><button class="ci-action ci-action-rescue" type="button" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.suggested_action||'') +'">Call</button></td>'
+          + '<td>' + ciRowMenuBtn('rescue', r.card_code, r.name, r.reason || ('Silent ' + (r.days_silent||0) + 'd')) + '</td>'
           + '</tr>';
       });
       seth('ci-rescue-tbody', rhtml);
     } else {
-      seth('ci-rescue-tbody', '<tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No rescue candidates — all accounts on cadence.</td></tr>');
+      seth('ci-rescue-tbody', '<tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No rescue candidates — all accounts on cadence.</td></tr>');
     }
 
     // ========== LEVEL 3 — GROWTH TABLE ==========
@@ -5269,11 +5517,12 @@ async function loadIntelligence(){
           + '<td style="font-size:11px;color:var(--text2);line-height:1.5">'+ esc(g.reason||'') +'</td>'
           + '<td class="num"><span class="ci-prio '+ pcls +'" title="Upside '+ fc(g.upside_php_yearly||0) +' · score = log10(upside/₱100K) × 25">'+ (g.priority_score||0) +'</span></td>'
           + '<td><button class="ci-action ci-action-grow" type="button" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.suggested_action||'') +'">Pitch</button></td>'
+          + '<td>' + ciRowMenuBtn('grow', g.card_code, g.name, 'Upside ' + fc(g.upside_php_yearly||0) + '/yr') + '</td>'
           + '</tr>';
       });
       seth('ci-growth-tbody', ghtml);
     } else {
-      seth('ci-growth-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No cross-sell opportunities above threshold this window.</td></tr>');
+      seth('ci-growth-tbody', '<tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No cross-sell opportunities above threshold this window.</td></tr>');
     }
 
     // ========== LEVEL 4 — EARLY WARNING TABLE ==========
@@ -5294,11 +5543,12 @@ async function loadIntelligence(){
           + '<td style="font-size:11px;color:var(--text2)">'+ esc(w.sales_rep||'—') +'</td>'
           + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(w.reason||'') +'">'+ (w.priority_score||0) +'</span></td>'
           + '<td><button class="ci-action ci-action-warn" type="button" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.suggested_action||'') +'">Visit</button></td>'
+          + '<td>' + ciRowMenuBtn('warning', w.card_code, w.name, (w.change_pct||0) + '% · risk ' + fc(w.revenue_impact_php_yearly||0)) + '</td>'
           + '</tr>';
       });
       seth('ci-warning-tbody', whtml);
     } else {
-      seth('ci-warning-tbody', '<tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No customers with meaningful declining trend.</td></tr>');
+      seth('ci-warning-tbody', '<tr><td colspan="11" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No customers with meaningful declining trend.</td></tr>');
     }
 
     // ========== LEVEL 5 — DORMANT SUMMARY + LIST ==========
@@ -5341,6 +5591,12 @@ async function loadIntelligence(){
     } else {
       seth('ci-dormant-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No dormant customers.</td></tr>');
     }
+
+    // ========== LEVEL 5.5 — LEGACY AR ==========
+    ciRenderLegacyAR(d.legacy_ar);
+
+    // Silenced drawer refresh (async; keeps its own state)
+    ciRefreshSilenced();
 
     pulseRefresh('pg-insights');
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
@@ -6320,6 +6576,295 @@ setInterval(tick,1000);tick();
 
 // Init home charts on page load
 setTimeout(function(){initCharts('pg-home')},300);
+
+/* =========================================================================
+   SILENCE SYSTEM (v1) — row menu · modal · drawer · toasts · legacy AR
+   ========================================================================= */
+
+var CI_SILENCES = [];            // last-known active silences for this user
+var CI_SILENCE_CTX = null;       // { alert_type, customer_code, customer_name, context_text }
+var CI_TOAST_ID = 0;
+
+/* -------- Row ⋯ menu button + popup -------- */
+function ciRowMenuBtn(alertType, code, name, ctxText){
+  // Returns an inline button that triggers ciOpenRowMenu()
+  var safeCode = esc(code||'');
+  var safeName = esc(name||code||'').replace(/"/g, '&quot;');
+  var safeCtx  = esc(ctxText||'').replace(/"/g, '&quot;');
+  return '<button class="ci-menu-btn" type="button" title="More options" '
+    + 'onclick="ciOpenRowMenu(event,\''+ alertType +'\',\''+ safeCode +'\',\''+ safeName +'\',\''+ safeCtx +'\')">⋯</button>';
+}
+
+function ciOpenRowMenu(ev, alertType, code, name, ctxText){
+  ev.stopPropagation();
+  var pop = document.getElementById('ci-menu-pop');
+  if(!pop) return;
+  // Decode the quoted entities
+  name = (name||'').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&#39;/g,"'");
+  ctxText = (ctxText||'').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&#39;/g,"'");
+  pop.innerHTML =
+      '<button type="button" class="ci-menu-item danger" onclick="ciCloseRowMenu();ciOpenSilenceModal(\''
+        + alertType + '\',\'' + code.replace(/'/g,"\\'") + '\',\''
+        + name.replace(/'/g,"\\'").replace(/\\/g,'\\\\') + '\',\''
+        + ctxText.replace(/'/g,"\\'") + '\')">🔕 Silence this alert</button>'
+    + '<button type="button" class="ci-menu-item" onclick="ciCloseRowMenu();openCust(\''
+        + code.replace(/'/g,"\\'") + '\')">👤 View Customer</button>';
+  // Position near the clicked button
+  var r = ev.currentTarget.getBoundingClientRect();
+  pop.style.top  = (window.scrollY + r.bottom + 4) + 'px';
+  pop.style.left = (window.scrollX + Math.max(8, r.right - 200)) + 'px';
+  pop.classList.add('open');
+  // Click-outside to close
+  setTimeout(function(){ document.addEventListener('click', ciCloseRowMenuOutside); }, 0);
+}
+function ciCloseRowMenu(){
+  var pop = document.getElementById('ci-menu-pop');
+  if(pop) pop.classList.remove('open');
+  document.removeEventListener('click', ciCloseRowMenuOutside);
+}
+function ciCloseRowMenuOutside(e){
+  var pop = document.getElementById('ci-menu-pop');
+  if(pop && !pop.contains(e.target)) ciCloseRowMenu();
+}
+
+/* -------- Silence modal -------- */
+function ciOpenSilenceModal(alertType, code, name, ctxText){
+  CI_SILENCE_CTX = { alert_type: alertType, customer_code: code, customer_name: name, context_text: ctxText || '' };
+  var back = document.getElementById('ci-silence-back');
+  sett('ci-silence-title', 'Silence alert for: ' + (name || code));
+  sett('ci-silence-sub', code ? 'Customer code: ' + code : '');
+  sett('ci-silence-ctx', 'Alert type: ' + ciAlertTypeLabel(alertType) + (ctxText ? '  ·  ' + ctxText : ''));
+  var note = document.getElementById('ci-silence-note');
+  if(note) note.value = '';
+  var status = document.getElementById('ci-silence-status');
+  if(status){ status.textContent = ''; status.className = 'ci-silence-status'; }
+  var defaultRadio = document.querySelector('input[name="ci-silence-dur"][value="7"]');
+  if(defaultRadio) defaultRadio.checked = true;
+  var btn = document.getElementById('ci-silence-submit');
+  if(btn) btn.disabled = false;
+  back.classList.add('open');
+  document.addEventListener('keydown', ciSilenceEscHandler);
+  setTimeout(function(){ if(note) note.focus(); }, 80);
+}
+function ciCloseSilenceModal(){
+  var back = document.getElementById('ci-silence-back');
+  if(back) back.classList.remove('open');
+  document.removeEventListener('keydown', ciSilenceEscHandler);
+  CI_SILENCE_CTX = null;
+}
+function ciSilenceEscHandler(e){ if(e.key === 'Escape') ciCloseSilenceModal(); }
+
+function ciAlertTypeLabel(t){
+  var map = {
+    rescue: 'Rescue', grow: 'Grow', warning: 'Early Warning',
+    legacy_ar: 'Legacy AR', margin_critical: 'Margin · Critical',
+    margin_warning: 'Margin · Warning', dormant_active: 'Dormant (Active)'
+  };
+  return map[t] || t;
+}
+
+async function ciSubmitSilence(){
+  if(!CI_SILENCE_CTX){ ciCloseSilenceModal(); return; }
+  var btn    = document.getElementById('ci-silence-submit');
+  var status = document.getElementById('ci-silence-status');
+  var durEl  = document.querySelector('input[name="ci-silence-dur"]:checked');
+  var duration = durEl ? Number(durEl.value) : 7;
+  var note   = (document.getElementById('ci-silence-note') || {}).value || '';
+  var payload = {
+    alert_type:     CI_SILENCE_CTX.alert_type,
+    customer_code:  CI_SILENCE_CTX.customer_code,
+    customer_name:  CI_SILENCE_CTX.customer_name,
+    duration_days:  duration === 0 ? null : duration,
+    note:           note || null
+  };
+  btn.disabled = true;
+  status.className = 'ci-silence-status';
+  status.innerHTML = '<span class="gs-spin"></span> Saving…';
+  try {
+    var res = await silenceAlert(payload);
+    if(!res || res.error){ throw new Error((res && res.error) || 'Save failed'); }
+    status.className = 'ci-silence-status ok';
+    status.textContent = '✓ Silenced';
+    var savedCtx = CI_SILENCE_CTX;
+    var savedRes = res;
+    setTimeout(function(){
+      ciCloseSilenceModal();
+      ciToast({
+        text: '🔕 ' + (savedCtx.customer_name || savedCtx.customer_code) +
+              ' silenced ' + (duration === 0 ? 'forever' : 'for ' + duration + ' days'),
+        undoId: savedRes.silence && savedRes.silence.id
+      });
+      // Refresh the page's alerts — bust cache + reload intelligence / margin
+      try { DC['pg-insights'] = null; } catch(e) {}
+      try { DC['pg-margin'] = null; } catch(e) {}
+      if(PG === 'pg-insights') { if(typeof loadIntelligence === 'function') loadIntelligence(); }
+      if(PG === 'pg-margin')   { if(typeof loadMargin === 'function') loadMargin(); }
+      ciRefreshSilenced('both');
+    }, 250);
+  } catch(e){
+    console.error('[silence]', e);
+    status.className = 'ci-silence-status err';
+    status.textContent = '✗ ' + (e.message || 'Save failed');
+    btn.disabled = false;
+  }
+}
+
+/* -------- Silenced drawer (pg-insights + pg-margin) -------- */
+function ciToggleDrawer(which){
+  var suffix = which === 'margin' ? '-margin' : '';
+  var body = document.getElementById('ci-drawer-body' + suffix);
+  var arrow= document.getElementById('ci-drawer-arrow' + suffix);
+  var state= document.getElementById('ci-drawer-state' + suffix);
+  var card = document.getElementById(which === 'margin' ? 'sec-silenced-margin' : 'sec-silenced');
+  if(!body) return;
+  if(body.style.display === 'block'){
+    body.style.display = 'none';
+    if(arrow) arrow.textContent = '▶';
+    if(state) state.textContent = 'expand';
+    if(card)  card.classList.remove('open');
+  } else {
+    body.style.display = 'block';
+    if(arrow) arrow.textContent = '▼';
+    if(state) state.textContent = 'collapse';
+    if(card)  card.classList.add('open');
+    // Refresh on expand
+    ciRefreshSilenced(which || 'both');
+  }
+}
+
+async function ciRefreshSilenced(which){
+  try {
+    var d = await getSilenced();
+    CI_SILENCES = (d && d.silences) || [];
+  } catch(e){
+    console.warn('[silence] refresh failed:', e.message);
+    CI_SILENCES = [];
+  }
+  // Always update both counts / tables if present in DOM
+  ciRenderDrawer('');          // pg-insights
+  ciRenderDrawer('margin');    // pg-margin (margin-only view)
+}
+
+function ciRenderDrawer(which){
+  var suffix = which === 'margin' ? '-margin' : '';
+  var cntEl  = document.getElementById('ci-drawer-count' + suffix);
+  var tbody  = document.getElementById('ci-drawer-tbody' + suffix);
+  if(!tbody) return;
+  var list = CI_SILENCES.slice();
+  if(which === 'margin'){
+    list = list.filter(function(s){ return s.alert_type === 'margin_critical' || s.alert_type === 'margin_warning'; });
+  }
+  if(cntEl) cntEl.textContent = String(list.length);
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:16px">No silenced ' + (which==='margin'?'margin ':'') + 'items.</td></tr>';
+    return;
+  }
+  var now = Date.now();
+  tbody.innerHTML = list.map(function(s){
+    var name = s.customer_name || s.customer_code;
+    var silencedAt = s.silenced_at ? new Date(s.silenced_at).toLocaleString('en-PH', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    var until = 'Forever';
+    if(s.silenced_until){
+      var u = new Date(s.silenced_until);
+      var ms = u.getTime() - now;
+      if(ms <= 0) until = 'Expired';
+      else {
+        var days = Math.ceil(ms / 86400000);
+        until = days + (days === 1 ? ' day' : ' days');
+      }
+    }
+    var reason = s.note ? esc(s.note) : '<span style="color:var(--text3);font-style:italic">—</span>';
+    return '<tr>'
+      + '<td><a class="ci-link" onclick="openCust(\''+ esc(s.customer_code) +'\')">'+ esc(name) +'</a>'
+        + '<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+ esc(s.customer_code) +'</div></td>'
+      + '<td style="font-size:11px;color:var(--text2)">'+ esc(ciAlertTypeLabel(s.alert_type)) +'</td>'
+      + '<td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+ silencedAt +'</td>'
+      + '<td style="font-size:11px;color:'+ (until==='Forever'?'var(--gold)':'var(--text2)') +';font-weight:700;font-family:var(--mono)">'+ until +'</td>'
+      + '<td style="font-size:11px;color:var(--text2)">'+ reason +'</td>'
+      + '<td><button class="ci-unsilence-btn" type="button" onclick="ciUnsilence(\''+ s.id +'\')">🔔 Unsilence</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function ciUnsilence(silenceId){
+  if(!silenceId) return;
+  // Optimistically remove from local list + rerender
+  var removed = CI_SILENCES.find(function(s){ return s.id === silenceId; });
+  CI_SILENCES = CI_SILENCES.filter(function(s){ return s.id !== silenceId; });
+  ciRenderDrawer(''); ciRenderDrawer('margin');
+  try {
+    var res = await unsilenceAlert({ silence_id: silenceId });
+    if(!res || res.error) throw new Error((res && res.error) || 'Unsilence failed');
+    ciToast({ text: '🔔 ' + (removed ? (removed.customer_name || removed.customer_code) : 'Alert') + ' unsilenced' });
+    // Reload alerts so they re-appear
+    try { DC['pg-insights'] = null; } catch(e){}
+    try { DC['pg-margin'] = null; } catch(e){}
+    if(PG === 'pg-insights' && typeof loadIntelligence === 'function') loadIntelligence();
+    if(PG === 'pg-margin'   && typeof loadMargin       === 'function') loadMargin();
+    // Resync from server (source of truth)
+    ciRefreshSilenced('both');
+  } catch(e){
+    console.error('[unsilence]', e);
+    ciToast({ text: '✗ Unsilence failed: ' + e.message, isError: true });
+    ciRefreshSilenced('both');
+  }
+}
+
+/* -------- Legacy AR render -------- */
+function ciRenderLegacyAR(l){
+  if(!l){ return; }
+  sett('ci-legacy-hdr',   fcn(l.customer_count||0) + ' customers · ' + fc(l.total_ar||0) + ' AR · pre-2024 balances');
+  sett('ci-legacy-count', fcn(l.customer_count||0));
+  sett('ci-legacy-ar',    fc(l.total_ar||0));
+  var reg = l.by_region || {};
+  seth('ci-legacy-regions', ['Luzon','Visayas','Mindanao','Other'].map(function(r){
+    return '<span class="ci-pill">'+ r +' <b>'+ fcn(reg[r]||0) +'</b></span>';
+  }).join(''));
+  var top = l.top_accounts || [];
+  if(!top.length){
+    seth('ci-legacy-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No legacy AR — all open balances have post-2024 activity.</td></tr>');
+    return;
+  }
+  var html = top.map(function(r, i){
+    var name = r.name || r.card_code;
+    var yrs  = (r.years_silent != null) ? (r.years_silent + ' yr') : '—';
+    return '<tr>'
+      + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
+      + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(name) +'</a></td>'
+      + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
+      + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
+      + '<td style="font-size:11px;color:var(--text2);font-family:var(--mono)">'+ ciFmtDate(r.last_inv_date) +'</td>'
+      + '<td class="num" style="font-family:var(--mono);color:var(--gold);font-weight:700">'+ esc(yrs) +'</td>'
+      + '<td class="num" style="font-family:var(--mono);color:var(--text2);font-weight:700">'+ fc(r.ar_balance||0) +'</td>'
+      + '<td>' + ciRowMenuBtn('legacy_ar', r.card_code, name, 'Legacy AR ' + fc(r.ar_balance||0)) + '</td>'
+      + '</tr>';
+  }).join('');
+  seth('ci-legacy-tbody', html);
+}
+
+/* -------- Toast notifications -------- */
+function ciToast(opts){
+  var wrap = document.getElementById('ci-toast-wrap');
+  if(!wrap) { console.log('[toast]', opts.text); return; }
+  var id = 'toast-' + (++CI_TOAST_ID);
+  var el = document.createElement('div');
+  el.className = 'ci-toast' + (opts.isError ? ' err' : '');
+  el.id = id;
+  var undoBtn = opts.undoId
+    ? '<button class="ci-toast-undo" type="button" onclick="ciUnsilence(\''+ opts.undoId +'\');document.getElementById(\''+ id +'\').classList.add(\'out\');setTimeout(function(){var e=document.getElementById(\''+ id +'\');if(e)e.remove();},250)">Undo</button>'
+    : '';
+  el.innerHTML = '<div class="ci-toast-text">'+ esc(opts.text||'') +'</div>' + undoBtn;
+  wrap.appendChild(el);
+  setTimeout(function(){
+    var e = document.getElementById(id);
+    if(!e) return;
+    e.classList.add('out');
+    setTimeout(function(){ var e2 = document.getElementById(id); if(e2) e2.remove(); }, 260);
+  }, opts.undoId ? 6000 : 4000);
+}
+
+// Initial fetch of silences once auth settles (used by drawer counts on first paint)
+setTimeout(ciRefreshSilenced, 1500);
 
 /* =========================================================================
    TRACK 2 — SOA generation, Global customer search, Inventory drill-down

@@ -1,6 +1,7 @@
 const { query } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
+const { isNonCustomer } = require('./lib/non-customer-codes')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -112,7 +113,15 @@ module.exports = async (req, res) => {
     const total = countRows[0]?.total || 0
     const pages = Math.ceil(total / limitNum)
 
-    const result = { customers, total, page: pageNum, pages, limit: limitNum }
+    // Filter out warehouse/internal CardCodes before returning
+    const customersClean = customers.filter(c => !isNonCustomer(c.CardCode))
+    const excluded = customers.length - customersClean.length
+    const result = {
+      customers: customersClean,
+      total: Math.max(0, total - excluded),
+      page: pageNum, pages, limit: limitNum,
+      non_customer_excluded: excluded
+    }
     cache.set(cacheKey, result, 600)
     res.json(result)
   } catch (err) {

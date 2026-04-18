@@ -18,7 +18,7 @@ app.use(cors({
     // Block everything else
     callback(new Error('CORS not allowed from ' + origin));
   },
-  methods: ['GET', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['x-session-id', 'content-type']
 }))
 
@@ -47,6 +47,9 @@ const itemizedHandler = require('./api/itemized')
 const itemizedMetaHandler = require('./api/itemized-meta')
 const customerSoaHandler = require('./api/customer-soa')
 const searchHandler = require('./api/search')
+const silenceHandler = require('./api/silence')
+const unsilenceHandler = require('./api/unsilence')
+const silencedHandler = require('./api/silenced')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -65,6 +68,9 @@ app.get('/api/itemized', itemizedHandler)
 app.get('/api/itemized/meta', itemizedMetaHandler)
 app.get('/api/customer/soa', customerSoaHandler)
 app.get('/api/search', searchHandler)
+app.post('/api/silence', silenceHandler)
+app.post('/api/unsilence', unsilenceHandler)
+app.get('/api/silenced', silencedHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
