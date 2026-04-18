@@ -3272,10 +3272,26 @@ function initApp(s) {
   // Role-based landing (Sprint B-EVP Day 1): CEO / EVP / exec / admin → EVP mobile home
   var _r = (s.role||'').toLowerCase();
   var _isExec = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
+  console.log('[EVP] role routing:', _r, '→ isExec:', _isExec);
   if(_isExec){
     document.body.classList.add('role-evp');
-    if(typeof navTo==='function'){ navTo('pg-evp-home'); }
-    else { PG='pg-evp-home'; loadPage('pg-evp-home'); }
+    // Robust page swap — bypass CSS specificity: force inline styles so pg-home cannot leak
+    var _allPages = document.querySelectorAll('.page');
+    for(var _i=0;_i<_allPages.length;_i++){
+      _allPages[_i].classList.remove('active');
+      _allPages[_i].style.display = 'none';
+    }
+    var _evp = document.getElementById('pg-evp-home');
+    if(_evp){
+      _evp.classList.add('active');
+      _evp.style.display = 'block';
+    }
+    // Titles + state
+    if(document.getElementById('topbar-title')) document.getElementById('topbar-title').textContent = 'EVP';
+    if(document.getElementById('topbar-sub'))   document.getElementById('topbar-sub').textContent   = 'Executive Overview';
+    PG = 'pg-evp-home';
+    // Kick data load directly (redundant with loadPage but guarantees it runs even if navTo path has issues)
+    if(typeof loadEvpHome==='function') { try { loadEvpHome(); } catch(e){ console.error('[EVP] loadEvpHome failed:', e); } }
   } else {
     loadPage('pg-home');
   }
@@ -3438,8 +3454,12 @@ var pageTitles = {
 };
 
 function navTo(id, navItem){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
-  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){
+    p.classList.remove('active');
+    p.style.display = '';   // clear any inline display so .page/.page.active CSS rules apply cleanly
+  });
+  var _tgt = document.getElementById(id);
+  if(_tgt){ _tgt.classList.add('active'); _tgt.style.display = ''; }
   if(navItem){
     document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
     navItem.classList.add('active');
@@ -3592,8 +3612,8 @@ async function loadHome(){
         var el = sel('hk-'+prefix+'-d');
         if(el){ el.className='kpi-delta '+cls; el.textContent=arrow+' '+Math.abs(deltaPct).toFixed(1)+'%'; }
       }
-      if(ytdActual!=null) sett('hk-'+prefix+'-ytd', formatFn(ytdActual));
-      if(ytdBudget!=null) sett('hk-'+prefix+'-ytd-bud','/ '+formatFn(ytdBudget));
+      if(ytdActual!=null){ var eA=sel('hk-'+prefix+'-ytd'); if(eA) eA.innerHTML = formatFn(ytdActual); }
+      if(ytdBudget!=null){ var eB=sel('hk-'+prefix+'-ytd-bud'); if(eB) eB.innerHTML = '/ '+formatFn(ytdBudget); }
       var bar = sel('hk-'+prefix+'-bar');
       if(bar){ bar.style.width = Math.min(pct,100)+'%'; bar.style.background = barColor(pct); }
       var st = sel('hk-'+prefix+'-pct');
@@ -3608,7 +3628,10 @@ async function loadHome(){
       var volMtd = UT==='Bags' ? d.volume_bags : d.volume_mt;
       var volYtd = UT==='Bags' ? (ytd.volume_bags||ytd.volume_mt*50) : ytd.volume_mt; // fallback: 50 bags/MT
       var volBud = UT==='Bags' ? (bud.ytd_bags || bud.ytd_mt*50) : bud.ytd_mt;
-      var volFmt = UT==='Bags' ? function(n){return fn(n)+' bags'} : fn;
+      // Volume shown with comma separator + MT suffix (e.g. "8,179 MT" not "8.2K")
+      var volFmt = UT==='Bags'
+        ? function(n){ return fcn(Math.round(n))+'<span style="font-size:11px;color:var(--text3);font-weight:500"> bags</span>'; }
+        : function(n){ return fcn(Math.round(n))+'<span style="font-size:11px;color:var(--text3);font-weight:500"> MT</span>'; };
       // 1-4: Sales / Volume / GM / GM-per-Ton
       setCard('sales', d.revenue,      dp.revenue,      ytd.revenue,      bud.ytd_sales,  fc);
       setCard('vol',   volMtd,         dp.volume_mt,    volYtd,           volBud,         volFmt);
@@ -3793,8 +3816,8 @@ async function loadSales(){
     console.log('[SALES] Rendering:', Object.keys(d));
     var kp = d.kpis || d;
     // KPIs — bind to top-level (new) or legacy aliases
-    if(kp.volume_mt!=null)     animateNumber(sel('sk-vol'),     kp.volume_mt,     function(v){return fn(v)+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
-    if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  kp.ytd_volume_mt, function(v){return fn(v)+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    if(kp.volume_mt!=null)     animateNumber(sel('sk-vol'),     kp.volume_mt,     function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  kp.ytd_volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
     if(kp.revenue!=null)       animateNumber(sel('sk-sales'),   kp.revenue,       fc);
     if(kp.gmt!=null)           animateNumber(sel('sk-gmt'),     kp.gmt,           function(v){return '₱'+fcn(Math.round(v))});
     // Deltas
