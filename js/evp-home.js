@@ -319,6 +319,16 @@
   }
 
   // --- More-menu bottom sheet -------------------------------------------------
+  // Scroll lock is handled in releaseScrollLock() so there is ONE authoritative
+  // reset. Any code path (closeEvpSheet, navTo, page unload, etc.) that may leave
+  // body overflow stuck calls releaseScrollLock() to guarantee scrollability.
+  function releaseScrollLock(){
+    document.body.classList.remove('evp-sheet-open');
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.documentElement.style.overflow = '';
+  }
   function openEvpMore(){
     var sheet = $('evp-more-sheet');
     var bd    = $('evp-sheet-backdrop');
@@ -331,8 +341,11 @@
     var bd    = $('evp-sheet-backdrop');
     if(sheet) sheet.classList.remove('open');
     if(bd)    bd.classList.remove('open');
-    document.body.classList.remove('evp-sheet-open');
+    releaseScrollLock();
   }
+  // Belt-and-suspenders: also release on history nav + visibility change
+  window.addEventListener('pageshow',         releaseScrollLock);
+  window.addEventListener('visibilitychange', releaseScrollLock);
 
   // --- Bottom-nav active-state sync -------------------------------------------
   // navTo() calls this after every page change. Highlights the matching nav item,
@@ -358,6 +371,7 @@
   window.loadEvpHome        = loadEvpHome;
   window.openEvpMore        = openEvpMore;
   window.closeEvpSheet      = closeEvpSheet;
+  window.releaseScrollLock  = releaseScrollLock;
   window.updateEvpNavActive = updateEvpNavActive;
   window.EVP_STATE          = EVP_STATE;
 })();
