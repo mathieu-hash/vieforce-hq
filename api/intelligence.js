@@ -1,8 +1,9 @@
-const { query } = require('./_db')
+const { query, queryH, queryBoth } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
+const { getCustomerMap } = require('./lib/customer-map')
 
 // --- Scoring helpers (deterministic, explainable) ---
 function scoreRescue(ar_balance, days_silent) {
@@ -59,15 +60,32 @@ module.exports = async (req, res) => {
     const silences  = await getActiveSilences(session.id)
     const silenceIdx = buildSilenceIndex(silences)
 
+    // Customer-code translation map — Jan 2026 SAP migration re-keyed every CardCode,
+    // so historical rows must be translated into current code-space before merging.
+    const codeMap = await getCustomerMap()
+    const h2c = codeMap.historicalToCurrent
+    // Translate historical recordsets' CardCode in place; drop rows with no current equiv.
+    const rekey = rows => {
+      const out = []
+      for (const r of rows) {
+        const cc = h2c.get(r.CardCode)
+        if (cc) out.push({ ...r, CardCode: cc })
+      }
+      return out
+    }
+
     // ============== Q1: per-customer activity (36mo) + 2024+ flag =========
-    const actBase = await query(`
+    // 36-mo scan spans the 2026-01-01 cutoff. Run against BOTH DBs and merge by CardCode.
+    // Rolling-window columns (vol_30d / vol_90d / rev_30d / rev_90d) are entirely post-cutoff
+    // so the historical DB returns 0 for them (DATEADD(DAY,-30,GETDATE()) is >= 2026-03-19).
+    // CardName / frozen_for / bp_status come from OCRD — prefer current over historical.
+    const Q1_SQL = `
       SELECT
         T0.CardCode,
         MAX(T0.CardName)                                                          AS CardName,
         MAX(OC.frozenFor)                                                         AS frozen_for,
         MAX(OC.U_BpStatus)                                                        AS bp_status,
         MAX(T0.DocDate)                                                           AS last_order_date,
-        DATEDIFF(DAY, MAX(T0.DocDate), GETDATE())                                 AS days_silent,
         COUNT(DISTINCT T0.DocEntry)                                               AS order_count,
         SUM(CASE WHEN T0.DocDate >= '2024-01-01' THEN 1 ELSE 0 END)              AS orders_since_2024,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)              AS vol_36m_mt,
@@ -87,10 +105,72 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate >= DATEADD(MONTH, -36, GETDATE())
         AND T0.CANCELED = 'N'
       GROUP BY T0.CardCode
-    `)
+    `
+    const [actCurrent, actHistoricalRaw] = await Promise.all([
+      query(Q1_SQL).catch(e => { console.warn('[intelligence] Q1 current failed:', e.message); return [] }),
+      queryH(Q1_SQL).catch(e => { console.warn('[intelligence] Q1 historical failed:', e.message); return [] })
+    ])
+    const actHistorical = rekey(actHistoricalRaw)  // translate CL00xxx → CA000xxx
+    const actMap = new Map()
+    // Merge: current first (source of truth for OCRD-backed fields), then historical (fills history)
+    for (const r of actCurrent) {
+      actMap.set(r.CardCode, {
+        CardCode: r.CardCode,
+        CardName: r.CardName,
+        frozen_for: r.frozen_for,
+        bp_status: r.bp_status,
+        last_order_date: r.last_order_date,
+        order_count: Number(r.order_count || 0),
+        orders_since_2024: Number(r.orders_since_2024 || 0),
+        vol_36m_mt: Number(r.vol_36m_mt || 0),
+        rev_36m: Number(r.rev_36m || 0),
+        vol_30d_mt: Number(r.vol_30d_mt || 0),
+        vol_90d_mt: Number(r.vol_90d_mt || 0),
+        rev_30d: Number(r.rev_30d || 0),
+        rev_90d: Number(r.rev_90d || 0)
+      })
+    }
+    for (const r of actHistorical) {
+      const ex = actMap.get(r.CardCode)
+      if (ex) {
+        ex.CardName = ex.CardName || r.CardName
+        ex.frozen_for = ex.frozen_for || r.frozen_for
+        ex.bp_status = ex.bp_status || r.bp_status
+        const histLast = r.last_order_date ? new Date(r.last_order_date) : null
+        const curLast  = ex.last_order_date ? new Date(ex.last_order_date) : null
+        if (histLast && (!curLast || histLast > curLast)) ex.last_order_date = r.last_order_date
+        ex.order_count       += Number(r.order_count || 0)
+        ex.orders_since_2024 += Number(r.orders_since_2024 || 0)
+        ex.vol_36m_mt        += Number(r.vol_36m_mt || 0)
+        ex.rev_36m           += Number(r.rev_36m || 0)
+        // rolling windows intentionally NOT added — historical returns 0 anyway
+      } else {
+        actMap.set(r.CardCode, {
+          CardCode: r.CardCode,
+          CardName: r.CardName,
+          frozen_for: r.frozen_for,
+          bp_status: r.bp_status,
+          last_order_date: r.last_order_date,
+          order_count: Number(r.order_count || 0),
+          orders_since_2024: Number(r.orders_since_2024 || 0),
+          vol_36m_mt: Number(r.vol_36m_mt || 0),
+          rev_36m: Number(r.rev_36m || 0),
+          vol_30d_mt: 0, vol_90d_mt: 0, rev_30d: 0, rev_90d: 0
+        })
+      }
+    }
+    // Recompute days_silent from merged last_order_date
+    const today = new Date()
+    const actBase = [...actMap.values()].map(r => ({
+      ...r,
+      days_silent: r.last_order_date
+        ? Math.floor((today - new Date(r.last_order_date)) / 86400000)
+        : 9999
+    }))
 
     // ============== Q2: last-order details ==============
-    const lastOrderDetail = await query(`
+    // Also spans cutoff. Take most-recent row across both DBs.
+    const Q2_SQL = `
       WITH Ranked AS (
         SELECT
           T0.CardCode,
@@ -110,40 +190,67 @@ module.exports = async (req, res) => {
       SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpName AS sales_rep
       FROM Ranked
       WHERE rn = 1
-    `)
+    `
+    const [loCurrent, loHistoricalRaw] = await Promise.all([
+      query(Q2_SQL).catch(() => []),
+      queryH(Q2_SQL).catch(() => [])
+    ])
+    const loHistorical = rekey(loHistoricalRaw)
+    const loMap = new Map()
+    for (const r of [...loHistorical, ...loCurrent]) {  // current wins ties via insertion order
+      const existing = loMap.get(r.CardCode)
+      const thisDate = r.last_order_date ? new Date(r.last_order_date) : null
+      const exDate   = existing?.last_order_date ? new Date(existing.last_order_date) : null
+      if (!existing || (thisDate && (!exDate || thisDate > exDate))) loMap.set(r.CardCode, r)
+    }
+    const lastOrderDetail = [...loMap.values()]
 
     // ============== Q3: dominant region (last 12mo) ==============
-    const regionsRaw = await query(`
-      WITH RegAgg AS (
-        SELECT
-          T0.CardCode,
-          CASE
-            WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
-            WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
-            WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
-            ELSE 'Other'
-          END AS region,
-          SUM(T1.LineTotal) AS region_rev
-        FROM OINV T0
-        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-        WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
-          AND T0.CANCELED = 'N'
-        GROUP BY
-          T0.CardCode,
-          CASE
-            WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
-            WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
-            WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
-            ELSE 'Other'
-          END
-      ),
-      Ranked AS (
-        SELECT CardCode, region,
-               ROW_NUMBER() OVER (PARTITION BY CardCode ORDER BY region_rev DESC) AS rn
-        FROM RegAgg
-      )
-      SELECT CardCode, region FROM Ranked WHERE rn = 1
-    `)
+    // 12-mo window spans cutoff. Union + re-rank by (CardCode, region) in Node.
+    const Q3_SQL = `
+      SELECT
+        T0.CardCode,
+        CASE
+          WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
+          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
+          WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
+          ELSE 'Other'
+        END AS region,
+        SUM(T1.LineTotal) AS region_rev
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+        AND T0.CANCELED = 'N'
+      GROUP BY
+        T0.CardCode,
+        CASE
+          WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
+          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
+          WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
+          ELSE 'Other'
+        END
+    `
+    // Run explicitly on each DB so we can rekey historical rows before merging.
+    const [regCur, regHistRaw] = await Promise.all([
+      query(Q3_SQL).catch(() => []),
+      queryH(Q3_SQL).catch(() => [])
+    ])
+    const regionsUnion = [...regCur, ...rekey(regHistRaw)]
+    // Sum rev by (CardCode, region), then pick the region with highest rev per CardCode
+    const regByCust = new Map()
+    for (const r of regionsUnion) {
+      const m = regByCust.get(r.CardCode) || new Map()
+      m.set(r.region, (m.get(r.region) || 0) + Number(r.region_rev || 0))
+      regByCust.set(r.CardCode, m)
+    }
+    const regionsRaw = []
+    for (const [cc, m] of regByCust.entries()) {
+      let best = null
+      for (const [region, rev] of m.entries()) {
+        if (!best || rev > best.rev) best = { region, rev }
+      }
+      if (best) regionsRaw.push({ CardCode: cc, region: best.region })
+    }
 
     // ============== Q4: open-AR per customer (any age) ==============
     const arRows = await query(`
@@ -155,7 +262,8 @@ module.exports = async (req, res) => {
     `)
 
     // ============== Q5: brand basket (12mo) ==============
-    const brandBasket = await query(`
+    // 12-mo window spans cutoff → run explicitly, rekey historical, then sum.
+    const Q5_SQL = `
       SELECT
         T0.CardCode,
         T1.Dscription                                                AS dscription,
@@ -168,18 +276,55 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
         AND T0.CANCELED = 'N'
       GROUP BY T0.CardCode, T1.Dscription
-    `)
+    `
+    const [bbCur, bbHistRaw] = await Promise.all([
+      query(Q5_SQL).catch(() => []),
+      queryH(Q5_SQL).catch(() => [])
+    ])
+    const brandBasketRaw = [...bbCur, ...rekey(bbHistRaw)]
+    const bbMap = new Map()
+    for (const r of brandBasketRaw) {
+      const k = `${r.CardCode}||${r.dscription}`
+      const cur = bbMap.get(k) || { CardCode: r.CardCode, dscription: r.dscription, vol_mt: 0, revenue: 0, kg: 0 }
+      cur.vol_mt  += Number(r.vol_mt  || 0)
+      cur.revenue += Number(r.revenue || 0)
+      cur.kg      += Number(r.kg      || 0)
+      bbMap.set(k, cur)
+    }
+    const brandBasket = [...bbMap.values()]
 
     // ============== Q6: last invoice date (full OINV history, any age) ========
-    // Catches pre-2023 OINV rows for legacy-AR classification (e.g. opening balances)
-    const arLastInv = await query(`
+    // Catches pre-migration OINV for legacy-AR classification — must query BOTH DBs.
+    const Q6_SQL = `
       SELECT T0.CardCode,
              MAX(T0.DocDate) AS last_inv_date,
              SUM(CASE WHEN T0.DocDate >= '2024-01-01' THEN 1 ELSE 0 END) AS orders_since_2024_full
       FROM OINV T0
       WHERE T0.CANCELED = 'N'
       GROUP BY T0.CardCode
-    `)
+    `
+    const [aliCur, aliHistRaw] = await Promise.all([
+      query(Q6_SQL).catch(() => []),
+      queryH(Q6_SQL).catch(() => [])
+    ])
+    const arLastInvRaw = [...aliCur, ...rekey(aliHistRaw)]
+    const arLastInvMergeMap = new Map()
+    for (const r of arLastInvRaw) {
+      const ex = arLastInvMergeMap.get(r.CardCode)
+      const thisLast = r.last_inv_date ? new Date(r.last_inv_date) : null
+      if (!ex) {
+        arLastInvMergeMap.set(r.CardCode, {
+          CardCode: r.CardCode,
+          last_inv_date: r.last_inv_date,
+          orders_since_2024_full: Number(r.orders_since_2024_full || 0)
+        })
+      } else {
+        const exLast = ex.last_inv_date ? new Date(ex.last_inv_date) : null
+        if (thisLast && (!exLast || thisLast > exLast)) ex.last_inv_date = r.last_inv_date
+        ex.orders_since_2024_full += Number(r.orders_since_2024_full || 0)
+      }
+    }
+    const arLastInv = [...arLastInvMergeMap.values()]
 
     // Build customer map
     const regionMap       = new Map(regionsRaw.map(r => [r.CardCode, r.region]))

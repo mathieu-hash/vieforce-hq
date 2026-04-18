@@ -1,5 +1,6 @@
-const { query } = require('./_db')
+const { query, queryH, queryBoth } = require('./_db')
 const { verifySession } = require('./_auth')
+const { toHistoricalCode } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 
 module.exports = async (req, res) => {
@@ -160,25 +161,49 @@ module.exports = async (req, res) => {
         AND T0.DocDate >= DATEADD(YEAR, -1, GETDATE())
     `, { id })
 
-    // --- CY vs LY monthly volume (last 12 months CY, same period LY) ---
-    const cyLy = await query(`
+    // --- CY vs LY monthly volume (last 24 months) — spans 2026-01-01 cutoff ---
+    // The Jan 2026 SAP migration RE-KEYED every CardCode (CL00xxx → CA000xxx).
+    // We must look up the historical CardCode by name before querying historical.
+    const histId = await toHistoricalCode(id).catch(() => null)
+    const CY_LY_SQL = `
       SELECT
         MONTH(T0.DocDate)                                                AS month_num,
         FORMAT(T0.DocDate, 'MMM')                                        AS month_name,
         YEAR(T0.DocDate)                                                 AS yr,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS vol,
         ISNULL(SUM(T1.LineTotal), 0)                                      AS sales,
-        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
-          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
-          ELSE 0 END                                                       AS gm_ton
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)), 0)             AS kg,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gp
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
         AND T0.DocDate >= DATEADD(MONTH, -24, GETDATE())
       GROUP BY MONTH(T0.DocDate), FORMAT(T0.DocDate, 'MMM'), YEAR(T0.DocDate)
-      ORDER BY yr ASC, month_num ASC
-    `, { id })
+    `
+    const [cyRaw, lyRaw] = await Promise.all([
+      query(CY_LY_SQL, { id }),
+      histId
+        ? queryH(CY_LY_SQL, { id: histId }).catch(() => [])
+        : Promise.resolve([])
+    ])
+    const cyLyRaw = [...cyRaw, ...lyRaw]
+
+    // Sum across DBs by (yr, month_num) — defensive against migration-period overlap
+    const cyLyMap = {}
+    for (const r of cyLyRaw) {
+      const k = `${r.yr}-${r.month_num}`
+      const cur = cyLyMap[k] || { month_num: r.month_num, month_name: r.month_name, yr: r.yr, vol: 0, sales: 0, kg: 0, gp: 0 }
+      cur.vol   += Number(r.vol   || 0)
+      cur.sales += Number(r.sales || 0)
+      cur.kg    += Number(r.kg    || 0)
+      cur.gp    += Number(r.gp    || 0)
+      cyLyMap[k] = cur
+    }
+    const cyLy = Object.values(cyLyMap).map(r => ({
+      ...r,
+      gm_ton: r.kg > 0 ? r.gp / (r.kg / 1000.0) : 0
+    })).sort((a, b) => (a.yr - b.yr) || (a.month_num - b.month_num))
 
     const currentYear = new Date().getFullYear()
     const lastYear = currentYear - 1
@@ -210,11 +235,33 @@ module.exports = async (req, res) => {
     })
 
     // --- Account age ---
+    // CreateDate from current DB shows the SAP record creation; use the earlier of
+    // (current_OCRD.CreateDate, historical_first_invoice_date) to capture true tenure
+    // for customers established before the 2026 migration.
     const ageRow = await query(`
-      SELECT DATEDIFF(DAY, T0.CreateDate, GETDATE()) AS age_days
+      SELECT DATEDIFF(DAY, T0.CreateDate, GETDATE()) AS age_days,
+             T0.CreateDate AS create_date
       FROM OCRD T0
       WHERE T0.CardCode = @id
     `, { id })
+
+    const histFirst = histId
+      ? await queryH(`
+          SELECT MIN(T0.DocDate) AS first_inv_date
+          FROM OINV T0
+          WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
+        `, { id: histId }).catch(() => [{ first_inv_date: null }])
+      : [{ first_inv_date: null }]
+
+    const histFirstDate = histFirst[0]?.first_inv_date
+    const createDate = ageRow[0]?.create_date
+    let trueFirstDate = createDate
+    if (histFirstDate && (!createDate || new Date(histFirstDate) < new Date(createDate))) {
+      trueFirstDate = histFirstDate
+    }
+    const trueAgeDays = trueFirstDate
+      ? Math.floor((Date.now() - new Date(trueFirstDate).getTime()) / 86400000)
+      : (ageRow[0]?.age_days || 0)
 
     // --- Volume rank ---
     const rankRow = await query(`
@@ -251,7 +298,8 @@ module.exports = async (req, res) => {
       recent_orders,
       cy_vs_ly: { months, cy_vol, ly_vol },
       monthly_table,
-      account_age_days: ageRow[0]?.age_days || 0,
+      account_age_days: trueAgeDays,
+      first_order_date: trueFirstDate,
       rank_by_volume: rankRow[0]?.rank_num || 0
     }
 

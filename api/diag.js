@@ -1,9 +1,285 @@
-const { query } = require('./_db')
+const { query, queryH } = require('./_db')
+const { getCustomerMap, toHistoricalCode } = require('./lib/customer-map')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  // LY sanity: end-to-end demonstrates the mapping actually resolves to real LY numbers.
+  if (req.query.ly_sanity === '1') {
+    try {
+      const custCode = req.query.code || 'CA000196'
+      const histCode = await toHistoricalCode(custCode)
+      const map = await getCustomerMap()
+
+      const curThis = await query(`
+        SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ytd_vol,
+               ISNULL(SUM(T1.LineTotal), 0) AS ytd_sales,
+               COUNT(DISTINCT T0.DocEntry) AS invoices
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
+          AND T0.DocDate >= DATEFROMPARTS(YEAR(GETDATE()), 1, 1)
+      `, { id: custCode })
+
+      const histLy = histCode ? await queryH(`
+        SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ytd_vol,
+               ISNULL(SUM(T1.LineTotal), 0) AS ytd_sales,
+               COUNT(DISTINCT T0.DocEntry) AS invoices
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
+          AND T0.DocDate BETWEEN @lyStart AND @lyEnd
+      `, {
+        id: histCode,
+        lyStart: new Date(new Date().getFullYear() - 1, 0, 1),
+        lyEnd: new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate())
+      }) : null
+
+      const histFullYr = histCode ? await queryH(`
+        SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS fy_vol,
+               ISNULL(SUM(T1.LineTotal), 0) AS fy_sales
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
+          AND YEAR(T0.DocDate) = YEAR(DATEADD(YEAR,-1,GETDATE()))
+      `, { id: histCode }) : null
+
+      return res.json({
+        _mode: 'ly_sanity_check',
+        map_stats: map.counts,
+        queried_current_code: custCode,
+        resolved_historical_code: histCode,
+        current_ytd: curThis[0] || null,
+        historical_ly_ytd: histLy ? histLy[0] : null,
+        historical_ly_full_year: histFullYr ? histFullYr[0] : null,
+        vs_ly_pct: histLy && histLy[0] && Number(histLy[0].ytd_vol) > 0
+          ? Math.round(((Number(curThis[0].ytd_vol) - Number(histLy[0].ytd_vol)) / Number(histLy[0].ytd_vol)) * 1000) / 10
+          : null
+      })
+    } catch (err) {
+      return res.status(500).json({ error: err.message, stack: err.stack })
+    }
+  }
+
+  // Customer-mapping probe — investigates whether CardCodes match across DBs
+  if (req.query.cust_map === '1') {
+    try {
+      // Count exact-code overlap
+      const overlap = await query(`
+        SELECT COUNT(*) AS n
+        FROM OCRD CUR
+        WHERE CUR.CardType = 'C'
+          AND CUR.CardCode IN (SELECT CardCode FROM OPENROWSET(
+            'SQLNCLI', 'Server=(local);Trusted_Connection=yes;', 'SELECT CardCode FROM Vienovo_Old.dbo.OCRD'
+          ) X)
+      `).catch(() => null)
+
+      // Simpler: pull both customer lists and intersect in Node
+      const cur = await query(`SELECT CardCode, CardName, CreateDate FROM OCRD WHERE CardType='C'`)
+      const hist = await queryH(`SELECT CardCode, CardName, CreateDate FROM OCRD WHERE CardType='C'`)
+
+      const histByCode = new Map(hist.map(r => [r.CardCode, r]))
+      const histByName = new Map()
+      for (const r of hist) {
+        const k = (r.CardName || '').trim().toUpperCase()
+        if (k) histByName.set(k, r)
+      }
+
+      let codeMatch = 0, nameOnlyMatch = 0, noMatch = 0
+      const sampleRekeyed = []   // current code differs from historical code (matched by name)
+      const sampleOrphans = []   // current code with no name match in history either
+      const fixedMar = []         // when CreateDate >= 2025-12-01 (likely migration-created)
+      const oldOnlyCount = hist.length - cur.length  // very rough
+
+      for (const c of cur) {
+        if (histByCode.has(c.CardCode)) {
+          codeMatch++
+          continue
+        }
+        const k = (c.CardName || '').trim().toUpperCase()
+        const h = k ? histByName.get(k) : null
+        if (h) {
+          nameOnlyMatch++
+          if (sampleRekeyed.length < 30) {
+            sampleRekeyed.push({
+              current_code: c.CardCode, historical_code: h.CardCode,
+              name: c.CardName, current_create: c.CreateDate, historical_create: h.CreateDate
+            })
+          }
+        } else {
+          noMatch++
+          if (sampleOrphans.length < 20) {
+            sampleOrphans.push({
+              current_code: c.CardCode, name: c.CardName, current_create: c.CreateDate
+            })
+          }
+        }
+        if (c.CreateDate && new Date(c.CreateDate) >= new Date('2025-12-01')) fixedMar.push(c.CardCode)
+      }
+
+      // Check: how many "active" customers (with 2026 invoices) fall into each bucket?
+      const activeCodes = await query(`
+        SELECT DISTINCT CardCode FROM OINV
+        WHERE CANCELED='N' AND DocDate >= '2026-01-01'
+      `)
+      const activeSet = new Set(activeCodes.map(r => r.CardCode))
+      let activeCodeMatch = 0, activeRekeyed = 0, activeOrphan = 0
+      for (const c of cur) {
+        if (!activeSet.has(c.CardCode)) continue
+        if (histByCode.has(c.CardCode)) { activeCodeMatch++; continue }
+        const k = (c.CardName || '').trim().toUpperCase()
+        if (k && histByName.get(k)) activeRekeyed++
+        else activeOrphan++
+      }
+
+      // FALCOR by name in historical
+      const falcorHist = await queryH(`
+        SELECT CardCode, CardName, CreateDate, Balance
+        FROM OCRD WHERE CardName LIKE '%FALCOR%'
+      `).catch(() => [])
+
+      return res.json({
+        _mode: 'customer_code_mapping_audit',
+        totals: {
+          current_customers: cur.length,
+          historical_customers: hist.length
+        },
+        all_current_customers: {
+          code_match_with_historical: codeMatch,
+          name_match_only_rekeyed:    nameOnlyMatch,
+          no_match_at_all:            noMatch,
+          new_in_2025_12_or_later:    fixedMar.length
+        },
+        active_2026_customers: {
+          total_active:              activeSet.size,
+          code_match:                activeCodeMatch,
+          rekeyed_name_match:        activeRekeyed,
+          no_historical_match:       activeOrphan
+        },
+        sample_rekeyed_customers: sampleRekeyed,
+        sample_no_match: sampleOrphans,
+        falcor_in_historical: falcorHist
+      })
+    } catch (err) {
+      return res.status(500).json({ error: err.message, stack: err.stack })
+    }
+  }
+
+  // Historical DB probe — verifies Vienovo_Old connection, schema parity,
+  // yearly volumes, customer continuity with Vienovo_Live
+  if (req.query.hist === '1') {
+    try {
+      const current_db = await query(`SELECT DB_NAME() AS db, @@VERSION AS ver`)
+      const historical_db = await queryH(`SELECT DB_NAME() AS db, @@VERSION AS ver`)
+
+      // Schema parity — check key tables exist in historical
+      const tables = await queryH(`
+        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME IN ('OINV','INV1','OCRD','OITM','ODLN','DLN1','OSLP','OCTG','ORCT','ORDR','RDR1','OWOR','OWHS')
+        ORDER BY TABLE_NAME
+      `)
+
+      // Invoice counts + revenue per year, 2015-2026
+      const perYear = await queryH(`
+        SELECT YEAR(DocDate) AS yr,
+               COUNT(*) AS invoices,
+               COUNT(DISTINCT CardCode) AS customers,
+               ISNULL(SUM(DocTotal), 0) AS revenue
+        FROM OINV
+        WHERE CANCELED = 'N' AND DocDate >= '2015-01-01'
+        GROUP BY YEAR(DocDate)
+        ORDER BY yr
+      `)
+
+      // Volume per year (MT)
+      const volPerYear = await queryH(`
+        SELECT YEAR(T0.DocDate) AS yr,
+               ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS mt
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CANCELED = 'N' AND T0.DocDate >= '2015-01-01'
+        GROUP BY YEAR(T0.DocDate)
+        ORDER BY yr
+      `)
+
+      // Customer overlap
+      const histCust = await queryH(`SELECT COUNT(DISTINCT CardCode) AS n FROM OCRD WHERE CardType='C'`)
+      const currCust = await query(`SELECT COUNT(DISTINCT CardCode) AS n FROM OCRD WHERE CardType='C'`)
+
+      // CA000196 spot-check (FALCOR MARKETING)
+      const spotHist = await queryH(`
+        SELECT TOP 1 CardCode, CardName, CreateDate, validFor
+        FROM OCRD WHERE CardCode = 'CA000196'
+      `).catch(e => ({ error: e.message }))
+      const spotCurr = await query(`
+        SELECT TOP 1 CardCode, CardName, CreateDate, validFor
+        FROM OCRD WHERE CardCode = 'CA000196'
+      `).catch(e => ({ error: e.message }))
+
+      // Oct 2025 MT spot (should be non-zero in historical)
+      const oct2025 = await queryH(`
+        SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS mt,
+               COUNT(DISTINCT T0.DocEntry) AS invoices
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CANCELED = 'N'
+          AND T0.DocDate >= '2025-10-01' AND T0.DocDate < '2025-11-01'
+      `)
+
+      // CA000196 volume history in old DB
+      const ca196Hist = await queryH(`
+        SELECT YEAR(T0.DocDate) AS yr,
+               ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS mt,
+               ISNULL(SUM(T1.LineTotal), 0) AS revenue
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        WHERE T0.CardCode = 'CA000196' AND T0.CANCELED = 'N'
+        GROUP BY YEAR(T0.DocDate)
+        ORDER BY yr
+      `)
+
+      // First-ever order date per DB (for account age)
+      const firstHist = await queryH(`SELECT MIN(DocDate) AS first_date FROM OINV WHERE CANCELED='N'`)
+      const firstCurr = await query(`SELECT MIN(DocDate) AS first_date FROM OINV WHERE CANCELED='N'`)
+
+      return res.json({
+        _mode: 'historical_db_probe',
+        current: { db: current_db[0]?.db, first_invoice: firstCurr[0]?.first_date },
+        historical: { db: historical_db[0]?.db, first_invoice: firstHist[0]?.first_date },
+        schema_parity: {
+          expected: ['OINV','INV1','OCRD','OITM','ODLN','DLN1','OSLP','OCTG','ORCT','ORDR','RDR1','OWOR','OWHS'],
+          found_in_historical: tables.map(t => t.TABLE_NAME)
+        },
+        yearly_invoices_historical: perYear,
+        yearly_volume_historical_mt: volPerYear,
+        customers: {
+          historical_distinct: histCust[0]?.n || 0,
+          current_distinct: currCust[0]?.n || 0
+        },
+        spot_check_CA000196: {
+          historical: spotHist[0] || spotHist,
+          current: spotCurr[0] || spotCurr,
+          code_match: (spotHist[0]?.CardCode === 'CA000196') && (spotCurr[0]?.CardCode === 'CA000196'),
+          historical_yearly: ca196Hist
+        },
+        oct_2025_sanity: {
+          historical_mt: oct2025[0]?.mt || 0,
+          historical_invoices: oct2025[0]?.invoices || 0,
+          expected: 'non-zero — FY2025 pre-migration data'
+        }
+      })
+    } catch (err) {
+      return res.status(500).json({ error: err.message, stack: err.stack })
+    }
+  }
 
   try {
     // Check what weight columns exist on OITM

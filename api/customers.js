@@ -1,7 +1,8 @@
-const { query } = require('./_db')
+const { query, queryH } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
+const { rekeyHistoricalRows } = require('./lib/customer-map')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -113,8 +114,79 @@ module.exports = async (req, res) => {
     const total = countRows[0]?.total || 0
     const pages = Math.ceil(total / limitNum)
 
+    // --- LY per-customer volume + YTD-rank (from historical DB) ---
+    // LY YTD = 2025-01-01 → same (month, day) of 2025.
+    // Full-year 2025 rank is used for rank_change (#N LY → #M this year).
+    const lyYtdFrom = new Date(new Date().getFullYear() - 1, 0, 1)
+    const lyYtdTo   = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate())
+    const lyRows = await queryH(`
+      SELECT
+        T0.CardCode                                                     AS code,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS ly_volume,
+        ISNULL(SUM(T1.LineTotal), 0)                                    AS ly_revenue
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @lyFrom AND @lyTo
+      GROUP BY T0.CardCode
+    `, { lyFrom: lyYtdFrom, lyTo: lyYtdTo }).catch(e => {
+      console.warn('[customers] LY YTD query failed:', e.message); return []
+    })
+
+    const lyFullYearRows = await queryH(`
+      SELECT
+        T0.CardCode                                                     AS code,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS ly_fy_volume
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.CANCELED = 'N'
+        AND YEAR(T0.DocDate) = YEAR(DATEADD(YEAR,-1,GETDATE()))
+      GROUP BY T0.CardCode
+    `).catch(e => {
+      console.warn('[customers] LY full-year query failed:', e.message); return []
+    })
+
+    // Translate historical CardCodes back to current CardCodes via the name-based map.
+    // Rows whose historical code has no current equivalent are dropped (e.g. dormant
+    // pre-2026 customers not carried over — they can't be compared YoY in any case).
+    const lyRowsMapped = await rekeyHistoricalRows(lyRows, 'code').catch(() => [])
+    const lyFullYearMapped = await rekeyHistoricalRows(lyFullYearRows, 'code').catch(() => [])
+
+    const lyYtdMap = Object.fromEntries(lyRowsMapped.map(r => [r.code, r]))
+    const lyFyMap = Object.fromEntries(lyFullYearMapped.map(r => [r.code, Number(r.ly_fy_volume || 0)]))
+
+    // Rank by LY full-year volume (using translated current codes)
+    const lyRanked = [...lyFullYearMapped].sort((a, b) => b.ly_fy_volume - a.ly_fy_volume)
+    const lyRankByCode = {}
+    lyRanked.forEach((r, i) => { lyRankByCode[r.code] = i + 1 })
+
     // Filter out warehouse/internal CardCodes before returning
-    const customersClean = customers.filter(c => !isNonCustomerRow(c.CardCode, c.CardName))
+    const customersClean = customers
+      .filter(c => !isNonCustomerRow(c.CardCode, c.CardName))
+      .map(c => {
+        const ly = lyYtdMap[c.CardCode] || {}
+        const lyVol = Number(ly.ly_volume || 0)
+        const cyVol = Number(c.ytd_volume || 0)
+        return {
+          ...c,
+          ly_volume: Math.round(lyVol * 10) / 10,
+          ly_revenue: Math.round(Number(ly.ly_revenue || 0)),
+          vs_ly_pct: lyVol > 0 ? Math.round(((cyVol - lyVol) / lyVol) * 1000) / 10 : null,
+          ly_rank: lyRankByCode[c.CardCode] || null
+        }
+      })
+
+    // Current-year rank (by ytd_volume, within the filtered set)
+    const cyRanked = [...customersClean].sort((a, b) => Number(b.ytd_volume || 0) - Number(a.ytd_volume || 0))
+    const cyRankByCode = {}
+    cyRanked.forEach((c, i) => { cyRankByCode[c.CardCode] = i + 1 })
+    for (const c of customersClean) {
+      c.cy_rank = cyRankByCode[c.CardCode] || null
+      c.rank_change = c.ly_rank && c.cy_rank ? c.ly_rank - c.cy_rank : null  // positive = moved up
+    }
+
     const excluded = customers.length - customersClean.length
     const result = {
       customers: customersClean,

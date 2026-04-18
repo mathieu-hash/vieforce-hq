@@ -1,4 +1,4 @@
-const { query } = require('./_db')
+const { query, queryH, queryBoth } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
@@ -68,16 +68,22 @@ module.exports = async (req, res) => {
     const lyStart = new Date(new Date().getFullYear() - 1, 0, 1)
     const lyEnd = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate())
 
-    const repSalesLY = await query(`
+    // LY window (entire prior-year YTD) is pre-2026 cutoff → historical DB.
+    // Join by SlpName (not SlpCode) — SAP migrations can re-key rep codes the
+    // same way they re-keyed customer codes. SlpName is the stable identifier.
+    const repSalesLY = await queryH(`
       SELECT
-        T0.SlpCode,
+        S.SlpName,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS ly_vol
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
       WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
-      GROUP BY T0.SlpCode
-    `, { lyStart, lyEnd })
+      GROUP BY S.SlpName
+    `, { lyStart, lyEnd }).catch(e => {
+      console.warn('[team] LY query failed:', e.message); return []
+    })
 
     // --- Speed by rep (current month, from ODLN) ---
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -138,7 +144,8 @@ module.exports = async (req, res) => {
     })
 
     // --- Monthly volume by rep (last 6 months) ---
-    const monthlyByRep = await query(`
+    // 6-month window may cross 2026-01-01 cutoff → union both DBs and sum by (SlpCode, month).
+    const monthlyByRepRaw = await queryBoth(`
       SELECT
         T0.SlpCode,
         S.SlpName,
@@ -150,8 +157,19 @@ module.exports = async (req, res) => {
       LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
       WHERE T0.DocDate >= DATEADD(MONTH, -6, GETDATE()) AND T0.CANCELED = 'N'
       GROUP BY T0.SlpCode, S.SlpName, FORMAT(T0.DocDate, 'yyyy-MM')
-      ORDER BY month ASC
     `)
+    // Key by (SlpName, month) — SlpCodes can differ across migration, names don't.
+    const normSlp = s => (s || '').toUpperCase().trim()
+    const mrepMap = {}
+    for (const r of monthlyByRepRaw) {
+      const n = normSlp(r.SlpName)
+      if (!n) continue
+      const k = `${n}|${r.month}`
+      const cur = mrepMap[k] || { SlpName: r.SlpName, _slpNorm: n, month: r.month, vol: 0 }
+      cur.vol += Number(r.vol || 0)
+      mrepMap[k] = cur
+    }
+    const monthlyByRep = Object.values(mrepMap).sort((a, b) => a.month.localeCompare(b.month))
 
     // Build RSM scorecard by matching SlpName patterns to hierarchy
     const rsms = RSM_HIERARCHY.map(rsm => {
@@ -164,7 +182,10 @@ module.exports = async (req, res) => {
       })
 
       const slpCode = match ? match.SlpCode : null
-      const lyMatch = slpCode ? repSalesLY.find(r => r.SlpCode === slpCode) : null
+      // LY lookup by SlpName (codes differ across the migration)
+      const lyMatch = match && match.SlpName
+        ? repSalesLY.find(r => r.SlpName && r.SlpName.toUpperCase().trim() === match.SlpName.toUpperCase().trim())
+        : null
       const speedMatch = slpCode ? repSpeed.find(r => r.SlpCode === slpCode) : null
       const dsoMatch = slpCode ? repDSO.find(r => r.SlpCode === slpCode) : null
       const silentMatch = slpCode ? repSilent.find(r => r.SlpCode === slpCode) : null
@@ -199,8 +220,13 @@ module.exports = async (req, res) => {
       months: recentMonths,
       rsms: rsms.map(r => r.name),
       grid: rsms.map(rsm => {
+        const rsmNorm = rsm.name.toUpperCase().trim()
         return recentMonths.map(month => {
-          const match = monthlyByRep.find(m => m.SlpCode === rsm.slp_code && m.month === month)
+          // Match by SlpName (normalized) rather than SlpCode — survives migration re-keying
+          const match = monthlyByRep.find(m =>
+            m.month === month &&
+            m._slpNorm && (m._slpNorm.includes(rsmNorm) || rsmNorm.includes(m._slpNorm))
+          )
           return match ? Math.round(match.vol) : 0
         })
       })
