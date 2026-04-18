@@ -10,7 +10,8 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#00293A">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/evp-home.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -1335,6 +1336,161 @@ body{
               </div>
             </div>
             <div class="card-body"><div class="chart-wrap" style="height:300px"><canvas id="homeQuarterlyChart"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== EVP MOBILE HOME (Sprint B-EVP Day 1) ===== -->
+      <div class="page" id="pg-evp-home">
+        <div class="evp-shell">
+
+          <!-- Mobile header -->
+          <div class="evp-mobile-hdr">
+            <div class="evp-hdr-greet">
+              <div class="evp-hdr-time" id="evp-hdr-time">Good morning, Mat 🌅</div>
+              <div class="evp-hdr-sub" id="evp-hdr-sub">● LIVE · loading…</div>
+            </div>
+            <div class="evp-hdr-badge">👔 EVP</div>
+          </div>
+
+          <!-- 2033 Journey Hero -->
+          <div class="evp-hero">
+            <div class="evp-hero-label">🎯 2033 VISION · 1M MT · TOP 3 PH</div>
+            <div class="evp-hero-title">Journey to 2033</div>
+            <div class="evp-journey-bar">
+              <div class="evp-journey-fill" id="evp-journey-fill"></div>
+              <div class="evp-journey-pace" id="evp-journey-pace"></div>
+            </div>
+            <div class="evp-journey-meta">
+              <span>YTD: <b id="evp-ytd-mt">—</b> MT</span>
+              <span id="evp-pace-pct">—%</span>
+              <span>Target: 1M MT</span>
+            </div>
+            <div class="evp-journey-warning" id="evp-pace-warning">⚠️ Calculating pace…</div>
+          </div>
+
+          <!-- Today's P&L -->
+          <div class="evp-card" onclick="navTo('pg-budget')">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">💰 Today's P&amp;L</div>
+              <div class="evp-lock">🔒 LOCKED</div>
+            </div>
+            <div class="evp-pnl-grid">
+              <div class="evp-pnl-item">
+                <div class="evp-pnl-label">Revenue</div>
+                <div class="evp-pnl-value" id="evp-revenue">—</div>
+                <div class="evp-pnl-trend up" id="evp-revenue-trend">—</div>
+              </div>
+              <div class="evp-pnl-item locked">
+                <div class="evp-pnl-label">GM %</div>
+                <div class="evp-pnl-value" id="evp-gm-pct">—</div>
+                <div class="evp-pnl-trend" id="evp-gm-trend">—</div>
+              </div>
+              <div class="evp-pnl-item">
+                <div class="evp-pnl-label">Volume</div>
+                <div class="evp-pnl-value" id="evp-volume">—</div>
+                <div class="evp-pnl-sub">MT</div>
+              </div>
+              <div class="evp-pnl-item locked">
+                <div class="evp-pnl-label">GM/Ton</div>
+                <div class="evp-pnl-value" id="evp-gmton">—</div>
+                <div class="evp-pnl-sub">₱/MT</div>
+              </div>
+            </div>
+            <div class="evp-card-cta">See full P&amp;L →</div>
+          </div>
+
+          <!-- Decisions Needed -->
+          <div class="evp-card evp-decisions">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">🚨 What needs you today</div>
+              <div class="evp-badge-urgent" id="evp-decisions-count">—</div>
+            </div>
+            <div class="evp-decision-list" id="evp-decisions-list"></div>
+          </div>
+
+          <!-- Regional Snapshot -->
+          <div class="evp-card" onclick="navTo('pg-home')">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">🌏 Regional Snapshot</div>
+              <div class="evp-card-sub">MTD vs target</div>
+            </div>
+            <div class="evp-regions" id="evp-regions"></div>
+          </div>
+
+          <!-- Risk Radar -->
+          <div class="evp-card evp-risk">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">⚠️ Risk Radar</div>
+              <div class="evp-card-sub">Top 3 threats</div>
+            </div>
+            <div class="evp-radar-list" id="evp-risks"></div>
+            <div class="evp-card-cta" onclick="event.stopPropagation(); navTo('pg-margin')">See all risks →</div>
+          </div>
+
+          <!-- Opportunity Radar -->
+          <div class="evp-card evp-opp">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">🎯 Opportunity Radar</div>
+              <div class="evp-card-sub">Top 3 bets</div>
+            </div>
+            <div class="evp-radar-list" id="evp-opps"></div>
+            <div class="evp-card-cta" onclick="event.stopPropagation(); navTo('pg-insights')">See all opportunities →</div>
+          </div>
+
+          <!-- Top Performers -->
+          <div class="evp-card" onclick="navTo('pg-team')">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">🏆 Top Performers MTD</div>
+            </div>
+            <div class="evp-performers" id="evp-performers"></div>
+          </div>
+
+          <!-- Weekly Agenda -->
+          <div class="evp-card">
+            <div class="evp-card-hdr">
+              <div class="evp-card-title">📋 This Week</div>
+            </div>
+            <div class="evp-agenda" id="evp-agenda">
+              <div class="evp-agenda-item">
+                <div class="evp-agenda-when">Thu Apr 23 · 9:00 AM</div>
+                <div class="evp-agenda-what">COMEX (3 items pending)</div>
+              </div>
+              <div class="evp-agenda-item">
+                <div class="evp-agenda-when">Fri Apr 24</div>
+                <div class="evp-agenda-what">DSM Monthly Review</div>
+              </div>
+              <div class="evp-agenda-item">
+                <div class="evp-agenda-when">Mon Apr 27</div>
+                <div class="evp-agenda-what">1:1 with Rina (RSM Luzon)</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:80px"></div>
+        </div>
+
+        <!-- Mobile bottom nav -->
+        <div class="evp-mobile-nav">
+          <div class="evp-nav-item active" onclick="navTo('pg-evp-home')">
+            <span class="evp-nav-ico">📊</span>
+            <span class="evp-nav-lbl">Home</span>
+          </div>
+          <div class="evp-nav-item" onclick="navTo('pg-budget')">
+            <span class="evp-nav-ico">💰</span>
+            <span class="evp-nav-lbl">P&amp;L</span>
+          </div>
+          <div class="evp-nav-item" onclick="navTo('pg-margin')">
+            <span class="evp-nav-ico">🔒</span>
+            <span class="evp-nav-lbl">Margin</span>
+          </div>
+          <div class="evp-nav-item" onclick="navTo('pg-team')">
+            <span class="evp-nav-ico">🏆</span>
+            <span class="evp-nav-lbl">Team</span>
+          </div>
+          <div class="evp-nav-item" onclick="openEvpMore()">
+            <span class="evp-nav-ico">≡</span>
+            <span class="evp-nav-lbl">More</span>
           </div>
         </div>
       </div>
@@ -3090,6 +3246,7 @@ body{
 <script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
+<script src="js/evp-home.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -3112,7 +3269,16 @@ function initApp(s) {
   var saved = localStorage.getItem('vf_theme');
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
   syncFilterUI();
-  loadPage('pg-home');
+  // Role-based landing (Sprint B-EVP Day 1): CEO / EVP / exec / admin → EVP mobile home
+  var _r = (s.role||'').toLowerCase();
+  var _isExec = (_r==='ceo' || _r==='evp' || _r==='exec' || _r==='admin');
+  if(_isExec){
+    document.body.classList.add('role-evp');
+    if(typeof navTo==='function'){ navTo('pg-evp-home'); }
+    else { PG='pg-evp-home'; loadPage('pg-evp-home'); }
+  } else {
+    loadPage('pg-home');
+  }
   setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
   // Auto-refresh every 60s
   setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
@@ -3256,6 +3422,7 @@ function injectExportButtons(){
 
 /* ===== NAV ===== */
 var pageTitles = {
+  'pg-evp-home':['EVP','Executive Overview'],
   'pg-home':['Dashboard','National Overview'],
   'pg-sales':['Sales','Rankings & Trends'],
   'pg-ar':['Accounts Receivable','National · Live'],
@@ -3356,6 +3523,7 @@ function doSearch(){var q=document.getElementById('global-search').value.trim();
 /* ===== LOAD ROUTER ===== */
 function loadPage(id){
   switch(id){
+    case 'pg-evp-home': if(typeof loadEvpHome==='function') loadEvpHome(); break;
     case 'pg-home': loadHome(); break;
     case 'pg-sales': loadSales(); break;
     case 'pg-ar': loadAR(); break;
