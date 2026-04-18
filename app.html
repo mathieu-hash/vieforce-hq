@@ -2360,190 +2360,270 @@ body{
       </div>
 
 
-      <!-- ===== INSIGHTS ===== -->
-      <!-- WIRED: /api/intelligence endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
+      <!-- ===== INSIGHTS — v2 REBUILD (2026-04-18) ===== -->
+      <!-- 4 action bands: RESCUE / GROW / EARLY WARNING / DORMANT — wired to /api/intelligence (v2 shape) -->
       <div class="page" id="pg-insights">
 
-        <!-- HERO -->
-        <div style="background:linear-gradient(135deg,rgba(0,59,82,0.4),rgba(6,11,20,0.9));border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:20px 28px;margin-bottom:16px;position:relative;overflow:hidden">
-          <div style="position:absolute;top:0;right:0;width:350px;height:180px;background:radial-gradient(ellipse at 80% 20%,rgba(0,174,239,0.06),transparent 70%)"></div>
-          <div style="display:flex;align-items:center;gap:20px;position:relative">
-            <div style="flex:1">
-              <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">🧠 Customer Intelligence</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:4px">Buying patterns, SKU penetration, growth vectors & risk signals — 710 active accounts analyzed</div>
+        <!-- LEVEL 1 — HERO STRIP (4 action cards) -->
+        <style>
+          .ci-hero-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+          .ci-hero-card{
+            position:relative;display:flex;flex-direction:column;gap:4px;
+            padding:16px 18px 14px;border-radius:var(--r-lg);
+            background:var(--surface-solid);border:1px solid var(--glass-border);
+            text-decoration:none;color:inherit;cursor:pointer;
+            transition:transform 0.15s,border-color 0.15s,box-shadow 0.2s;
+            overflow:hidden;
+          }
+          .ci-hero-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.25)}
+          .ci-hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--text3)}
+          .ci-hero-card[data-tone="rescue"]::before{background:var(--red)}
+          .ci-hero-card[data-tone="grow"]::before{background:var(--green)}
+          .ci-hero-card[data-tone="warn"]::before{background:var(--gold)}
+          .ci-hero-card[data-tone="dormant"]::before{background:var(--text3)}
+          .ci-hero-card:hover[data-tone="rescue"]{border-color:rgba(231,76,60,0.35)}
+          .ci-hero-card:hover[data-tone="grow"]{border-color:rgba(151,201,61,0.35)}
+          .ci-hero-card:hover[data-tone="warn"]{border-color:rgba(241,177,29,0.35)}
+          .ci-hero-card:hover[data-tone="dormant"]{border-color:rgba(255,255,255,0.14)}
+          .ci-hero-top{display:flex;align-items:center;gap:10px}
+          .ci-hero-icon{font-size:22px;line-height:1}
+          .ci-hero-tag{font-size:9px;font-weight:800;letter-spacing:0.8px;color:var(--text3);text-transform:uppercase}
+          .ci-hero-val{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;line-height:1.1}
+          .ci-hero-card[data-tone="rescue"] .ci-hero-val{color:var(--red)}
+          .ci-hero-card[data-tone="grow"] .ci-hero-val{color:var(--green)}
+          .ci-hero-card[data-tone="warn"] .ci-hero-val{color:var(--gold)}
+          .ci-hero-card[data-tone="dormant"] .ci-hero-val{color:var(--text2)}
+          .ci-hero-sub{font-size:11px;color:var(--text2);line-height:1.5}
+          .ci-hero-sub b{color:var(--text);font-family:var(--mono);font-weight:700}
+          .ci-hero-cta{margin-top:10px;font-size:11px;font-weight:700;color:var(--blue);letter-spacing:0.2px}
+          /* Section cards */
+          .ci-tbl th{position:sticky;top:0;background:var(--surface-solid);z-index:1}
+          .ci-tbl td{font-size:12px}
+          .ci-tbl .ci-link{color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;border-bottom:1px dotted transparent;transition:border-color 0.15s}
+          .ci-tbl .ci-link:hover{border-bottom-color:var(--blue);color:var(--blue)}
+          .ci-tbl .ci-action{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:0.3px;border:1px solid;background:transparent;cursor:pointer;transition:background 0.12s}
+          .ci-action-rescue{color:var(--red);border-color:rgba(231,76,60,0.35)}
+          .ci-action-rescue:hover{background:rgba(231,76,60,0.1)}
+          .ci-action-grow{color:var(--green);border-color:rgba(151,201,61,0.35)}
+          .ci-action-grow:hover{background:rgba(151,201,61,0.1)}
+          .ci-action-warn{color:var(--gold);border-color:rgba(241,177,29,0.35)}
+          .ci-action-warn:hover{background:rgba(241,177,29,0.1)}
+          .ci-prio{display:inline-flex;min-width:34px;justify-content:center;padding:2px 8px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700}
+          .ci-prio-red{background:rgba(231,76,60,0.14);color:var(--red)}
+          .ci-prio-amber{background:rgba(241,177,29,0.14);color:var(--gold)}
+          .ci-prio-blue{background:rgba(0,174,239,0.14);color:var(--blue)}
+          .ci-prio-gray{background:rgba(255,255,255,0.06);color:var(--text3)}
+          .ci-brand-pill{display:inline-block;padding:1px 7px;margin:1px 3px 1px 0;border-radius:5px;background:rgba(0,174,239,0.08);color:var(--blue);font-size:10px;font-weight:600;letter-spacing:0.2px;font-family:var(--mono)}
+          .ci-brand-pill-miss{background:rgba(151,201,61,0.1);color:var(--green)}
+          .ci-pill{display:inline-block;padding:3px 10px;margin:2px 6px 2px 0;border-radius:12px;background:rgba(255,255,255,0.04);font-size:11px;color:var(--text2);border:1px solid var(--divider)}
+          .ci-pill b{color:var(--text);font-family:var(--mono);margin-left:4px}
+          .ci-modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center}
+          .ci-modal-back.on{display:flex}
+          .ci-modal{background:var(--surface-solid);border:1px solid var(--glass-border);border-radius:var(--r-lg);padding:24px 28px;min-width:440px;max-width:540px;box-shadow:0 22px 60px rgba(0,0,0,0.5);transform:scale(0.95);opacity:0;transition:all 0.18s}
+          .ci-modal-back.on .ci-modal{transform:scale(1);opacity:1}
+          .ci-modal h3{font-size:15px;font-weight:800;margin:0 0 6px;letter-spacing:-0.3px}
+          .ci-modal p{font-size:12px;color:var(--text2);line-height:1.6;margin:0 0 14px}
+          .ci-modal ul{font-size:12px;color:var(--text2);margin:0 0 16px;padding-left:22px;line-height:1.8}
+          .ci-modal-close{position:absolute;top:12px;right:14px;background:transparent;border:0;color:var(--text3);font-size:18px;cursor:pointer}
+          .ci-modal-act{display:flex;gap:8px;justify-content:flex-end}
+          [data-theme="light"] .ci-hero-card:hover{box-shadow:0 8px 20px rgba(0,74,100,0.1)}
+          [data-theme="light"] .ci-modal-back{background:rgba(0,30,50,0.45)}
+        </style>
+
+        <div class="ci-hero-grid">
+          <a href="#sec-rescue" class="ci-hero-card" data-tone="rescue" onclick="ciScrollTo(event,'sec-rescue')">
+            <div class="ci-hero-top"><span class="ci-hero-icon">🔴</span><span class="ci-hero-tag">Rescue</span></div>
+            <div class="ci-hero-val" id="ci-hero-rescue-amt">—</div>
+            <div class="ci-hero-sub"><b id="ci-hero-rescue-cnt">—</b> customers · silent ≥ 30d</div>
+            <div class="ci-hero-cta">View All →</div>
+          </a>
+          <a href="#sec-growth" class="ci-hero-card" data-tone="grow" onclick="ciScrollTo(event,'sec-growth')">
+            <div class="ci-hero-top"><span class="ci-hero-icon">🟢</span><span class="ci-hero-tag">Grow</span></div>
+            <div class="ci-hero-val" id="ci-hero-grow-amt">—</div>
+            <div class="ci-hero-sub"><b id="ci-hero-grow-cnt">—</b> cross-sell opportunities · yearly</div>
+            <div class="ci-hero-cta">View All →</div>
+          </a>
+          <a href="#sec-warning" class="ci-hero-card" data-tone="warn" onclick="ciScrollTo(event,'sec-warning')">
+            <div class="ci-hero-top"><span class="ci-hero-icon">🟡</span><span class="ci-hero-tag">Early Warning</span></div>
+            <div class="ci-hero-val" id="ci-hero-warn-amt">—</div>
+            <div class="ci-hero-sub"><b id="ci-hero-warn-cnt">—</b> declining · yearly risk</div>
+            <div class="ci-hero-cta">View All →</div>
+          </a>
+          <a href="#sec-dormant" class="ci-hero-card" data-tone="dormant" onclick="ciScrollTo(event,'sec-dormant')">
+            <div class="ci-hero-top"><span class="ci-hero-icon">💤</span><span class="ci-hero-tag">Dormant</span></div>
+            <div class="ci-hero-val" id="ci-hero-dormant-cnt">—</div>
+            <div class="ci-hero-sub">customers · <b id="ci-hero-dormant-amt">—</b> historical AR</div>
+            <div class="ci-hero-cta">Win Back →</div>
+          </a>
+        </div>
+
+        <!-- LEVEL 2 — RESCUE TODAY (red) -->
+        <div class="card" id="sec-rescue" style="border-left:3px solid var(--red);margin-bottom:18px">
+          <div class="card-hdr">
+            <div class="card-title" style="color:var(--red)">🔴 RESCUE TODAY — top <span id="ci-rescue-title-cnt">—</span> customers needing immediate action</div>
+            <button class="export-btn" type="button" onclick="ciExport('rescue')" style="color:var(--red);border-color:rgba(231,76,60,0.3)">⬇ Export List</button>
+          </div>
+          <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
+            <table class="tbl ci-tbl">
+              <thead>
+                <tr>
+                  <th style="width:30px">#</th>
+                  <th>Customer</th>
+                  <th>Region</th>
+                  <th class="num">AR</th>
+                  <th class="num">Silent</th>
+                  <th>Last Order</th>
+                  <th>Sales Rep</th>
+                  <th class="num" title="Priority = (AR / ₱1M) × log10(days_silent + 1) × 10, clamped 0-100">Priority</th>
+                  <th style="width:84px">Action</th>
+                </tr>
+              </thead>
+              <tbody id="ci-rescue-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- LEVEL 3 — GROW THIS MONTH (green) -->
+        <div class="card" id="sec-growth" style="border-left:3px solid var(--green);margin-bottom:18px">
+          <div class="card-hdr">
+            <div class="card-title" style="color:var(--green)">🟢 GROW THIS MONTH — top <span id="ci-growth-title-cnt">—</span> cross-sell opportunities</div>
+            <button class="export-btn" type="button" onclick="ciExport('growth')">⬇ Export List</button>
+          </div>
+          <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
+            <table class="tbl ci-tbl">
+              <thead>
+                <tr>
+                  <th style="width:30px">#</th>
+                  <th>Customer</th>
+                  <th>Currently</th>
+                  <th>Missing</th>
+                  <th class="num" title="Conservative upside: peer-group avg volume × 60% × avg PHP/kg (annualised)">Yearly Upside</th>
+                  <th>Reason</th>
+                  <th class="num" title="Priority = log10(upside / ₱100K) × 25, clamped 0-100">Priority</th>
+                  <th style="width:84px">Action</th>
+                </tr>
+              </thead>
+              <tbody id="ci-growth-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- LEVEL 4 — EARLY WARNING (gold) -->
+        <div class="card" id="sec-warning" style="border-left:3px solid var(--gold);margin-bottom:18px">
+          <div class="card-hdr">
+            <div class="card-title" style="color:var(--gold)">🟡 EARLY WARNING — top <span id="ci-warning-title-cnt">—</span> customers with declining trend</div>
+            <button class="export-btn" type="button" onclick="ciExport('warning')" style="color:var(--gold);border-color:rgba(241,177,29,0.3)">⬇ Export List</button>
+          </div>
+          <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
+            <table class="tbl ci-tbl">
+              <thead>
+                <tr>
+                  <th style="width:30px">#</th>
+                  <th>Customer</th>
+                  <th>Region</th>
+                  <th class="num">90d Avg</th>
+                  <th class="num">Last 30d</th>
+                  <th class="num">Δ</th>
+                  <th class="num">Yearly Risk</th>
+                  <th>Sales Rep</th>
+                  <th class="num" title="Priority = (risk_millions × |Δ%|) ÷ 5, clamped 0-100">Priority</th>
+                  <th style="width:84px">Action</th>
+                </tr>
+              </thead>
+              <tbody id="ci-warning-tbody"><tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- LEVEL 5 — DORMANT (gray, collapsible) -->
+        <div class="card" id="sec-dormant" style="border-left:3px solid var(--text3);margin-bottom:18px">
+          <div class="card-hdr">
+            <div class="card-title" style="color:var(--text2)">💤 DORMANT — <span id="ci-dormant-hdr">—</span></div>
+            <div style="display:flex;gap:6px">
+              <button class="export-btn" type="button" onclick="ciExport('dormant')">⬇ Export CSV</button>
+              <button class="export-btn" type="button" onclick="ciWinBackModal()" style="color:var(--blue);border-color:rgba(0,174,239,0.35)">🚀 Win-Back</button>
             </div>
-            <div style="display:flex;gap:16px;flex-shrink:0">
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Whitespace</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--cyan)">₱142M</div><div style="font-size:9px;color:var(--text3)">est. opportunity</div></div>
-              <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">At-Risk</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--red)">₱12.4M</div><div style="font-size:9px;color:var(--text3)">silent + declining</div></div>
-              <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Avg Health</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">74/100</div><div style="font-size:9px;color:var(--text3)">account score</div></div>
+          </div>
+          <div class="card-body" style="padding-top:14px">
+            <div style="display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;margin-bottom:12px">
+              <div>
+                <span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">By region:</span>
+                <span id="ci-dormant-regions">—</span>
+              </div>
+              <div>
+                <span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Last active:</span>
+                <span id="ci-dormant-years">—</span>
+              </div>
+              <div>
+                <span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Avg dormancy:</span>
+                <span id="ci-dormant-avgdays" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span>
+              </div>
+              <div>
+                <span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Lifetime volume:</span>
+                <span id="ci-dormant-vol" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span>
+              </div>
+            </div>
+            <button id="ci-dormant-toggle-btn" type="button" onclick="ciToggleDormantList()" style="background:rgba(255,255,255,0.04);border:1px solid var(--divider);color:var(--text2);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.2px;transition:background 0.15s">▼ Show dormant list (top 50 by historical AR)</button>
+            <div id="ci-dormant-list-wrap" style="display:none;margin-top:16px;overflow-x:auto;max-height:480px;overflow-y:auto">
+              <table class="tbl ci-tbl">
+                <thead>
+                  <tr>
+                    <th style="width:30px">#</th>
+                    <th>Customer</th>
+                    <th>Region</th>
+                    <th>Sales Rep</th>
+                    <th>Last Order</th>
+                    <th class="num">Days Silent</th>
+                    <th class="num">Historical AR</th>
+                    <th class="num">Vol (36mo)</th>
+                  </tr>
+                </thead>
+                <tbody id="ci-dormant-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- SIGNAL KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:16px" class="stagger">
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--red)"><div class="kpi-val" style="font-size:18px;color:var(--red)">8</div><div class="kpi-label" style="color:var(--red)">Silent ≥30d</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-val" style="font-size:18px;color:var(--gold)">14</div><div class="kpi-label" style="color:var(--gold)">Vol. Drop</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--green)"><div class="kpi-val" style="font-size:18px;color:var(--green)">22</div><div class="kpi-label" style="color:var(--green)">Growing</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--blue)"><div class="kpi-val" style="font-size:18px;color:var(--blue)">6</div><div class="kpi-label" style="color:var(--blue)">New SKU</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg SKUs/Cust</div><div class="kpi-val" style="font-size:18px">4.2</div><div class="kpi-src">of 28 available</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Brands/Cust</div><div class="kpi-val" style="font-size:18px">1.8</div><div class="kpi-src">of 4 brands</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order Freq</div><div class="kpi-val" style="font-size:18px">2.1<span style="font-size:10px;color:var(--text3)">/wk</span></div><div class="kpi-src">national avg</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order Size</div><div class="kpi-val" style="font-size:18px">28<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src">per delivery</div></div>
-        </div>
-
-        <!-- ROW 1: Brand Coverage + Growth Vectors -->
-        <div class="grid-2" style="margin-bottom:16px">
-          <!-- BRAND COVERAGE / SKU PENETRATION -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Brand Coverage — Gap Analysis</div><div class="card-badge b-cyan" style="background:rgba(0,212,255,0.1);color:var(--cyan)">WHITESPACE</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
-                Of 710 active accounts: <b style="color:var(--text)">312 carry only 1 brand</b> (44%), <b style="color:var(--gold)">248 carry 2 brands</b> (35%), <b style="color:var(--green)">128 carry 3 brands</b> (18%), <b style="color:var(--cyan)">22 carry all 4</b> (3%).
-              </div>
-              <table class="tbl">
-                <thead><tr><th>Brand</th><th class="num">Customers</th><th class="num">Penetration</th><th class="num">Vol/Cust</th><th class="num">Whitespace</th><th class="num">Est. Opp.</th></tr></thead>
-                <tbody id="intel-brand-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-              </table>
-              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider);font-size:10px;color:var(--cyan);font-weight:700">
-                Total estimated whitespace: ₱142M — if each non-carrying account adopted at 50% of segment avg.
-              </div>
-            </div>
+        <!-- LEVEL 6 — DEEPER ANALYTICS (v1.1 placeholder) -->
+        <div class="card" id="sec-deeper" style="opacity:0.82">
+          <div class="card-hdr">
+            <div class="card-title">📊 Deeper Analytics — coming in v1.1</div>
+            <div style="font-size:9px;color:var(--text3);letter-spacing:0.3px">SKU Penetration · Buying Patterns · Brand Coverage</div>
           </div>
-
-          <!-- GROWTH VECTORS: Vertical vs Horizontal -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Growth Vectors — Vertical vs Horizontal</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
-                <div style="padding:14px;background:rgba(0,174,239,0.04);border:1px solid rgba(0,174,239,0.1);border-radius:var(--r-sm)">
-                  <div style="font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">📈 Vertical Growth</div>
-                  <div style="font-size:10px;color:var(--text2);line-height:1.6">More volume per existing SKU. Deepen wallet share with current products.</div>
-                  <div style="margin-top:8px;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--blue)">186 accounts</div>
-                  <div style="font-size:9px;color:var(--text3)">buying &lt;50% of territory benchmark per SKU</div>
-                </div>
-                <div style="padding:14px;background:rgba(151,215,0,0.04);border:1px solid rgba(151,215,0,0.1);border-radius:var(--r-sm)">
-                  <div style="font-size:11px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">🔀 Horizontal Growth</div>
-                  <div style="font-size:10px;color:var(--text2);line-height:1.6">More SKUs adopted. Broaden the basket with new product categories.</div>
-                  <div style="margin-top:8px;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--green)">312 accounts</div>
-                  <div style="font-size:9px;color:var(--text3)">carrying only 1 brand — missing 2-3 categories</div>
-                </div>
-              </div>
-              <table class="tbl">
-                <thead><tr><th>Top Horizontal Targets</th><th class="num">SKUs</th><th class="num">Brands</th><th class="num">Volume</th></tr></thead>
-                <tbody id="intel-horiz-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ROW 2: Buying Patterns + SKU Penetration Matrix -->
-        <div class="grid-2" style="margin-bottom:16px">
-          <!-- BUYING PATTERNS -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Buying Pattern Analysis</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <table class="tbl">
-                <thead><tr><th>Pattern</th><th class="num">Customers</th><th class="num">%</th><th class="num">Avg Vol</th><th>Signal</th></tr></thead>
-                <tbody id="intel-pattern-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-              </table>
-              <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--divider)">
-                <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Reorder Prediction</div>
-                <div style="font-size:11px;color:var(--text2);line-height:1.7">
-                  <b style="color:var(--green)">42 accounts</b> expected to reorder within 3 days based on historical cadence.
-                  <b style="color:var(--gold)">18 accounts</b> are 5+ days overdue vs. their typical pattern — proactive outreach recommended.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SKU PENETRATION MATRIX -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">SKU Penetration — Top 15 Customers</div><div style="font-size:9px;color:var(--text3)">● = carries · ○ = whitespace</div></div>
-            <div class="card-body" style="padding-top:8px;overflow-x:auto;font-size:11px">
-              <style>
-                .pen-tbl{width:100%;border-collapse:separate;border-spacing:2px;font-size:10px}
-                .pen-tbl th{padding:6px 4px;font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:center;writing-mode:vertical-rl;height:80px;letter-spacing:0.3px}
-                .pen-tbl th:first-child{writing-mode:horizontal-tb;text-align:left;height:auto;min-width:140px}
-                .pen-tbl td{padding:5px 4px;text-align:center;border-radius:3px;font-size:12px}
-                .pen-tbl td:first-child{text-align:left;font-family:var(--font);font-weight:600;font-size:10px}
-                .pen-y{background:rgba(0,174,239,0.12);color:var(--blue)}
-                .pen-n{background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.1)}
-                .pen-hot{background:rgba(255,199,44,0.15);color:var(--gold)}
-              </style>
-              <table class="pen-tbl" id="intel-pen-tbl">
-                <thead id="intel-pen-thead"><tr><th colspan="12" style="text-align:center;color:var(--text3);font-size:11px">Loading…</th></tr></thead>
-                <tbody id="intel-pen-tbody"></tbody>
-              </table>
-              <div style="margin-top:8px;font-size:9px;color:var(--text4)">● = active purchases last 90d &nbsp;·&nbsp; <span style="color:var(--gold)">○ = high-probability whitespace</span> &nbsp;·&nbsp; ○ = not carried</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ROW 3: Alerts (Silent + Drops + Growing) -->
-        <div class="sec-hdr"><div class="sec-title-lg">Behavioral Alerts</div><div class="sec-line"></div><div class="sec-count">₱12.4M at-risk · ₱18.2M growing</div></div>
-        <div class="grid-3" style="margin-bottom:16px">
-          <div class="card" style="border-left:3px solid var(--red)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--red)">🔴 Silent ≥30 days</div><div class="sec-count" id="intel-silent-count">—</div></div>
-            <div class="card-body" style="padding:0" id="intel-silent-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
-          </div>
-          <div class="card" style="border-left:3px solid var(--gold)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--gold)">🟡 Volume Drops &gt;30%</div><div class="sec-count" id="intel-drops-count">—</div></div>
-            <div class="card-body" style="padding:0" id="intel-drops-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
-          </div>
-          <div class="card" style="border-left:3px solid var(--green)">
-            <div class="card-hdr"><div class="card-title" style="color:var(--green)">🟢 Growing &gt;25%</div><div class="sec-count" id="intel-growing-count">—</div></div>
-            <div class="card-body" style="padding:0" id="intel-growing-list"><div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Loading…</div></div>
-          </div>
-        </div>
-
-        <!-- ROW 4: Account Health Distribution + Reorder Prediction -->
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Account Health Score Distribution</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Composite score: Volume trend (25%) + Order frequency (20%) + SKU penetration (20%) + Payment behavior (20%) + Margin health (15%)</div>
-              <div style="display:flex;gap:2px;height:32px;border-radius:6px;overflow:hidden;margin-bottom:10px">
-                <div style="width:8%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;border-radius:6px 0 0 6px">8%</div>
-                <div style="width:14%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#000">14%</div>
-                <div style="width:32%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800">32%</div>
-                <div style="width:28%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800">28%</div>
-                <div style="width:18%;background:rgba(0,212,255,0.5);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;border-radius:0 6px 6px 0">18%</div>
-              </div>
-              <table class="tbl">
-                <tr><th>Score Band</th><th class="num">Accounts</th><th class="num">%</th><th class="num">Volume</th><th class="num">Revenue</th><th>Action</th></tr>
-                <tr><td style="color:var(--red);font-weight:700">0-30 Critical</td><td class="num">57</td><td class="num">8%</td><td class="num">2,840 MT</td><td class="num">₱42M</td><td style="font-size:10px;color:var(--red)">Urgent outreach</td></tr>
-                <tr><td style="color:var(--gold);font-weight:700">31-50 Warning</td><td class="num">99</td><td class="num">14%</td><td class="num">6,120 MT</td><td class="num">₱86M</td><td style="font-size:10px;color:var(--gold)">Review w/ RSM</td></tr>
-                <tr><td style="color:var(--blue);font-weight:700">51-70 Stable</td><td class="num">227</td><td class="num">32%</td><td class="num">18,400 MT</td><td class="num">₱248M</td><td style="font-size:10px">Maintain cadence</td></tr>
-                <tr><td style="color:var(--green);font-weight:700">71-85 Strong</td><td class="num">199</td><td class="num">28%</td><td class="num">16,800 MT</td><td class="num">₱228M</td><td style="font-size:10px;color:var(--green)">Upsell potential</td></tr>
-                <tr><td style="color:var(--cyan);font-weight:700">86-100 Champion</td><td class="num">128</td><td class="num">18%</td><td class="num">10,240 MT</td><td class="num">₱152M</td><td style="font-size:10px;color:var(--cyan)">Referral program</td></tr>
-              </table>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Reorder Prediction — Next 7 Days</div><div class="card-badge b-green">AI Forecast</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Based on historical cadence, order size patterns, and day-of-week preferences.</div>
-              <table class="tbl">
-                <tr><th>Customer</th><th class="num">Expected</th><th class="num">Est. Vol</th><th class="num">Confidence</th><th>Status</th></tr>
-                <tr><td style="font-weight:700">Metro Feeds Corp.</td><td class="num">Apr 16</td><td class="num">35 MT</td><td class="num" style="color:var(--green)">94%</td><td><span class="badge b-green">On track</span></td></tr>
-                <tr><td style="font-weight:700">Cebu Agri Partners</td><td class="num">Apr 17</td><td class="num">28 MT</td><td class="num" style="color:var(--green)">91%</td><td><span class="badge b-green">On track</span></td></tr>
-                <tr><td style="font-weight:700">Laguna Premium</td><td class="num">Apr 16</td><td class="num">22 MT</td><td class="num" style="color:var(--green)">88%</td><td><span class="badge b-green">On track</span></td></tr>
-                <tr><td style="font-weight:700">Pampanga Agri</td><td class="num">Apr 18</td><td class="num">18 MT</td><td class="num" style="color:var(--green)">85%</td><td><span class="badge b-green">On track</span></td></tr>
-                <tr><td style="font-weight:700;color:var(--gold)">Negros Feed House</td><td class="num" style="color:var(--gold)">OVERDUE</td><td class="num">15 MT</td><td class="num" style="color:var(--red)">—</td><td><span class="badge b-gold">5d late</span></td></tr>
-                <tr><td style="font-weight:700;color:var(--gold)">Bacolod Supply</td><td class="num" style="color:var(--gold)">OVERDUE</td><td class="num">12 MT</td><td class="num" style="color:var(--red)">—</td><td><span class="badge b-red">8d late</span></td></tr>
-                <tr><td style="font-weight:700;color:var(--gold)">CDO Livestock</td><td class="num" style="color:var(--gold)">OVERDUE</td><td class="num">10 MT</td><td class="num" style="color:var(--red)">—</td><td><span class="badge b-red">12d late</span></td></tr>
-              </table>
-              <div style="margin-top:10px;padding:10px;background:rgba(255,199,44,0.06);border:1px solid rgba(255,199,44,0.1);border-radius:var(--r-sm);font-size:10px;color:var(--gold);font-weight:600">
-                ⚠ 18 accounts are 5+ days overdue vs. their historical cadence — recommend proactive outreach by DSM today.
-              </div>
-            </div>
+          <div class="card-body" style="padding-top:10px;font-size:12px;color:var(--text2);line-height:1.7">
+            Advanced analytics (SKU Penetration Matrix, Buying-Pattern classifier, Brand Coverage gap report)
+            will return in <b style="color:var(--text)">v1.1</b>. The previous SKU matrix produced incorrect results
+            (all zeros for every customer) and was removed pending data-quality fixes. The behavioural-alerts
+            and pattern blocks have been replaced by the <b style="color:var(--red)">Rescue</b>,
+            <b style="color:var(--gold)">Early Warning</b>, and <b style="color:var(--text3)">Dormant</b> bands
+            above — they answer the same questions with higher signal-to-noise.
           </div>
         </div>
 
       </div>
+
+      <!-- Win-Back Campaign modal -->
+      <div id="ci-winback-back" class="ci-modal-back" onclick="if(event.target===this)ciCloseWinBack()">
+        <div class="ci-modal" style="position:relative">
+          <button class="ci-modal-close" onclick="ciCloseWinBack()" aria-label="Close">×</button>
+          <h3>🚀 Win-Back Campaign Builder</h3>
+          <p style="color:var(--blue);font-weight:600">Coming in v1.1</p>
+          <p>Selected: <b id="ci-wb-count" style="color:var(--text);font-family:var(--mono)">—</b> dormant customers · <b id="ci-wb-amt" style="color:var(--text);font-family:var(--mono)">—</b> historical AR</p>
+          <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Suggested actions</div>
+          <ul>
+            <li>Email blast with 10% return-customer discount</li>
+            <li>SMS re-engagement ("We miss you — here's what's new")</li>
+            <li>Personal RSM visits for top 50 by historical AR</li>
+            <li>Tiered promo: dormancy &gt; 6mo / &gt; 1yr / &gt; 2yr</li>
+          </ul>
+          <div class="ci-modal-act">
+            <button class="export-btn" type="button" onclick="ciCloseWinBack()" style="border-color:var(--divider);color:var(--text3)">Cancel</button>
+            <button class="export-btn" type="button" onclick="ciExport('dormant');ciCloseWinBack()" style="color:var(--blue);border-color:rgba(0,174,239,0.35)">⬇ Export Customer List for Outreach →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== END INSIGHTS ===== -->
 
       <!-- ===== TEAM ===== -->
       <!-- WIRED: /api/team endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
@@ -4712,156 +4792,369 @@ async function loadMargin(){
   } catch(e) { console.error('Margin:', e); showError('pg-margin','Unable to load margin data'); }
 }
 
-/* ===== INTELLIGENCE — wired to /api/intelligence ===== */
+/* ===== INTELLIGENCE — /api/intelligence v2 (4 action bands) ===== */
+var CI_DATA = null;   // last-fetched response, kept for export + modal handlers
+
+function ciPrioCls(score){
+  if(score >= 90) return 'ci-prio-red';
+  if(score >= 70) return 'ci-prio-amber';
+  if(score >= 50) return 'ci-prio-blue';
+  return 'ci-prio-gray';
+}
+function ciFmtDate(d){
+  if(!d) return '—';
+  var dt = new Date(d); if(isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-PH', {year:'2-digit',month:'short',day:'numeric'});
+}
+function ciScrollTo(ev, id){
+  if(ev){ ev.preventDefault(); }
+  var el = document.getElementById(id);
+  if(!el) return;
+  var content = document.querySelector('.content') || window;
+  if(content.scrollTo){
+    var top = el.offsetTop - 20;
+    (content === window ? window : content).scrollTo({top: top, behavior: 'smooth'});
+  } else {
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+function ciToggleDormantList(){
+  var wrap = sel('ci-dormant-list-wrap');
+  var btn  = sel('ci-dormant-toggle-btn');
+  if(!wrap || !btn) return;
+  if(wrap.style.display === 'none' || !wrap.style.display){
+    wrap.style.display = 'block';
+    btn.innerHTML = '▲ Hide dormant list';
+  } else {
+    wrap.style.display = 'none';
+    btn.innerHTML = '▼ Show dormant list (top 50 by historical AR)';
+  }
+}
+function ciWinBackModal(){
+  var back = sel('ci-winback-back'); if(!back) return;
+  if(CI_DATA && CI_DATA.dormant_summary){
+    sett('ci-wb-count', fcn(CI_DATA.dormant_summary.customer_count || 0));
+    sett('ci-wb-amt',   fc(CI_DATA.dormant_summary.historical_ar_amt || 0));
+  }
+  back.classList.add('on');
+}
+function ciCloseWinBack(){
+  var back = sel('ci-winback-back'); if(back) back.classList.remove('on');
+}
+
+// xlsx-js-style Vienovo-branded export — used by every [Export List] button
+function ciExport(section){
+  if(typeof XLSX === 'undefined'){ alert('Export library not loaded — please refresh.'); return; }
+  if(!CI_DATA){ alert('No data to export yet — wait for page to finish loading.'); return; }
+  var today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var filename, title, headers, rows;
+  var NAVY = '004A64', WHITE = 'FFFFFF', GREEN_BG = 'E8F5D8';
+
+  if(section === 'rescue'){
+    filename = 'VPI_CustIntel_Rescue_' + today + '.xlsx';
+    title = 'RESCUE TODAY — Customers needing immediate action';
+    headers = ['#','Customer Code','Customer Name','Region','Sales Rep','AR Balance (PHP)','Last Order','Last Order (PHP)','Days Silent','Priority (0-100)','Reason','Suggested Action'];
+    rows = (CI_DATA.top_rescue||[]).map(function(r,i){
+      return [i+1, r.card_code, r.name, r.region, r.sales_rep||'', Number(r.ar_balance||0),
+              r.last_order_date ? new Date(r.last_order_date) : '', Number(r.last_order_amount||0),
+              Number(r.days_silent||0), Number(r.priority_score||0), r.reason||'', r.suggested_action||''];
+    });
+  } else if(section === 'growth'){
+    filename = 'VPI_CustIntel_Growth_' + today + '.xlsx';
+    title = 'GROW THIS MONTH — Cross-sell opportunities';
+    headers = ['#','Customer Code','Customer Name','Region','Sales Rep','Currently Buys','Missing Brand','Peer Avg (MT/yr)','Upside (MT/yr)','Upside (PHP/yr)','Priority','Reason','Suggested Action'];
+    rows = (CI_DATA.top_growth||[]).map(function(r,i){
+      return [i+1, r.card_code, r.name, r.region, r.sales_rep||'', (r.current_brands||[]).join(', '),
+              (r.missing_brands||[]).join(', '), Number(r.peer_avg_volume_mt||0),
+              Number(r.upside_mt_yearly||0), Number(r.upside_php_yearly||0),
+              Number(r.priority_score||0), r.reason||'', r.suggested_action||''];
+    });
+  } else if(section === 'warning'){
+    filename = 'VPI_CustIntel_EarlyWarning_' + today + '.xlsx';
+    title = 'EARLY WARNING — Declining customers';
+    headers = ['#','Customer Code','Customer Name','Region','Sales Rep','90d Avg (MT)','Last 30d (MT)','Change %','Yearly Risk (PHP)','Priority','Reason','Suggested Action'];
+    rows = (CI_DATA.early_warning||[]).map(function(r,i){
+      return [i+1, r.card_code, r.name, r.region, r.sales_rep||'', Number(r.avg_90d_mt||0),
+              Number(r.last_30d_mt||0), Number(r.change_pct||0)/100,
+              Number(r.revenue_impact_php_yearly||0), Number(r.priority_score||0),
+              r.reason||'', r.suggested_action||''];
+    });
+  } else if(section === 'dormant'){
+    filename = 'VPI_CustIntel_Dormant_' + today + '.xlsx';
+    title = 'DORMANT — Customers for win-back campaign';
+    headers = ['#','Customer Code','Customer Name','Region','Sales Rep','Last Order','Days Dormant','Historical AR (PHP)','Volume 36mo (MT)'];
+    rows = (CI_DATA.dormant_list||[]).map(function(r,i){
+      return [i+1, r.card_code, r.name, r.region, r.sales_rep||'',
+              r.last_order_date ? new Date(r.last_order_date) : '',
+              Number(r.days_dormant||0), Number(r.historical_ar||0), Number(r.lifetime_volume_mt||0)];
+    });
+  } else return;
+
+  if(!rows.length){ alert('No rows in this section to export.'); return; }
+
+  // Build AOA: title · subtitle · blank · headers · rows · blank · totals
+  var aoa = [
+    [title],
+    ['Vienovo Philippines Inc. · VieForce HQ · Generated ' + new Date().toLocaleString('en-PH')],
+    [],
+    headers
+  ].concat(rows);
+
+  // Totals row — only for numeric-amount columns
+  var totalsRow = [], totalsIdx = -1;
+  if(section === 'rescue')        totalsIdx = 5;   // AR Balance
+  else if(section === 'growth')   totalsIdx = 9;   // Upside PHP
+  else if(section === 'warning')  totalsIdx = 8;   // Yearly Risk
+  else if(section === 'dormant')  totalsIdx = 7;   // Historical AR
+  if(totalsIdx > -1){
+    totalsRow = headers.map(function(_,i){
+      if(i === 0) return 'TOTAL';
+      if(i === totalsIdx) return rows.reduce(function(s,r){ return s + (Number(r[totalsIdx])||0); }, 0);
+      return '';
+    });
+    aoa.push([]);
+    aoa.push(totalsRow);
+  }
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Column widths
+  ws['!cols'] = headers.map(function(h){
+    var len = String(h).length;
+    if(/Customer Name|Reason|Suggested Action|Currently Buys/i.test(h)) return {wch: 36};
+    if(/Code|Region|Rep/i.test(h)) return {wch: 16};
+    if(/PHP|MT|Priority|Days|#/i.test(h)) return {wch: 14};
+    return {wch: Math.max(12, len + 2)};
+  });
+
+  // Merges for title + subtitle across the header width
+  var lastCol = headers.length - 1;
+  ws['!merges'] = [
+    { s:{r:0,c:0}, e:{r:0,c:lastCol} },
+    { s:{r:1,c:0}, e:{r:1,c:lastCol} }
+  ];
+
+  // Style: title / subtitle / header row / totals row
+  function col(i){ return XLSX.utils.encode_col(i); }
+  function setStyle(ref, s){ if(ws[ref]) ws[ref].s = s; }
+
+  // Title (row 0) — Deep Navy fill, white bold 14pt
+  setStyle('A1', {
+    font:{name:'Arial',bold:true,sz:14,color:{rgb:WHITE}},
+    fill:{fgColor:{rgb:NAVY}},
+    alignment:{horizontal:'left',vertical:'center'}
+  });
+  // Subtitle (row 1) — light gray italic
+  setStyle('A2', {
+    font:{name:'Arial',italic:true,sz:10,color:{rgb:'666666'}},
+    alignment:{horizontal:'left',vertical:'center'}
+  });
+
+  // Header row (row 3 = index 3)
+  headers.forEach(function(_,i){
+    setStyle(col(i)+'4', {
+      font:{name:'Arial',bold:true,sz:10,color:{rgb:WHITE}},
+      fill:{fgColor:{rgb:NAVY}},
+      alignment:{horizontal:/#|PHP|MT|Priority|Days|%/i.test(headers[i]) ? 'right' : 'left', vertical:'center'},
+      border:{bottom:{style:'thin',color:{rgb:'CCCCCC'}}}
+    });
+  });
+
+  // Data rows — PHP format for currency columns
+  var phpCols = {};
+  headers.forEach(function(h,i){ if(/PHP/i.test(h)) phpCols[i] = true; });
+  var mtCols = {};
+  headers.forEach(function(h,i){ if(/MT/i.test(h) && !/PHP/i.test(h)) mtCols[i] = true; });
+  var pctCols = {};
+  headers.forEach(function(h,i){ if(/Change %/i.test(h)) pctCols[i] = true; });
+
+  for(var r = 0; r < rows.length; r++){
+    for(var c = 0; c < headers.length; c++){
+      var ref = col(c) + (5 + r);
+      if(!ws[ref]) continue;
+      var style = {
+        font:{name:'Arial',sz:10},
+        alignment:{horizontal: (phpCols[c]||mtCols[c]||pctCols[c]||c===0)?'right':'left', vertical:'center'},
+        border:{bottom:{style:'hair',color:{rgb:'EEEEEE'}}}
+      };
+      if(phpCols[c]) ws[ref].z = '_-"₱"* #,##0_-;-"₱"* #,##0_-;_-"₱"* "-"_-;_-@_-';
+      else if(mtCols[c]) ws[ref].z = '#,##0.0';
+      else if(pctCols[c]) ws[ref].z = '0%';
+      ws[ref].s = style;
+    }
+  }
+
+  // Totals row (if any)
+  if(totalsIdx > -1){
+    var totalsRowNum = 5 + rows.length + 1 + 1;  // data ends at row (5+rows.length-1), then blank, then totals
+    for(var c2 = 0; c2 < headers.length; c2++){
+      var ref2 = col(c2) + totalsRowNum;
+      if(!ws[ref2]) continue;
+      ws[ref2].s = {
+        font:{name:'Arial',bold:true,sz:10,color:{rgb:'004A64'}},
+        fill:{fgColor:{rgb:GREEN_BG}},
+        alignment:{horizontal:(c2===0?'right':'right'),vertical:'center'},
+        border:{top:{style:'medium',color:{rgb:'004A64'}}, bottom:{style:'medium',color:{rgb:'004A64'}}}
+      };
+      if(phpCols[c2]) ws[ref2].z = '_-"₱"* #,##0_-;-"₱"* #,##0_-;_-"₱"* "-"_-;_-@_-';
+    }
+  }
+
+  // Freeze top 4 rows (title + subtitle + spacer + header)
+  ws['!views'] = [{state:'frozen', ySplit:4}];
+
+  // Auto-filter on the header row
+  ws['!autofilter'] = { ref: 'A4:' + col(lastCol) + (4 + rows.length) };
+
+  // Build workbook + download
+  var wb = XLSX.utils.book_new();
+  wb.Props = { Title: title, Author: 'VieForce HQ', Company: 'Vienovo Philippines Inc.', CreatedDate: new Date() };
+  XLSX.utils.book_append_sheet(wb, ws, section.slice(0,30));
+  try { XLSX.writeFile(wb, filename); }
+  catch(e){ console.error('[ciExport]', e); alert('Export failed: ' + e.message); }
+}
+
 async function loadIntelligence(){
   clearError('pg-insights');
   try {
-    if(!DC) DC={};
+    if(!DC) DC = {};
     if(!DC['pg-insights']){
-      DC['pg-insights'] = await getIntelligenceData().catch(function(e){console.error('intelligence:',e);return null});
+      DC['pg-insights'] = await getIntelligenceData({period: PD}).catch(function(e){ console.error('intelligence:', e); return null; });
     }
     var d = DC['pg-insights'];
-    if(!d){showError('pg-insights','Unable to load intelligence data');return}
-    console.log('[INTELLIGENCE] Rendering:', d.hero);
-    var pg=sel('pg-insights');
-    // Hero numbers
-    if(d.hero){
-      var heroNums=pg.querySelectorAll('[style*="font-size:22px"]');
-      if(heroNums[0] && d.hero.whitespace_total!=null) heroNums[0].textContent=fc(d.hero.whitespace_total);
-      if(heroNums[1] && d.hero.at_risk_total!=null) heroNums[1].textContent=fc(d.hero.at_risk_total);
-      if(heroNums[2] && d.hero.avg_health_score!=null) heroNums[2].textContent=d.hero.avg_health_score+'/100';
-    }
-    // KPI row (8 KPIs)
-    if(d.kpis){
-      var kpis=pg.querySelectorAll('#pg-insights .kpi-val');
-      if(kpis[0] && d.kpis.silent_30d!=null) kpis[0].textContent=d.kpis.silent_30d.toString();
-      if(kpis[1] && d.kpis.vol_drop!=null) kpis[1].textContent=d.kpis.vol_drop.toString();
-      if(kpis[2] && d.kpis.growing!=null) kpis[2].textContent=d.kpis.growing.toString();
-      if(kpis[4] && d.kpis.avg_skus_per_cust!=null) kpis[4].textContent=d.kpis.avg_skus_per_cust.toFixed(1);
-      if(kpis[5] && d.kpis.avg_brands_per_cust!=null) kpis[5].textContent=d.kpis.avg_brands_per_cust.toFixed(1);
-    }
-    // BRAND COVERAGE table
-    if(d.brand_coverage && d.brand_coverage.length){
-      var bhtml='';
-      d.brand_coverage.forEach(function(b){
-        bhtml+='<tr><td style="font-weight:700">'+esc(b.brand||'')+'</td>';
-        bhtml+='<td class="num">'+fcn(b.customers||0)+'</td>';
-        bhtml+='<td class="num">'+(b.penetration_pct!=null?b.penetration_pct+'%':'--')+'</td>';
-        bhtml+='<td class="num">'+fcn(Math.round(b.vol_per_cust||0))+' MT</td>';
-        bhtml+='<td class="num" style="color:var(--gold)">'+fcn(b.whitespace_count||0)+' accts</td>';
-        bhtml+='<td class="num" style="color:var(--cyan)">'+fc(b.est_opportunity||0)+'</td></tr>';
+    if(!d){ showError('pg-insights','Unable to load intelligence data'); return; }
+    CI_DATA = d;
+    console.log('[INTELLIGENCE] v2 rendering:', d.hero_stats, 'meta:', d.meta);
+
+    // ========== HERO CARDS ==========
+    var hs = d.hero_stats || {};
+    animateNumber(sel('ci-hero-rescue-amt'),  hs.rescue_at_risk_amt || 0, fc);
+    sett('ci-hero-rescue-cnt', fcn(hs.rescue_count || 0));
+    animateNumber(sel('ci-hero-grow-amt'),    hs.growth_upside_amt  || 0, fc);
+    sett('ci-hero-grow-cnt',   fcn(hs.growth_count || 0));
+    animateNumber(sel('ci-hero-warn-amt'),    hs.early_warning_amt  || 0, fc);
+    sett('ci-hero-warn-cnt',   fcn(hs.early_warning_count || 0));
+    animateNumber(sel('ci-hero-dormant-cnt'), hs.dormant_count || 0, function(v){ return fcn(Math.round(v)); });
+    sett('ci-hero-dormant-amt', fc(hs.dormant_historical_ar_amt || 0));
+
+    // ========== LEVEL 2 — RESCUE TABLE ==========
+    sett('ci-rescue-title-cnt', (d.top_rescue||[]).length);
+    if(d.top_rescue && d.top_rescue.length){
+      var rhtml = '';
+      d.top_rescue.forEach(function(r, i){
+        var pcls = ciPrioCls(r.priority_score || 0);
+        rhtml += '<tr>'
+          + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a></td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
+          + '<td class="num" style="color:var(--red);font-weight:700">'+ fc(r.ar_balance||0) +'</td>'
+          + '<td class="num" style="color:var(--gold);font-family:var(--mono);font-weight:700">'+ (r.days_silent||0) +'d</td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ ciFmtDate(r.last_order_date) + (r.last_order_amount ? ' · '+ fc(r.last_order_amount) : '') +'</td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
+          + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(r.reason||'') +'">'+ (r.priority_score||0) +'</span></td>'
+          + '<td><button class="ci-action ci-action-rescue" type="button" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.suggested_action||'') +'">Call</button></td>'
+          + '</tr>';
       });
-      seth('intel-brand-tbody', bhtml);
+      seth('ci-rescue-tbody', rhtml);
     } else {
-      seth('intel-brand-tbody','<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">No brand coverage data</td></tr>');
+      seth('ci-rescue-tbody', '<tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No rescue candidates — all accounts on cadence.</td></tr>');
     }
 
-    // HORIZONTAL TARGETS table
-    if(d.horizontal_targets && d.horizontal_targets.length){
-      var hhtml='';
-      d.horizontal_targets.slice(0,10).forEach(function(h){
-        hhtml+='<tr><td style="font-weight:600">'+esc(h.customer||h.name||'')+'</td>';
-        hhtml+='<td class="num">'+(h.skus||0)+'</td>';
-        hhtml+='<td class="num">'+(h.brands||0)+'</td>';
-        hhtml+='<td class="num">'+fcn(Math.round(h.vol||0))+' MT</td></tr>';
+    // ========== LEVEL 3 — GROWTH TABLE ==========
+    sett('ci-growth-title-cnt', (d.top_growth||[]).length);
+    if(d.top_growth && d.top_growth.length){
+      var ghtml = '';
+      d.top_growth.forEach(function(g, i){
+        var pcls = ciPrioCls(g.priority_score || 0);
+        var currentHtml = (g.current_brands||[]).slice(0,3).map(function(b){ return '<span class="ci-brand-pill">'+ esc(b) +'</span>'; }).join('');
+        if((g.current_brands||[]).length > 3) currentHtml += '<span class="ci-brand-pill" style="background:rgba(255,255,255,0.04);color:var(--text3)">+'+ ((g.current_brands||[]).length - 3) +'</span>';
+        var missingHtml = (g.missing_brands||[]).map(function(b){ return '<span class="ci-brand-pill ci-brand-pill-miss">'+ esc(b) +'</span>'; }).join('');
+        ghtml += '<tr>'
+          + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.card_code) +'">'+ esc(g.name||g.card_code) +'</a><div style="font-size:10px;color:var(--text3);margin-top:2px">'+ esc(g.region||'') + (g.sales_rep ? ' · '+ esc(g.sales_rep) : '') +'</div></td>'
+          + '<td style="font-size:11px;line-height:1.8">'+ currentHtml + '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+ fcn(Math.round(g.current_volume_ytd_mt||0)) +' MT/yr</div></td>'
+          + '<td style="font-size:11px">'+ (missingHtml || '<span style="color:var(--text3)">—</span>') +'</td>'
+          + '<td class="num" style="color:var(--green);font-weight:700">'+ fc(g.upside_php_yearly||0) +'<div style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--mono)">'+ fcn(Math.round(g.upside_mt_yearly||0)) +' MT/yr</div></td>'
+          + '<td style="font-size:11px;color:var(--text2);line-height:1.5">'+ esc(g.reason||'') +'</td>'
+          + '<td class="num"><span class="ci-prio '+ pcls +'" title="Upside '+ fc(g.upside_php_yearly||0) +' · score = log10(upside/₱100K) × 25">'+ (g.priority_score||0) +'</span></td>'
+          + '<td><button class="ci-action ci-action-grow" type="button" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.suggested_action||'') +'">Pitch</button></td>'
+          + '</tr>';
       });
-      seth('intel-horiz-tbody', hhtml);
+      seth('ci-growth-tbody', ghtml);
     } else {
-      seth('intel-horiz-tbody','<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">No horizontal targets</td></tr>');
+      seth('ci-growth-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No cross-sell opportunities above threshold this window.</td></tr>');
     }
 
-    // BUYING PATTERNS table
-    if(d.buying_patterns && d.buying_patterns.length){
-      var phtml='';
-      d.buying_patterns.forEach(function(p){
-        var sigCls = p.signal==='Loyal'?'b-green' : p.signal==='Stable'?'b-blue' : p.signal==='At Risk'?'b-gold' : p.signal==='Lost?'?'b-red' : 'b-gold';
-        phtml+='<tr><td style="font-weight:700">'+esc(p.pattern||'')+'</td>';
-        phtml+='<td class="num">'+fcn(p.count||0)+'</td>';
-        phtml+='<td class="num">'+(p.pct!=null?p.pct+'%':'--')+'</td>';
-        phtml+='<td class="num">'+fcn(Math.round(p.avg_vol||0))+' MT/mo</td>';
-        phtml+='<td><span class="badge '+sigCls+'">'+esc(p.signal||'--')+'</span></td></tr>';
+    // ========== LEVEL 4 — EARLY WARNING TABLE ==========
+    sett('ci-warning-title-cnt', (d.early_warning||[]).length);
+    if(d.early_warning && d.early_warning.length){
+      var whtml = '';
+      d.early_warning.forEach(function(w, i){
+        var pcls = ciPrioCls(w.priority_score || 0);
+        var chgCls = (w.change_pct||0) < -50 ? 'color:var(--red)' : 'color:var(--gold)';
+        whtml += '<tr>'
+          + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.card_code) +'">'+ esc(w.name||w.card_code) +'</a></td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(w.region||'—') +'</td>'
+          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round((w.avg_90d_mt||0))) +'</td>'
+          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round((w.last_30d_mt||0))) +'</td>'
+          + '<td class="num" style="'+ chgCls +';font-weight:700;font-family:var(--mono)">'+ (w.change_pct||0) +'%</td>'
+          + '<td class="num" style="color:var(--gold);font-weight:700">'+ fc(w.revenue_impact_php_yearly||0) +'</td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(w.sales_rep||'—') +'</td>'
+          + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(w.reason||'') +'">'+ (w.priority_score||0) +'</span></td>'
+          + '<td><button class="ci-action ci-action-warn" type="button" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.suggested_action||'') +'">Visit</button></td>'
+          + '</tr>';
       });
-      seth('intel-pattern-tbody', phtml);
+      seth('ci-warning-tbody', whtml);
     } else {
-      seth('intel-pattern-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No pattern data</td></tr>');
+      seth('ci-warning-tbody', '<tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No customers with meaningful declining trend.</td></tr>');
     }
 
-    // Behavioral alerts — 3 lists (silent, drops, growing)
-    function renderAlertList(listId, countId, items, kind){
-      var el = sel(listId); if(!el) return;
-      if(!items || !items.length){
-        el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">No accounts in this band</div>';
-        sett(countId, '0 accounts');
-        return;
-      }
-      var html = items.slice(0, 10).map(function(x){
-        var name = x.customer || x.name || x.CardName || '—';
-        var code = x.code || x.CardCode || '';
-        var meta = '';
-        if(kind === 'silent'){
-          var daysSilent = x.days_silent || x.days_since_last || x.days_overdue;
-          var yearly = x.yearly_value || x.revenue || x.est_value;
-          meta = (daysSilent!=null?daysSilent+'d ago':'—') + (yearly?' · '+fc(yearly)+'/yr':'') + (code?' · '+code:'');
-        } else if(kind === 'drops'){
-          var prev = x.prev_vol || x.prior_vol;
-          var curr = x.current_vol || x.recent_vol;
-          meta = (prev!=null && curr!=null ? prev+'→'+curr+' MT' : (code||''));
-        } else {
-          var p = x.prev_vol || x.prior_vol, c = x.current_vol || x.recent_vol;
-          meta = (p!=null && c!=null ? p+'→'+c+' MT' : (code||''));
-        }
-        var badgeCls = kind==='silent'?'b-red' : kind==='drops'?'b-gold' : 'b-green';
-        var badgeText;
-        if(kind==='silent') badgeText = x.days_silent || x.days_since_last ? (x.days_silent||x.days_since_last)+'d' : 'SILENT';
-        else if(kind==='drops') badgeText = x.change_pct!=null ? x.change_pct.toFixed(0)+'%' : (x.vs_prior_pct!=null ? x.vs_prior_pct.toFixed(0)+'%' : '▼');
-        else badgeText = x.change_pct!=null ? '+'+x.change_pct.toFixed(0)+'%' : (x.vs_prior_pct!=null ? '+'+x.vs_prior_pct.toFixed(0)+'%' : '▲');
-        return '<div class="list-row" '+(code?'onclick="openCust(\''+esc(code)+'\')" style="cursor:pointer"':'')+'>'
-          + '<div style="flex:1;font-size:12px"><b>'+esc(name)+'</b><br>'
-          + '<span style="color:var(--text3);font-size:10px">'+esc(meta)+'</span></div>'
-          + '<span class="badge '+badgeCls+'">'+esc(badgeText)+'</span></div>';
-      }).join('');
-      el.innerHTML = html;
-      sett(countId, items.length + ' accounts');
-    }
-    var alerts = d.behavioral_alerts || {};
-    renderAlertList('intel-silent-list',  'intel-silent-count',  alerts.silent,  'silent');
-    renderAlertList('intel-drops-list',   'intel-drops-count',   alerts.drops,   'drops');
-    renderAlertList('intel-growing-list', 'intel-growing-count', alerts.growing, 'growing');
+    // ========== LEVEL 5 — DORMANT SUMMARY + LIST ==========
+    var ds = d.dormant_summary || {};
+    sett('ci-dormant-hdr', fcn(ds.customer_count||0) +' customers · '+ fc(ds.historical_ar_amt||0) +' historical AR');
+    sett('ci-dormant-avgdays', fcn(ds.avg_dormancy_days||0) +'d');
+    sett('ci-dormant-vol', fcn(Math.round(ds.lifetime_volume_mt||0)) +' MT');
 
-    // SKU Penetration Matrix — customers (rows) × categories (cols)
-    if(d.sku_penetration_matrix && d.sku_penetration_matrix.customers){
-      var pm = d.sku_penetration_matrix;
-      var thead = '<tr><th>Customer</th>';
-      (pm.categories || []).forEach(function(c){
-        thead += '<th>'+esc((c||'').slice(0,12))+'</th>';
+    // Region pills
+    var regions = ds.by_region || {};
+    var regionHtml = ['Luzon','Visayas','Mindanao','Other'].map(function(r){
+      return '<span class="ci-pill">'+ r +' <b>'+ fcn(regions[r]||0) +'</b></span>';
+    }).join('');
+    seth('ci-dormant-regions', regionHtml);
+
+    // Year pills (desc)
+    var years = ds.by_last_active_year || {};
+    var yearKeys = Object.keys(years).sort().reverse();
+    var yearHtml = yearKeys.length
+      ? yearKeys.map(function(y){ return '<span class="ci-pill">'+ esc(y) +' <b>'+ fcn(years[y]) +'</b></span>'; }).join('')
+      : '<span class="ci-pill">—</span>';
+    seth('ci-dormant-years', yearHtml);
+
+    // Dormant list (top 50)
+    if(d.dormant_list && d.dormant_list.length){
+      var dhtml = '';
+      d.dormant_list.forEach(function(r, i){
+        dhtml += '<tr>'
+          + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a></td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
+          + '<td style="font-size:11px;color:var(--text2)">'+ ciFmtDate(r.last_order_date) +'</td>'
+          + '<td class="num" style="font-family:var(--mono);color:var(--text2)">'+ fcn(r.days_dormant||0) +'d</td>'
+          + '<td class="num" style="font-family:var(--mono);'+ (r.historical_ar>0?'color:var(--red);font-weight:700':'color:var(--text3)') +'">'+ fc(r.historical_ar||0) +'</td>'
+          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round(r.lifetime_volume_mt||0)) +'</td>'
+          + '</tr>';
       });
-      thead += '<th style="writing-mode:horizontal-tb;height:auto;color:var(--blue)">Score</th></tr>';
-      seth('intel-pen-thead', thead);
-      var maxCols = (pm.categories || []).length;
-      var rows = (pm.customers || []).map(function(cust, rowIdx){
-        var score = 0;
-        var cells = '';
-        var row = pm.grid && pm.grid[rowIdx] ? pm.grid[rowIdx] : [];
-        for(var i=0; i<maxCols; i++){
-          var v = row[i];
-          var cls, mark;
-          if(v != null && v > 0){ cls='pen-y'; mark='●'; score++; }
-          else if(v === 0 || v == null){ cls='pen-n'; mark='○'; }
-          else { cls='pen-n'; mark='○'; }
-          cells += '<td class="'+cls+'">'+mark+'</td>';
-        }
-        var scoreCls = score >= 7 ? 'var(--green)' : score >= 4 ? 'var(--gold)' : 'var(--red)';
-        return '<tr><td>'+esc((cust||'').slice(0,20))+'</td>'+cells+'<td style="font-family:var(--mono);font-weight:700;color:'+scoreCls+'">'+score+'/'+maxCols+'</td></tr>';
-      });
-      seth('intel-pen-tbody', rows.join(''));
+      seth('ci-dormant-tbody', dhtml);
+    } else {
+      seth('ci-dormant-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No dormant customers.</td></tr>');
     }
-    // Health distribution (logged only; bar is prototype)
-    if(d.health_distribution && d.health_distribution.length){
-      console.log('[INTELLIGENCE] '+d.health_distribution.length+' health bands (prototype bar retained)');
-    }
+
     pulseRefresh('pg-insights');
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
 }
+
 
 /* ===== TEAM — wired to /api/team ===== */
 async function loadTeam(){

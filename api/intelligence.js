@@ -2,318 +2,481 @@ const { query } = require('./_db')
 const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
+// --- Scoring helpers (deterministic, explainable) ---
+function scoreRescue(ar_balance, days_silent) {
+  // priority = (AR_millions) × log10(days_silent+1) × 10 · clamped 0–100
+  const raw = (ar_balance / 1_000_000) * Math.log10((days_silent || 0) + 1) * 10
+  return Math.max(0, Math.min(100, Math.round(raw)))
+}
+function scoreGrowth(upside_php_yearly) {
+  // priority = log10(upside/100K) × 25 · clamped 0–100
+  const raw = Math.log10(Math.max(1, upside_php_yearly / 100_000)) * 25
+  return Math.max(0, Math.min(100, Math.round(raw)))
+}
+function scoreWarning(revenue_impact, change_pct) {
+  // priority = (impact_millions × |Δ%|) / 5 · clamped 0–100
+  const raw = (revenue_impact / 1_000_000) * Math.min(100, Math.abs(change_pct)) / 5
+  return Math.max(0, Math.min(100, Math.round(raw)))
+}
+
+// Brand token = first two words of INV1.Dscription (e.g. "VIEPRO LAYER 1 Crumble" → "VIEPRO LAYER")
+function extractBrandToken(dscription) {
+  if (!dscription) return 'UNKNOWN'
+  const parts = String(dscription).trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0] + ' ' + parts[1]).toUpperCase()
+  return (parts[0] || 'UNKNOWN').toUpperCase()
+}
+
+function fmtPhpShort(n) {
+  if (!n) return '₱0'
+  const a = Math.abs(n)
+  if (a >= 1e6) return '₱' + (n / 1e6).toFixed(1) + 'M'
+  if (a >= 1e3) return '₱' + Math.round(n / 1e3) + 'K'
+  return '₱' + Math.round(n)
+}
+
+function tierOf(c) {
+  // Volume tier = average monthly MT over last 90 days (or lifetime if no recent vol)
+  const monthly = c.vol_90d_mt > 0 ? c.vol_90d_mt / 3 : (c.vol_36m_mt || 0) / 36
+  if (monthly < 50) return 'Small'
+  if (monthly < 200) return 'Medium'
+  return 'Large'
+}
+
 module.exports = async (req, res) => {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Cache check (10 min — heavy computation)
-  const cacheKey = `intelligence_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `intelligence_v2_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const baseWhere = `WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE()) AND T0.CANCELED = 'N'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
-
-    // --- Brand coverage per customer (last 12 months) ---
-    // Brand = first word of SKU description (e.g. "VIEPRO MUSCLY..." -> "VIEPRO")
-    const brandCoverage = await query(`
-      SELECT TOP 20
-        CASE
-          WHEN CHARINDEX(' ', T1.Dscription) > 0
-          THEN LEFT(T1.Dscription, CHARINDEX(' ', T1.Dscription) - 1)
-          ELSE T1.Dscription
-        END                                                              AS brand,
-        COUNT(DISTINCT T0.CardCode)                                      AS customers,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS total_vol
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      ${filteredWhere}
-      GROUP BY
-        CASE
-          WHEN CHARINDEX(' ', T1.Dscription) > 0
-          THEN LEFT(T1.Dscription, CHARINDEX(' ', T1.Dscription) - 1)
-          ELSE T1.Dscription
-        END
-      HAVING SUM(T1.Quantity) > 50
-      ORDER BY total_vol DESC
-    `)
-
-    // Total active customers
-    const activeRow = await query(`
-      SELECT COUNT(DISTINCT T0.CardCode) AS total_active
-      FROM OINV T0
-      ${filteredWhere}
-    `)
-    const totalActive = activeRow[0]?.total_active || 1
-
-    const brand_coverage = brandCoverage.map(b => ({
-      brand: b.brand,
-      customers: b.customers,
-      penetration_pct: Math.round((b.customers / totalActive) * 100),
-      vol_per_cust: Math.round((b.total_vol / b.customers) * 10) / 10,
-      whitespace_count: totalActive - b.customers,
-      est_opportunity: Math.round((totalActive - b.customers) * (b.total_vol / b.customers) * 0.5 * 31.735)
-    }))
-
-    // --- Brands per customer ---
-    const brandsPerCust = await query(`
+    // ============== QUERY 1: per-customer activity (36mo window) ==============
+    const actBase = await query(`
       SELECT
         T0.CardCode,
-        T0.CardName,
-        COUNT(DISTINCT T1.Dscription)                                    AS brand_count,
-        COUNT(DISTINCT T1.ItemCode)                                      AS sku_count,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS total_vol
+        MAX(T0.CardName)                                                          AS CardName,
+        MAX(OC.frozenFor)                                                         AS frozen_for,
+        MAX(OC.U_BpStatus)                                                        AS bp_status,
+        MAX(T0.DocDate)                                                           AS last_order_date,
+        DATEDIFF(DAY, MAX(T0.DocDate), GETDATE())                                 AS days_silent,
+        COUNT(DISTINCT T0.DocEntry)                                               AS order_count,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)              AS vol_36m_mt,
+        ISNULL(SUM(T1.LineTotal), 0)                                              AS rev_36m,
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,GETDATE())
+            THEN T1.Quantity * ISNULL(I.NumInSale,1) ELSE 0 END) / 1000.0, 0)      AS vol_30d_mt,
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,GETDATE())
+            THEN T1.Quantity * ISNULL(I.NumInSale,1) ELSE 0 END) / 1000.0, 0)      AS vol_90d_mt,
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,GETDATE())
+            THEN T1.LineTotal ELSE 0 END), 0)                                      AS rev_30d,
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,GETDATE())
+            THEN T1.LineTotal ELSE 0 END), 0)                                      AS rev_90d
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      ${filteredWhere}
-      GROUP BY T0.CardCode, T0.CardName
-      ORDER BY total_vol DESC
+      LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
+      LEFT JOIN OCRD OC  ON T0.CardCode = OC.CardCode
+      WHERE T0.DocDate >= DATEADD(MONTH, -36, GETDATE())
+        AND T0.CANCELED = 'N'
+      GROUP BY T0.CardCode
     `)
 
-    const horizontal_targets = brandsPerCust
-      .filter(c => c.brand_count < 2)
-      .slice(0, 20)
-      .map(c => ({
-        customer: c.CardName,
-        code: c.CardCode,
-        skus: c.sku_count,
-        brands: c.brand_count,
-        vol: Math.round(c.total_vol * 10) / 10
-      }))
-
-    // --- Buying patterns by order frequency ---
-    const orderFreq = await query(`
-      SELECT
-        T0.CardCode,
-        T0.CardName,
-        COUNT(DISTINCT T0.DocEntry)                                      AS order_count,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS total_vol,
-        MIN(T0.DocDate)                                                  AS first_order,
-        MAX(T0.DocDate)                                                  AS last_order,
-        DATEDIFF(DAY, MAX(T0.DocDate), GETDATE())                        AS days_since_last
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      ${filteredWhere}
-      GROUP BY T0.CardCode, T0.CardName
-    `)
-
-    // Classify by cadence
-    const patterns = { regular: [], biweekly: [], monthly: [], sporadic: [], dormant: [] }
-    orderFreq.forEach(c => {
-      const span = Math.max(1, Math.round((new Date(c.last_order) - new Date(c.first_order)) / (1000 * 60 * 60 * 24)))
-      const freq = span > 0 ? c.order_count / (span / 30) : 0
-
-      if (c.days_since_last > 60) patterns.dormant.push(c)
-      else if (freq >= 4) patterns.regular.push(c)
-      else if (freq >= 2) patterns.biweekly.push(c)
-      else if (freq >= 1) patterns.monthly.push(c)
-      else patterns.sporadic.push(c)
-    })
-
-    const buying_patterns = [
-      { pattern: 'Regular (weekly+)', count: patterns.regular.length, pct: Math.round((patterns.regular.length / totalActive) * 100), avg_vol: Math.round(patterns.regular.reduce((s, c) => s + c.total_vol, 0) / Math.max(1, patterns.regular.length)), signal: 'Loyal' },
-      { pattern: 'Bi-weekly', count: patterns.biweekly.length, pct: Math.round((patterns.biweekly.length / totalActive) * 100), avg_vol: Math.round(patterns.biweekly.reduce((s, c) => s + c.total_vol, 0) / Math.max(1, patterns.biweekly.length)), signal: 'Stable' },
-      { pattern: 'Monthly', count: patterns.monthly.length, pct: Math.round((patterns.monthly.length / totalActive) * 100), avg_vol: Math.round(patterns.monthly.reduce((s, c) => s + c.total_vol, 0) / Math.max(1, patterns.monthly.length)), signal: 'Monitor' },
-      { pattern: 'Sporadic (>30d gaps)', count: patterns.sporadic.length, pct: Math.round((patterns.sporadic.length / totalActive) * 100), avg_vol: Math.round(patterns.sporadic.reduce((s, c) => s + c.total_vol, 0) / Math.max(1, patterns.sporadic.length)), signal: 'At Risk' },
-      { pattern: 'Dormant (>60d)', count: patterns.dormant.length, pct: Math.round((patterns.dormant.length / totalActive) * 100), avg_vol: 0, signal: 'Lost?' }
-    ]
-
-    // --- Behavioral alerts ---
-    const silent = orderFreq
-      .filter(c => c.days_since_last >= 30 && c.days_since_last < 90)
-      .sort((a, b) => b.days_since_last - a.days_since_last)
-      .slice(0, 10)
-      .map(c => ({ customer: c.CardName, code: c.CardCode, days_ago: c.days_since_last, ytd_vol: Math.round(c.total_vol * 10) / 10 }))
-
-    // Volume drops: compare last 3 months vs prior 3 months
-    const volChanges = await query(`
-      SELECT TOP 100
-        T0.CardCode,
-        T0.CardName,
-        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(MONTH, -3, GETDATE())
-          THEN T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0 ELSE 0 END), 0) AS recent_vol,
-        ISNULL(SUM(CASE WHEN T0.DocDate < DATEADD(MONTH, -3, GETDATE())
-          AND T0.DocDate >= DATEADD(MONTH, -6, GETDATE())
-          THEN T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0 ELSE 0 END), 0) AS prior_vol
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= DATEADD(MONTH, -6, GETDATE()) AND T0.CANCELED = 'N'
-      GROUP BY T0.CardCode, T0.CardName
-      HAVING SUM(CASE WHEN T0.DocDate < DATEADD(MONTH, -3, GETDATE())
-        AND T0.DocDate >= DATEADD(MONTH, -6, GETDATE())
-        THEN T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0 ELSE 0 END) > 10
-      ORDER BY (SUM(CASE WHEN T0.DocDate >= DATEADD(MONTH, -3, GETDATE())
-        THEN T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0 ELSE 0 END) -
-        SUM(CASE WHEN T0.DocDate < DATEADD(MONTH, -3, GETDATE())
-        AND T0.DocDate >= DATEADD(MONTH, -6, GETDATE())
-        THEN T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0 ELSE 0 END)) ASC
-    `)
-
-    const drops = volChanges
-      .filter(c => c.prior_vol > 0 && ((c.recent_vol - c.prior_vol) / c.prior_vol) < -0.3)
-      .slice(0, 10)
-      .map(c => ({
-        customer: c.CardName,
-        code: c.CardCode,
-        recent_vol: Math.round(c.recent_vol),
-        prior_vol: Math.round(c.prior_vol),
-        change_pct: Math.round(((c.recent_vol - c.prior_vol) / c.prior_vol) * 100)
-      }))
-
-    const growing = volChanges
-      .filter(c => c.prior_vol > 0 && ((c.recent_vol - c.prior_vol) / c.prior_vol) > 0.25)
-      .sort((a, b) => ((b.recent_vol - b.prior_vol) / b.prior_vol) - ((a.recent_vol - a.prior_vol) / a.prior_vol))
-      .slice(0, 10)
-      .map(c => ({
-        customer: c.CardName,
-        code: c.CardCode,
-        recent_vol: Math.round(c.recent_vol),
-        prior_vol: Math.round(c.prior_vol),
-        change_pct: Math.round(((c.recent_vol - c.prior_vol) / c.prior_vol) * 100)
-      }))
-
-    // --- Account health score distribution ---
-    // Simple composite: order frequency + volume trend + brand count
-    const healthBands = [
-      { band: '0-30 Critical', min: 0, max: 30, count: 0, volume: 0, revenue: 0 },
-      { band: '31-50 Warning', min: 31, max: 50, count: 0, volume: 0, revenue: 0 },
-      { band: '51-70 Stable', min: 51, max: 70, count: 0, volume: 0, revenue: 0 },
-      { band: '71-85 Strong', min: 71, max: 85, count: 0, volume: 0, revenue: 0 },
-      { band: '86-100 Champion', min: 86, max: 100, count: 0, volume: 0, revenue: 0 }
-    ]
-
-    let healthScoreSum = 0
-    orderFreq.forEach(c => {
-      // Frequency score (0-25): weekly=25, biweekly=20, monthly=15, sporadic=8, dormant=0
-      const span = Math.max(1, Math.round((new Date(c.last_order) - new Date(c.first_order)) / (1000 * 60 * 60 * 24)))
-      const freq = c.order_count / (span / 30)
-      const freqScore = freq >= 4 ? 25 : freq >= 2 ? 20 : freq >= 1 ? 15 : c.days_since_last > 60 ? 0 : 8
-
-      // Recency score (0-20): <7d=20, <14d=16, <30d=10, <60d=5, >60d=0
-      const recencyScore = c.days_since_last < 7 ? 20 : c.days_since_last < 14 ? 16 : c.days_since_last < 30 ? 10 : c.days_since_last < 60 ? 5 : 0
-
-      // Volume score (0-25): top quartile = 25, etc.
-      const avgVol = orderFreq.reduce((s, x) => s + x.total_vol, 0) / totalActive
-      const volRatio = avgVol > 0 ? c.total_vol / avgVol : 0
-      const volScore = volRatio >= 2 ? 25 : volRatio >= 1 ? 20 : volRatio >= 0.5 ? 15 : volRatio >= 0.2 ? 8 : 3
-
-      // Brand diversity (0-15)
-      const bc = brandsPerCust.find(b => b.CardCode === c.CardCode)
-      const brandScore = bc ? Math.min(15, (bc.brand_count / Math.max(1, brandCoverage.length)) * 15 * 5) : 5
-
-      // Payment (0-15): placeholder — would need ORCT or PaidToDate analysis
-      const payScore = 10
-
-      const score = Math.min(100, Math.round(freqScore + recencyScore + volScore + brandScore + payScore))
-      healthScoreSum += score
-
-      const band = healthBands.find(b => score >= b.min && score <= b.max)
-      if (band) {
-        band.count++
-        band.volume += c.total_vol
-      }
-    })
-
-    const health_distribution = healthBands.map(b => ({
-      band: b.band,
-      count: b.count,
-      pct: Math.round((b.count / Math.max(1, totalActive)) * 100),
-      volume: Math.round(b.volume),
-      revenue: Math.round(b.volume * 31735)
-    }))
-
-    // --- SKU penetration matrix (top 15 customers x top categories) ---
-    const top15 = brandsPerCust.slice(0, 15)
-    const topCategories = brandCoverage.slice(0, 10).map(b => b.brand)
-
-    let sku_penetration_matrix = { customers: [], categories: topCategories, grid: [] }
-    if (top15.length > 0 && topCategories.length > 0) {
-      const custCodes = top15.map(c => c.CardCode)
-      const matrixParams = {}
-      custCodes.forEach((c, i) => { matrixParams[`mc${i}`] = c })
-      const mcList = custCodes.map((_, i) => `@mc${i}`).join(',')
-
-      const matrixData = await query(`
+    // ============== QUERY 2: last-order details (date, amount, sales rep) ==============
+    const lastOrderDetail = await query(`
+      WITH Ranked AS (
         SELECT
           T0.CardCode,
-          T1.Dscription AS category,
-          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS vol
+          T0.DocDate,
+          T0.DocEntry,
+          T0.DocTotal,
+          S.SlpName,
+          ROW_NUMBER() OVER (
+            PARTITION BY T0.CardCode
+            ORDER BY T0.DocDate DESC, T0.DocEntry DESC
+          ) AS rn
+        FROM OINV T0
+        LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate >= DATEADD(MONTH, -36, GETDATE())
+          AND T0.CANCELED = 'N'
+      )
+      SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpName AS sales_rep
+      FROM Ranked
+      WHERE rn = 1
+    `)
+
+    // ============== QUERY 3: dominant region per customer (last 12mo) ==============
+    const regionsRaw = await query(`
+      WITH RegAgg AS (
+        SELECT
+          T0.CardCode,
+          CASE
+            WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
+            WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
+            WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
+            ELSE 'Other'
+          END AS region,
+          SUM(T1.LineTotal) AS region_rev
         FROM OINV T0
         INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate >= DATEADD(MONTH, -3, GETDATE())
+        WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
           AND T0.CANCELED = 'N'
-          AND T0.CardCode IN (${mcList})
-        GROUP BY T0.CardCode, T1.Dscription
-      `, matrixParams)
+        GROUP BY
+          T0.CardCode,
+          CASE
+            WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
+            WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
+            WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
+            ELSE 'Other'
+          END
+      ),
+      Ranked AS (
+        SELECT CardCode, region,
+               ROW_NUMBER() OVER (PARTITION BY CardCode ORDER BY region_rev DESC) AS rn
+        FROM RegAgg
+      )
+      SELECT CardCode, region FROM Ranked WHERE rn = 1
+    `)
 
-      sku_penetration_matrix.customers = top15.map(c => c.CardName)
-      sku_penetration_matrix.grid = top15.map(cust => {
-        return topCategories.map(cat => {
-          const match = matrixData.find(m => m.CardCode === cust.CardCode && m.category === cat)
-          return match ? Math.round(match.vol * 10) / 10 : 0
-        })
+    // ============== QUERY 4: open-AR balance per customer (any age) ==============
+    const arRows = await query(`
+      SELECT T0.CardCode, SUM(T0.DocTotal - T0.PaidToDate) AS ar_balance
+      FROM OINV T0
+      WHERE T0.CANCELED = 'N'
+        AND (T0.DocTotal - T0.PaidToDate) > 0.01
+      GROUP BY T0.CardCode
+    `)
+
+    // ============== QUERY 5: per-customer × per-SKU basket (12mo), brand-token built in JS ==============
+    const brandBasket = await query(`
+      SELECT
+        T0.CardCode,
+        T1.Dscription                                                AS dscription,
+        SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0            AS vol_mt,
+        SUM(T1.LineTotal)                                            AS revenue,
+        SUM(T1.Quantity * ISNULL(I.NumInSale,1))                     AS kg
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+        AND T0.CANCELED = 'N'
+      GROUP BY T0.CardCode, T1.Dscription
+    `)
+
+    // ============== Build customer map ==============
+    const regionMap = new Map(regionsRaw.map(r => [r.CardCode, r.region]))
+    const arMap     = new Map(arRows.map(r => [r.CardCode, Number(r.ar_balance || 0)]))
+    const lastMap   = new Map(lastOrderDetail.map(r => [r.CardCode, r]))
+
+    const custMap = new Map()
+    for (const row of actBase) {
+      const cc = row.CardCode
+      const last = lastMap.get(cc) || {}
+      custMap.set(cc, {
+        card_code:         cc,
+        name:              row.CardName,
+        frozen_for:        row.frozen_for || 'N',
+        bp_status:         row.bp_status || '',
+        region:            regionMap.get(cc) || 'Other',
+        sales_rep:         last.sales_rep || '',
+        ar_balance:        arMap.get(cc) || 0,
+        last_order_date:   last.last_order_date || row.last_order_date,
+        last_order_amount: Number(last.last_order_amount || 0),
+        days_silent:       Number(row.days_silent || 0),
+        order_count:       Number(row.order_count || 0),
+        vol_36m_mt:        Number(row.vol_36m_mt || 0),
+        rev_36m:           Number(row.rev_36m || 0),
+        vol_30d_mt:        Number(row.vol_30d_mt || 0),
+        vol_90d_mt:        Number(row.vol_90d_mt || 0),
+        rev_30d:           Number(row.rev_30d || 0),
+        rev_90d:           Number(row.rev_90d || 0)
       })
     }
 
-    // --- Reorder predictions (overdue based on avg frequency) ---
-    const reorder_predictions = orderFreq
-      .filter(c => c.order_count >= 3 && c.days_since_last > 0)
+    // Include customers with open AR but no OINV in 36mo (orphaned dormant balances)
+    for (const [cc, arbal] of arMap.entries()) {
+      if (custMap.has(cc)) continue
+      custMap.set(cc, {
+        card_code: cc, name: '(unknown)', frozen_for: 'N', bp_status: '',
+        region: 'Other', sales_rep: '', ar_balance: arbal,
+        last_order_date: null, last_order_amount: 0,
+        days_silent: 9999, order_count: 0,
+        vol_36m_mt: 0, rev_36m: 0,
+        vol_30d_mt: 0, vol_90d_mt: 0, rev_30d: 0, rev_90d: 0
+      })
+    }
+
+    // Backfill names for AR-only orphans
+    const unknowns = [...custMap.values()].filter(c => c.name === '(unknown)').map(c => c.card_code)
+    for (let i = 0; i < unknowns.length; i += 100) {
+      const chunk = unknowns.slice(i, i + 100)
+      const params = {}
+      chunk.forEach((cc, j) => { params['uc' + j] = cc })
+      const placeholders = chunk.map((_, j) => '@uc' + j).join(',')
+      const rows = await query(
+        `SELECT CardCode, CardName, frozenFor, U_BpStatus FROM OCRD WHERE CardCode IN (${placeholders})`,
+        params
+      ).catch(() => [])
+      for (const r of rows) {
+        const c = custMap.get(r.CardCode)
+        if (!c) continue
+        c.name = r.CardName || r.CardCode
+        c.frozen_for = r.frozenFor || 'N'
+        c.bp_status = r.U_BpStatus || ''
+      }
+    }
+
+    const allCustomers = [...custMap.values()]
+
+    // ============== LIST 1 — TOP RESCUE ==============
+    // Active (not frozen/delinquent), AR > 0, silent 30–90 days.
+    const rescueAll = allCustomers
+      .filter(c => {
+        if (c.frozen_for === 'Y') return false
+        if (c.bp_status === 'Delinquent' || c.bp_status === 'InActive') return false
+        if (c.ar_balance <= 0) return false
+        if (c.days_silent < 30 || c.days_silent > 90) return false
+        return true
+      })
       .map(c => {
-        const span = Math.max(1, Math.round((new Date(c.last_order) - new Date(c.first_order)) / (1000 * 60 * 60 * 24)))
-        const avgInterval = span / Math.max(1, c.order_count - 1)
-        const daysOverdue = c.days_since_last - avgInterval
+        const priority_score = scoreRescue(c.ar_balance, c.days_silent)
+        const reason = `Silent ${c.days_silent}d + ${fmtPhpShort(c.ar_balance)} AR`
+        let suggested_action
+        if      (priority_score >= 80) suggested_action = 'Personal call by RSM this week'
+        else if (priority_score >= 50) suggested_action = 'Phone follow-up within 3 days'
+        else                           suggested_action = 'SMS/email check-in'
         return {
-          customer: c.CardName,
-          code: c.CardCode,
-          avg_interval_days: Math.round(avgInterval),
-          days_since_last: c.days_since_last,
-          days_overdue: Math.round(daysOverdue),
-          est_vol: Math.round(c.total_vol / Math.max(1, c.order_count) * 10) / 10,
-          status: daysOverdue > 5 ? 'OVERDUE' : daysOverdue > 0 ? 'DUE' : 'On track'
+          card_code:          c.card_code,
+          name:               c.name,
+          region:             c.region,
+          sales_rep:          c.sales_rep,
+          ar_balance:         Math.round(c.ar_balance),
+          last_order_date:    c.last_order_date,
+          last_order_amount:  Math.round(c.last_order_amount),
+          days_silent:        c.days_silent,
+          reason,
+          priority_score,
+          suggested_action
         }
       })
-      .filter(c => c.days_overdue > -3)
-      .sort((a, b) => b.days_overdue - a.days_overdue)
-      .slice(0, 15)
+      .sort((a, b) => b.priority_score - a.priority_score)
+    const top_rescue = rescueAll.slice(0, 15)
 
-    const whitespace_total = brand_coverage.reduce((s, b) => s + b.est_opportunity, 0)
-    const at_risk_rev = [...silent, ...drops].reduce((s, c) => s + (c.ytd_vol || c.recent_vol || 0) * 31735, 0)
-    const avg_health_score = totalActive > 0 ? Math.round(healthScoreSum / totalActive) : 0
+    // ============== LIST 2 — TOP GROWTH (peer-driven cross-sell) ==============
+    // Build per-customer brand basket from SKU aggregate
+    const custBrand = new Map()  // cc → Map(brand → {vol_mt, revenue, kg})
+    for (const row of brandBasket) {
+      const cc = row.CardCode
+      const brand = extractBrandToken(row.dscription)
+      if (!custBrand.has(cc)) custBrand.set(cc, new Map())
+      const bm = custBrand.get(cc)
+      const prev = bm.get(brand) || { vol_mt: 0, revenue: 0, kg: 0 }
+      bm.set(brand, {
+        vol_mt:  prev.vol_mt  + Number(row.vol_mt  || 0),
+        revenue: prev.revenue + Number(row.revenue || 0),
+        kg:      prev.kg      + Number(row.kg      || 0)
+      })
+    }
+
+    // Peer groups keyed by region|tier; members = active customers (silent < 90d, not frozen)
+    const peerGroups = new Map()
+    for (const c of allCustomers) {
+      if (c.days_silent >= 90) continue
+      if (c.frozen_for === 'Y') continue
+      const key = `${c.region}|${tierOf(c)}`
+      if (!peerGroups.has(key)) peerGroups.set(key, { members: [], brandStats: new Map() })
+      peerGroups.get(key).members.push(c.card_code)
+    }
+
+    // Aggregate brand stats within each peer group
+    for (const [, group] of peerGroups.entries()) {
+      const raw = new Map()
+      for (const cc of group.members) {
+        const basket = custBrand.get(cc)
+        if (!basket) continue
+        for (const [brand, st] of basket.entries()) {
+          const cur = raw.get(brand) || { buyers: 0, vol_mt: 0, revenue: 0, kg: 0 }
+          cur.buyers  += 1
+          cur.vol_mt  += st.vol_mt
+          cur.revenue += st.revenue
+          cur.kg      += st.kg
+          raw.set(brand, cur)
+        }
+      }
+      const size = group.members.length
+      const final = new Map()
+      for (const [brand, s] of raw.entries()) {
+        final.set(brand, {
+          penetration:          size > 0 ? s.buyers / size : 0,
+          avg_vol_mt:           s.buyers > 0 ? s.vol_mt / s.buyers : 0,
+          avg_price_php_per_kg: s.kg > 0 ? s.revenue / s.kg : 0,
+          buyers:               s.buyers,
+          group_size:           size
+        })
+      }
+      group.brandStats = final
+    }
+
+    // For each active customer, pick the single best missing brand (highest PHP upside)
+    const growthAll = []
+    for (const c of allCustomers) {
+      if (c.days_silent >= 90) continue
+      if (c.frozen_for === 'Y') continue
+      const tier = tierOf(c)
+      const group = peerGroups.get(`${c.region}|${tier}`)
+      if (!group || group.members.length < 5) continue   // peer group too small for signal
+      const basket = custBrand.get(c.card_code) || new Map()
+      const currentBrands = [...basket.keys()].sort()
+
+      let best = null
+      for (const [brand, stats] of group.brandStats.entries()) {
+        if (basket.has(brand)) continue
+        if (stats.penetration < 0.70) continue
+        const upside_mt_yearly  = stats.avg_vol_mt * 0.6
+        const upside_php_yearly = upside_mt_yearly * 1000 * stats.avg_price_php_per_kg
+        if (!best || upside_php_yearly > best.upside_php_yearly) {
+          best = {
+            brand,
+            peer_avg_volume_mt:  Math.round(stats.avg_vol_mt * 10) / 10,
+            peer_penetration:    Math.round(stats.penetration * 100),
+            upside_mt_yearly:    Math.round(upside_mt_yearly),
+            upside_php_yearly:   Math.round(upside_php_yearly),
+            peer_group_size:     stats.group_size
+          }
+        }
+      }
+      if (!best || best.upside_php_yearly < 50000) continue   // skip trivial
+      const priority_score = scoreGrowth(best.upside_php_yearly)
+      growthAll.push({
+        card_code:                 c.card_code,
+        name:                      c.name,
+        region:                    c.region,
+        sales_rep:                 c.sales_rep,
+        current_volume_ytd_mt:     Math.round(c.vol_90d_mt * 4 * 10) / 10,  // 90d annualised
+        current_brands:            currentBrands,
+        missing_brands:            [best.brand],
+        peer_avg_volume_mt:        best.peer_avg_volume_mt,
+        upside_mt_yearly:          best.upside_mt_yearly,
+        upside_php_yearly:         best.upside_php_yearly,
+        cross_sell_recommendation: best.brand,
+        reason:                    `${best.peer_penetration}% of ${c.region} ${tier} peers buy ${best.brand}`,
+        priority_score,
+        suggested_action:          `Pitch ${best.brand} trial order at next visit`
+      })
+    }
+    growthAll.sort((a, b) => b.upside_php_yearly - a.upside_php_yearly)
+    const top_growth = growthAll.slice(0, 15)
+
+    // ============== LIST 3 — EARLY WARNING ==============
+    // Active (< 30d silent), vol_30d < 70% of (vol_90d/3), meaningful size.
+    const warningAll = []
+    for (const c of allCustomers) {
+      if (c.days_silent >= 30) continue
+      if (c.frozen_for === 'Y') continue
+      if (c.vol_90d_mt <= 5) continue
+      const avg_30d_from_90d = c.vol_90d_mt / 3
+      if (avg_30d_from_90d <= 0) continue
+      const change_pct = ((c.vol_30d_mt - avg_30d_from_90d) / avg_30d_from_90d) * 100
+      if (change_pct >= -30) continue
+
+      const monthly_gap = avg_30d_from_90d - c.vol_30d_mt
+      // php per MT from trailing 90d revenue ÷ 90d volume (MT)
+      const php_per_mt = c.vol_90d_mt > 0 ? c.rev_90d / c.vol_90d_mt : 0
+      const revenue_impact_php_yearly = Math.max(0, Math.round(monthly_gap * 12 * php_per_mt))
+      if (revenue_impact_php_yearly < 50000) continue
+
+      const priority_score = scoreWarning(revenue_impact_php_yearly, change_pct)
+      warningAll.push({
+        card_code:                  c.card_code,
+        name:                       c.name,
+        region:                     c.region,
+        sales_rep:                  c.sales_rep,
+        avg_90d_mt:                 Math.round(avg_30d_from_90d * 10) / 10,
+        last_30d_mt:                Math.round(c.vol_30d_mt * 10) / 10,
+        change_pct:                 Math.round(change_pct),
+        revenue_impact_php_yearly,
+        reason:                     `Volume down ${Math.round(Math.abs(change_pct))}% in last 30d vs 90d avg`,
+        priority_score,
+        suggested_action:           priority_score >= 70
+          ? 'Schedule visit within 1 week'
+          : 'Schedule check-in within 2 weeks'
+      })
+    }
+    warningAll.sort((a, b) => b.revenue_impact_php_yearly - a.revenue_impact_php_yearly)
+    const early_warning = warningAll.slice(0, 15)
+
+    // ============== LIST 4 — DORMANT ==============
+    const dormantAll = allCustomers.filter(c => c.days_silent >= 60)
+    const dormant_count = dormantAll.length
+    const historical_ar_amt = Math.round(dormantAll.reduce((s, c) => s + c.ar_balance, 0))
+    const lifetime_volume_mt = Math.round(dormantAll.reduce((s, c) => s + c.vol_36m_mt, 0) * 10) / 10
+    const avg_dormancy_days = dormant_count > 0
+      ? Math.round(dormantAll.reduce((s, c) => s + c.days_silent, 0) / dormant_count)
+      : 0
+
+    const by_region = { Luzon: 0, Visayas: 0, Mindanao: 0, Other: 0 }
+    for (const c of dormantAll) by_region[c.region] = (by_region[c.region] || 0) + 1
+
+    const by_last_active_year = {}
+    for (const c of dormantAll) {
+      if (!c.last_order_date) continue
+      const y = new Date(c.last_order_date).getFullYear().toString()
+      by_last_active_year[y] = (by_last_active_year[y] || 0) + 1
+    }
+
+    const dormant_list = dormantAll
+      .slice()
+      .sort((a, b) => (b.ar_balance - a.ar_balance) || (b.vol_36m_mt - a.vol_36m_mt))
+      .slice(0, 50)
+      .map(c => ({
+        card_code:          c.card_code,
+        name:               c.name,
+        region:             c.region,
+        sales_rep:          c.sales_rep,
+        last_order_date:    c.last_order_date,
+        days_dormant:       c.days_silent,
+        historical_ar:      Math.round(c.ar_balance),
+        lifetime_volume_mt: Math.round(c.vol_36m_mt * 10) / 10
+      }))
+
+    // ============== HERO STATS ==============
+    const hero_stats = {
+      rescue_at_risk_amt:         Math.round(top_rescue.reduce((s, r) => s + r.ar_balance, 0)),
+      rescue_count:               top_rescue.length,
+      growth_upside_amt:          Math.round(top_growth.reduce((s, g) => s + g.upside_php_yearly, 0)),
+      growth_count:               top_growth.length,
+      early_warning_amt:          Math.round(early_warning.reduce((s, w) => s + w.revenue_impact_php_yearly, 0)),
+      early_warning_count:        early_warning.length,
+      dormant_count,
+      dormant_historical_ar_amt:  historical_ar_amt
+    }
 
     const result = {
-      hero: {
-        whitespace_total: Math.round(whitespace_total),
-        at_risk_total: Math.round(at_risk_rev),
-        avg_health_score,
-        total_active: totalActive
+      hero_stats,
+      top_rescue,
+      top_growth,
+      early_warning,
+      dormant_summary: {
+        customer_count:       dormant_count,
+        historical_ar_amt,
+        lifetime_volume_mt,
+        avg_dormancy_days,
+        by_region,
+        by_last_active_year
       },
-      kpis: {
-        silent_30d: silent.length,
-        vol_drop: drops.length,
-        growing: growing.length,
-        avg_skus_per_cust: Math.round(brandsPerCust.reduce((s, c) => s + c.sku_count, 0) / Math.max(1, totalActive) * 10) / 10,
-        avg_brands_per_cust: Math.round(brandsPerCust.reduce((s, c) => s + c.brand_count, 0) / Math.max(1, totalActive) * 10) / 10
-      },
-      brand_coverage,
-      horizontal_targets,
-      buying_patterns,
-      sku_penetration_matrix,
-      behavioral_alerts: { silent, drops, growing },
-      health_distribution,
-      reorder_predictions
+      dormant_list,
+      meta: {
+        total_customers_analyzed: allCustomers.length,
+        rescue_pool_size:         rescueAll.length,
+        growth_pool_size:         growthAll.length,
+        warning_pool_size:        warningAll.length,
+        dormant_pool_size:        dormantAll.length,
+        generated_at:             new Date().toISOString()
+      }
     }
 
     cache.set(cacheKey, result, 600)
@@ -323,3 +486,6 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'Database error', detail: err.message })
   }
 }
+
+// Acknowledge unused imports for future role-based filtering
+void applyRoleFilter
