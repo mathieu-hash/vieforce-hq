@@ -216,80 +216,96 @@ module.exports = async (req, res) => {
       WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
     `)
 
-    // --- Region performance (current period + previous period for vs_pp delta) ---
-    const regionPerfCur = await query(`
-      SELECT
-        CASE
+    // --- Region performance (current period + previous period for vs_pp delta)
+    //     Volume (.vol) = ODLN · Sales (.sales) = OINV · gm_ton = OINV/OINV. Mat's rule 2026-04-18.
+    const REGION_CASE_OINV = `CASE
           WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
           WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
           WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
           ELSE 'Other'
-        END                                                                AS region,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol,
+        END`
+    // Same mapping, different join path (DLN1.WhsCode instead of INV1.WhsCode)
+    const REGION_CASE_ODLN = REGION_CASE_OINV
+
+    const regionInvCur = await query(`
+      SELECT ${REGION_CASE_OINV} AS region,
         ISNULL(SUM(T1.LineTotal), 0)                                      AS sales,
-        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
-          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
-          ELSE 0 END                                                       AS gm_ton
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gm_sum,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol_invoiced
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-      GROUP BY
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END
-      ORDER BY vol DESC
+      GROUP BY ${REGION_CASE_OINV}
     `, { dateFrom, dateTo })
 
-    // Previous period for vs_pp
-    const regionPerfPrev = await query(`
-      SELECT
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END                                                                AS region,
+    const regionOdlnCur = await query(`
+      SELECT ${REGION_CASE_ODLN} AS region,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      GROUP BY ${REGION_CASE_ODLN}
+    `, { dateFrom, dateTo })
+
+    const regionOdlnPrev = await query(`
+      SELECT ${REGION_CASE_ODLN} AS region,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED='N'
-      GROUP BY
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END
+      GROUP BY ${REGION_CASE_ODLN}
     `, { ppFrom: prev.from, ppTo: prev.to })
 
-    const prevMap = Object.fromEntries(regionPerfPrev.map(r => [r.region, r.vol]))
-    const regionPerf = regionPerfCur.map(r => ({
-      ...r,
-      vs_pp: prevMap[r.region] > 0
-        ? Math.round(((r.vol - prevMap[r.region]) / prevMap[r.region]) * 1000) / 10
+    // Merge: ODLN vol is the headline; OINV provides sales + gm_ton.
+    const invByRegion = Object.fromEntries(regionInvCur.map(r => [r.region, r]))
+    const prevMap = Object.fromEntries(regionOdlnPrev.map(r => [r.region, r.vol]))
+    const allRegions = new Set([...regionOdlnCur.map(r => r.region), ...regionInvCur.map(r => r.region)])
+    const regionPerf = [...allRegions].map(region => {
+      const odln = regionOdlnCur.find(r => r.region === region) || { vol: 0 }
+      const inv = invByRegion[region] || { sales: 0, gm_sum: 0, vol_invoiced: 0 }
+      const gm_ton = inv.vol_invoiced > 0 ? inv.gm_sum / inv.vol_invoiced : 0
+      const vs_pp = prevMap[region] > 0
+        ? Math.round(((odln.vol - prevMap[region]) / prevMap[region]) * 1000) / 10
         : null
-    }))
+      return {
+        region,
+        vol: odln.vol,                 // DR (ODLN)
+        vol_invoiced: inv.vol_invoiced, // OINV — for ref / sub-line
+        sales: inv.sales,
+        gm_ton,
+        vs_pp
+      }
+    }).sort((a, b) => b.vol - a.vol)
 
-    // --- Top customers (pull extra rows so filtering warehouse codes still yields 5) ---
-    const topCustRaw = await query(`
-      SELECT TOP 15
+    // --- Top customers — rank by ODLN (DR) volume, revenue from OINV ---
+    const topCustDLN = await query(`
+      SELECT TOP 20
         T0.CardCode                                                     AS code,
         T0.CardName                                                     AS name,
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS vol,
-        ISNULL(SUM(T1.LineTotal), 0)                                    AS revenue
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS vol
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      ${filteredWhere}
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
       GROUP BY T0.CardCode, T0.CardName
       ORDER BY vol DESC
     `, { dateFrom, dateTo })
-    const topCust = topCustRaw.filter(c => !isNonCustomer(c.code)).slice(0, 5)
+    const topCustInvRaw = await query(`
+      SELECT T0.CardCode AS code,
+        ISNULL(SUM(T1.LineTotal), 0) AS revenue
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      ${filteredWhere}
+      GROUP BY T0.CardCode
+    `, { dateFrom, dateTo })
+    const revByCust = Object.fromEntries(topCustInvRaw.map(r => [r.code, r.revenue]))
+    const topCust = topCustDLN
+      .filter(c => !isNonCustomer(c.code))
+      .slice(0, 5)
+      .map(c => ({ code: c.code, name: c.name, vol: c.vol, revenue: revByCust[c.code] || 0 }))
 
     // --- Monthly performance (last 7 months, CY + LY volume + GM) — OINV only ---
     const monthlyRaw = await query(`
@@ -306,11 +322,29 @@ module.exports = async (req, res) => {
       GROUP BY YEAR(T0.DocDate), MONTH(T0.DocDate)
     `)
 
+    // Volume for monthly chart comes from ODLN (DR); gross margin stays OINV.
+    const monthlyOdln = await query(`
+      SELECT
+        YEAR(T0.DocDate)                                                  AS y,
+        MONTH(T0.DocDate)                                                 AS m,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= DATEADD(MONTH, -19, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+        AND T0.CANCELED = 'N'
+      GROUP BY YEAR(T0.DocDate), MONTH(T0.DocDate)
+    `)
+
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    const monthlyMap = {}  // 'YYYY-MM' -> { volume_mt, gm }
+    const monthlyMap = {}  // 'YYYY-MM' -> { volume_mt (ODLN), gm (OINV) }
     for (const r of monthlyRaw) {
       const k = `${r.y}-${String(r.m).padStart(2,'0')}`
-      monthlyMap[k] = { volume_mt: Number(r.volume_mt||0), gm: Number(r.gross_margin||0) }
+      monthlyMap[k] = { volume_mt: 0, gm: Number(r.gross_margin||0) }
+    }
+    for (const r of monthlyOdln) {
+      const k = `${r.y}-${String(r.m).padStart(2,'0')}`
+      monthlyMap[k] = { ...(monthlyMap[k] || { gm: 0 }), volume_mt: Number(r.volume_mt||0) }
     }
     // Build last 7 months ending with current month (descending-build, reversed to ascending order)
     const monthly_perf = []
@@ -345,9 +379,27 @@ module.exports = async (req, res) => {
       GROUP BY YEAR(T0.DocDate), DATEPART(QUARTER, T0.DocDate)
     `)
 
+    // Volume for quarterly chart comes from ODLN; gm stays OINV.
+    const quarterlyOdln = await query(`
+      SELECT
+        YEAR(T0.DocDate)                                                  AS y,
+        DATEPART(QUARTER, T0.DocDate)                                     AS q,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate >= DATEFROMPARTS(YEAR(GETDATE()) - 1, 1, 1)
+        AND T0.CANCELED = 'N'
+      GROUP BY YEAR(T0.DocDate), DATEPART(QUARTER, T0.DocDate)
+    `)
+
     const qMap = {}
     for (const r of quarterlyRaw) {
-      qMap[`${r.y}-Q${r.q}`] = { volume_mt: Number(r.volume_mt||0), gm: Number(r.gross_margin||0) }
+      qMap[`${r.y}-Q${r.q}`] = { volume_mt: 0, gm: Number(r.gross_margin||0) }
+    }
+    for (const r of quarterlyOdln) {
+      const k = `${r.y}-Q${r.q}`
+      qMap[k] = { ...(qMap[k] || { gm: 0 }), volume_mt: Number(r.volume_mt||0) }
     }
     const quarterly_perf = []
     for (let q = 1; q <= 4; q++) {
@@ -382,45 +434,64 @@ module.exports = async (req, res) => {
     `, { dateFrom, dateTo })
 
     const d = kpis[0] || {}, p = prevKpis[0] || {}, y = ytdKpis[0] || {}, ly = lyKpis[0] || {}
+    const dOdln = odlnCur[0] || {}, pOdln = prevOdln[0] || {}, yOdln = ytdOdln[0] || {}, lyOdlnRow = lyOdln[0] || {}
+    const pb = pendingBilling[0] || {}
 
     // Delta vs previous period (pct)
     const delta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : 0)
 
+    // Volume = ODLN (DR); Revenue + GM + GM/ton = OINV (unchanged). Mat's rule 2026-04-18.
+    const cur_vol_mt   = Number(dOdln.volume_mt  || 0)
+    const cur_vol_bags = Number(dOdln.volume_bags || 0)
+    const prev_vol_mt  = Number(pOdln.volume_mt || 0)
+    const ytd_vol_mt   = Number(yOdln.volume_mt || 0)
+    const ly_vol_mt    = Number(lyOdlnRow.volume_mt || 0)
+    const cur_vol_inv  = Number(d.volume_mt_invoiced || 0)
+    const pending_mt   = Math.max(0, Math.round((cur_vol_mt - cur_vol_inv) * 10) / 10)
+    const pending_docs = Number(pb.pending_docs || 0)
+
     const result = {
-      revenue:      d.revenue || 0,
-      volume_bags:  d.volume_bags || 0,
-      volume_mt:    d.volume_mt || 0,
-      gross_margin: d.gross_margin || 0,
-      gm_per_bag:   d.gm_per_bag || 0,
-      gmt:          d.gmt || 0,
+      revenue:               d.revenue || 0,
+      volume_bags:           cur_vol_bags,                           // ODLN (DR)
+      volume_mt:             cur_vol_mt,                             // ODLN (DR)
+      volume_mt_invoiced:    cur_vol_inv,                            // OINV (for sub-line)
+      volume_bags_invoiced:  Number(d.volume_bags_invoiced || 0),
+      pending_billing_mt:    pending_mt,
+      pending_billing_docs:  pending_docs,
+      gross_margin:          d.gross_margin || 0,                    // OINV
+      gm_per_bag:            d.gm_per_bag || 0,                      // OINV / OINV
+      gmt:                   d.gmt || 0,                             // OINV / OINV
 
       previous_period: {
         revenue:      p.revenue || 0,
-        volume_mt:    p.volume_mt || 0,
+        volume_mt:    prev_vol_mt,                                   // ODLN
+        volume_mt_invoiced: Number(p.volume_mt_invoiced || 0),
         gross_margin: p.gross_margin || 0,
         gmt:          p.gmt || 0
       },
       last_year: {
         revenue:      ly.revenue || 0,
-        volume_mt:    ly.volume_mt || 0,
+        volume_mt:    ly_vol_mt,                                     // ODLN
+        volume_mt_invoiced: Number(ly.volume_mt_invoiced || 0),
         gross_margin: ly.gross_margin || 0,
         gmt:          ly.gmt || 0
       },
       delta_pct: {
         revenue:      delta(d.revenue, p.revenue),
-        volume_mt:    delta(d.volume_mt, p.volume_mt),
+        volume_mt:    delta(cur_vol_mt, prev_vol_mt),                // ODLN vs ODLN
         gross_margin: delta(d.gross_margin, p.gross_margin),
         gmt:          delta(d.gmt, p.gmt)
       },
       delta_pct_ly: {
         revenue:      delta(d.revenue, ly.revenue),
-        volume_mt:    delta(d.volume_mt, ly.volume_mt),
+        volume_mt:    delta(cur_vol_mt, ly_vol_mt),                  // ODLN vs ODLN
         gross_margin: delta(d.gross_margin, ly.gross_margin),
         gmt:          delta(d.gmt, ly.gmt)
       },
       ytd: {
         revenue:      y.revenue || 0,
-        volume_mt:    y.volume_mt || 0,
+        volume_mt:    ytd_vol_mt,                                    // ODLN
+        volume_mt_invoiced: Number(y.volume_mt_invoiced || 0),
         gross_margin: y.gross_margin || 0,
         gmt:          y.gmt || 0
       },
