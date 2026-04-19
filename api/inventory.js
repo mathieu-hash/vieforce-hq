@@ -1,16 +1,43 @@
 const { query } = require('./_db')
-const { verifySession } = require('./_auth')
+const { verifySession, verifyServiceToken } = require('./_auth')
+const { scopeForUser } = require('./_scope')
 const cache = require('../lib/cache')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const session = await verifySession(req)
+  // Auth — service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
+  // Parse optional scope=user:<uuid>. Resolved for response metadata ONLY —
+  // inventory is plant-based (WhsCode), not customer-based (CardCode/SlpCode),
+  // so every caller sees the full national dataset regardless of scope.
+  // No zero-state short-circuit on is_empty: a DSM without sap_slpcode still
+  // needs inventory visibility to check stock before promising customers.
+  // Field-rep region scoping (Luzon DSM → Luzon plants only) is deferred
+  // until a field rep complains; not in this phase.
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      try {
+        scope = await scopeForUser(uuid)
+      } catch (err) {
+        console.error('[inventory] scope resolve failed:', err.message)
+        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
+                  slpCodes: [], districtCodes: [] }
+      }
+    }
+  }
+
+  // Cache key includes req.url (which encodes the scope param) so a scoped
+  // call and an unscoped call get separate envelopes — prevents the scope
+  // meta field from leaking into / out of the cached response incorrectly.
   const cacheKey = `inventory_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
@@ -267,6 +294,19 @@ module.exports = async (req, res) => {
       negative_avail_count: negRow[0]?.negative_count || 0,
       cover_days: { national: nationalCoverDays },
       last_updated: new Date().toISOString()
+    }
+    // Scope meta — only when the caller passed ?scope=user:<uuid>. The
+    // `scope_applied: false` flag is EXPLICIT so Patrol can surface
+    // "Showing national inventory" context in the UI. Web dashboard (session
+    // auth, no scope param) sees a byte-identical response shape.
+    if (scope) {
+      result.scope = {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: !!scope.is_empty,
+        scope_applied: false,
+        scope_applied_reason: 'inventory is national — plant-based, not customer-based'
+      }
     }
 
     cache.set(cacheKey, result, 900)
