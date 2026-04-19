@@ -1,31 +1,80 @@
 const { query, queryH } = require('./_db')
-const { verifySession, applyRoleFilter } = require('./_auth')
+const { verifySession, verifyServiceToken, applyRoleFilter } = require('./_auth')
+const { scopeForUser, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const session = await verifySession(req)
+  // Auth — try service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `customers_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
+  // Parse pagination / filter params up front so zero-state can echo them back.
+  const { search = '', region = 'ALL', page = '1', limit = '50', sort = 'revenue' } = req.query
+  const pageNum  = Math.max(1, parseInt(page) || 1)
+  const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50))
+  const offset   = (pageNum - 1) * limitNum
+
+  // Parse optional scope=user:<uuid>. Same pattern as /api/sales + /api/customer.
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      try {
+        scope = await scopeForUser(uuid)
+      } catch (err) {
+        console.error('[customers] scope resolve failed:', err.message)
+        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
+                  slpCodes: [], districtCodes: [] }
+      }
+    }
+  }
+
+  // EXISTS-based WHERE fragment that restricts to the caller's SlpCodes +
+  // districts. '' when scope is 'ALL' or no scope param was passed.
+  const scopeFilter = buildScopeWhere(scope, 'T0')
+
+  // Zero-state short-circuit — no SQL, shape matches normal response so
+  // Patrol renders a consistent "no data" view without branching.
+  if (scopeFilter.isEmpty) {
+    return res.json({
+      customers: [],
+      total: 0,
+      page: 1,
+      pages: 0,
+      limit: limitNum,
+      non_customer_excluded: 0,
+      scope: scope ? {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: true,
+        slpCodes_count: 0
+      } : undefined
+    })
+  }
+
+  // Cache key includes scope so user A's cached rows can't leak to user B.
+  const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
+  const cacheKey = `customers_v2_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const { search = '', region = 'ALL', page = '1', limit = '50', sort = 'revenue' } = req.query
-    const pageNum  = Math.max(1, parseInt(page) || 1)
-    const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50))
-    const offset   = (pageNum - 1) * limitNum
-
-    let baseWhere = `WHERE T0.CardType = 'C'`
+    // Build base WHERE. CE% + SlpCode=1 exclusions are defense-in-depth: they
+    // apply to BOTH scoped and session-auth paths so employee self-invoicing
+    // accounts and the VPI house account never leak into the list for anyone.
+    let baseWhere = `WHERE T0.CardType = 'C' AND T0.CardCode NOT LIKE 'CE%' AND T0.SlpCode <> 1`
     if (search) baseWhere += ` AND T0.CardName LIKE '%' + @search + '%'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    // applyRoleFilter kept as a no-op pass-through for symmetry with other
+    // endpoints; swap to scopeFilter.sql when a scope was resolved.
+    const filteredWhere = baseWhere + (scopeFilter.sql || '')
 
     // Region filter applied on derived region column
     const regionFilter = region && region !== 'ALL' ? ` AND dom_region = @region` : ''
@@ -193,6 +242,16 @@ module.exports = async (req, res) => {
       total: Math.max(0, total - excluded),
       page: pageNum, pages, limit: limitNum,
       non_customer_excluded: excluded
+    }
+    // Scope meta — only when caller passed ?scope=user:<uuid>. Web dashboard
+    // (session auth, no scope) sees a byte-identical response.
+    if (scope) {
+      result.scope = {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: !!scope.is_empty,
+        slpCodes_count: scope.slpCodes === 'ALL' ? 'ALL' : (scope.slpCodes || []).length
+      }
     }
     cache.set(cacheKey, result, 600)
     res.json(result)
