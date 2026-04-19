@@ -6501,28 +6501,48 @@ async function loadTeam(){
     if(!d){showError('pg-team','Unable to load team data');return}
     console.log('[TEAM] Rendering:', d.evp);
     var pg=sel('pg-team');
-    // EVP Hero — wired to d.evp + FY26 budget
+    // EVP Hero — all numbers come from /api/team backend (single source of truth)
     if(d.evp){
       var e = d.evp;
-      // Meta line: actual rsm/dsm/customer counts (but keep generic "National" scope copy)
-      sett('team-evp-meta', 'National · All Regions · All BU · ' + (e.rsm_count || 0) + ' RSMs · ' + (e.dsm_count || 0) + ' DSMs · ' + fcn(e.customers_count || 0) + ' Active Accounts');
-      // YTD Vol + Budget prorated (FY 188,266 MT × (months_elapsed / 12) — loose approx)
-      var ytdVol = Math.round(e.ytd_vol || 0);
-      var monthsElapsed = (new Date()).getMonth() + 1;
-      var prorated = Math.round(188266 * (monthsElapsed / 12));
-      var ach = prorated > 0 ? Math.round((ytdVol / prorated) * 100) : 0;
-      animateNumber(sel('team-evp-ytd'),   ytdVol,   function(v){return fcn(Math.round(v)) + ' MT'});
-      animateNumber(sel('team-evp-budget'),prorated, function(v){return fcn(Math.round(v)) + ' MT'});
+      // Meta line: real RSM count + Reps + Active Accounts (renamed from "DSMs"
+      // since SAP has no DSM layer — Reps = TSRs/DSMs/KA/vacant under any RSM)
+      sett('team-evp-meta',
+        'National · All Regions · All BU · '
+        + (e.rsm_count || 0) + ' RSMs · '
+        + (e.reports_count || 0) + ' Reps · '
+        + fcn(e.active_customers || 0) + ' Active Accounts');
+
+      var ytdVol  = Math.round(e.ytd_vol || 0);
+      var budget  = Math.round(e.budget_mt || 0);
+      var ach     = e.ach_pct != null ? e.ach_pct : 0;
+
+      animateNumber(sel('team-evp-ytd'),    ytdVol, function(v){return fcn(Math.round(v)) + ' MT'});
+      animateNumber(sel('team-evp-budget'), budget, function(v){return fcn(Math.round(v)) + ' MT'});
+
       var achEl = sel('team-evp-ach');
       if(achEl){
-        achEl.textContent = ach + '%';
+        achEl.textContent = ach.toFixed(1) + '%';
         achEl.style.color = ach >= 95 ? 'var(--green)' : ach >= 80 ? 'var(--gold)' : 'var(--red)';
       }
-      animateNumber(sel('team-evp-speed'), e.speed || 0, function(v){return fcn(Math.round(v))+' MT/d'});
-      animateNumber(sel('team-evp-gmton'), e.gm_ton || 0, function(v){return '₱'+fcn(Math.round(v))});
-      // vs LY — backend returns 0 (no 2025 data); show "—" until data exists
-      sett('team-evp-vsly', '—');
-      console.log('[TEAM] EVP hero wired:', 'YTD='+ytdVol, 'Budget='+prorated, 'Ach='+ach+'%', 'RSMs='+e.rsm_count);
+      animateNumber(sel('team-evp-speed'), e.speed || 0, function(v){return fcn(Math.round(v)) + ' MT/d'});
+      animateNumber(sel('team-evp-gmton'), e.gm_ton || 0, function(v){return '₱' + fcn(Math.round(v))});
+
+      // vs LY — backend now returns real % from historical DB
+      var vsLyEl = sel('team-evp-vsly');
+      if(vsLyEl){
+        if(e.vs_ly_pct == null){
+          vsLyEl.textContent = '—';
+          vsLyEl.style.color = 'var(--text3)';
+        } else {
+          var vs = e.vs_ly_pct;
+          vsLyEl.textContent = (vs >= 0 ? '+' : '') + vs.toFixed(1) + '%';
+          vsLyEl.style.color = vs >= 0 ? 'var(--green)' : 'var(--red)';
+        }
+      }
+      console.log('[TEAM] EVP hero wired:',
+        'YTD=' + ytdVol, 'Budget=' + budget, 'Ach=' + ach + '%',
+        'vsLY=' + e.vs_ly_pct, 'Speed=' + e.speed, 'GM/Ton=' + e.gm_ton,
+        'RSMs=' + e.rsm_count, 'Reps=' + e.reports_count, 'Customers=' + e.active_customers);
     }
     // RSM SCORECARD — main team table
     if(d.rsms && d.rsms.length){
