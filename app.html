@@ -1257,7 +1257,7 @@ body{
 
           <!-- BU Split (moved to top) -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">BU Split · MTD</div></div>
+            <div class="card-hdr"><div class="card-title" id="home-bu-title">BU Split · MTD</div></div>
             <div class="card-body">
               <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:14px">
                 <div style="display:flex;align-items:center;gap:8px">
@@ -1285,7 +1285,7 @@ body{
 
           <!-- Top Customers -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Top Customers · MTD</div></div>
+            <div class="card-hdr"><div class="card-title" id="home-topcust-title">Top Customers · MTD</div></div>
             <div class="card-body" style="padding:0" id="home-topcust">
               <div class="list-row" onclick="navTo('pg-custdetail')" style="padding:10px 16px">
                 <div class="rank rank-1">1</div>
@@ -4549,10 +4549,30 @@ async function loadHome(){
         }
       }
     }
+    // Period-aware widget titles — BU Split + Top Customers labels follow active period
+    var __pdLabel = (typeof PD === 'string' && PD) ? PD : 'MTD';
+    sett('home-bu-title',      'BU Split · '      + __pdLabel);
+    sett('home-topcust-title', 'Top Customers · ' + __pdLabel);
+
     // Monthly & Quarterly Performance combo charts — real OINV data from /api/dashboard
+    // Defer one frame so the home grid layout has settled before Chart.js measures
+    // the canvas. Without this, charts can render to a narrow (~255px) container
+    // before the grid expands, and Chart.js' ResizeObserver doesn't always recover.
     if(d && (d.monthly_perf || d.quarterly_perf)){
-      try { renderHomeCombos({ monthly_perf: d.monthly_perf || [], quarterly_perf: d.quarterly_perf || [] }); }
-      catch(e){ console.error('[HOME] combo charts:', e); }
+      var __comboData = { monthly_perf: d.monthly_perf || [], quarterly_perf: d.quarterly_perf || [] };
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          try { renderHomeCombos(__comboData); }
+          catch(e){ console.error('[HOME] combo charts:', e); }
+          // Defensive: force a resize+redraw after the layout has fully settled.
+          setTimeout(function(){
+            if(typeof charts === 'object'){
+              if(charts.homeMonthly)   charts.homeMonthly.resize();
+              if(charts.homeQuarterly) charts.homeQuarterly.resize();
+            }
+          }, 200);
+        });
+      });
     }
     pulseRefresh('pg-home');
   } catch(e) { console.error('Home:', e); showError('pg-home','Unable to load live data'); }
@@ -7224,6 +7244,12 @@ function buildHomeComboChart(canvasId, chartKey, labels, cyVol, lyVol, gm, gmLY)
     },
     options:{
       responsive:true, maintainAspectRatio:false,
+      // Animation disabled — Chart.js v4.4.1 + chartjs-plugin-datalabels@2 + this
+      // chart's mixed bar/line config produces a regression where bar heights
+      // remain null after animation init (verified 2026-04-19). Static render
+      // is the safe path; bars + GM line + delta badges all paint correctly.
+      animation: false,
+      animations: false,
       layout:{padding:{top:34, right:6, left:6}},
       interaction:{mode:'index', intersect:false},
       plugins:{
