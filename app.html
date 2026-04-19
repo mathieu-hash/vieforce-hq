@@ -3230,19 +3230,175 @@ body{
           </div>
         </div>
 
-        <!-- LEVEL 6 — DEEPER ANALYTICS (v1.1 placeholder) -->
-        <div class="card" id="sec-deeper" style="opacity:0.82">
+        <!-- ===== DEEPER ANALYTICS — built 2026-04-19 for Joel Demo ===== -->
+        <style>
+          /* Heatmap */
+          .da-section { margin-top: 16px }
+          .da-controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:0 0 12px }
+          .da-toggle { display:inline-flex; border:1px solid var(--glass-border); border-radius:6px; overflow:hidden }
+          .da-toggle button { background:transparent; border:none; color:var(--text2); padding:6px 14px; font-size:11px; font-weight:600; letter-spacing:0.4px; cursor:pointer; font-family:inherit }
+          .da-toggle button.on { background:var(--blue); color:#fff }
+          .da-select { background:transparent; border:1px solid var(--glass-border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer }
+          .da-heatmap-wrap { overflow-x:auto; padding-bottom:6px }
+          .da-heatmap-tbl { border-collapse:separate; border-spacing:2px; font-size:11px; min-width:100% }
+          .da-heatmap-tbl th, .da-heatmap-tbl td { padding:0; }
+          .da-heatmap-tbl th.da-cust-head { text-align:left; padding:6px 10px 6px 4px; font-weight:600; color:var(--text3); font-size:10px; letter-spacing:0.4px; text-transform:uppercase; min-width:240px; max-width:240px; position:sticky; left:0; background:var(--bg); z-index:2 }
+          .da-heatmap-tbl th.da-brand-head { writing-mode:vertical-rl; transform:rotate(180deg); padding:8px 4px; font-weight:600; color:var(--text3); font-size:10px; letter-spacing:0.4px; min-width:42px; max-width:42px; height:130px; vertical-align:bottom; white-space:nowrap }
+          .da-heatmap-tbl td.da-cust-cell { padding:0 8px 0 4px; font-size:11px; font-weight:500; color:var(--text); position:sticky; left:0; background:var(--bg); z-index:1; cursor:pointer; line-height:1.3 }
+          .da-heatmap-tbl td.da-cust-cell:hover { color:var(--blue); text-decoration:underline }
+          .da-heatmap-tbl td.da-cust-cell .da-cust-meta { font-size:9px; color:var(--text3); font-weight:400; margin-top:1px }
+          .da-cell { border-radius:4px; min-width:42px; height:34px; text-align:center; vertical-align:middle; font-family:var(--mono); font-size:10px; font-weight:600; color:#fff; cursor:pointer; transition:transform 120ms; padding:0 4px }
+          .da-cell:hover { transform:scale(1.08); box-shadow:0 0 0 1px rgba(0,174,239,0.6) }
+          .da-cell.zero { background:#F5F5F5; color:transparent; cursor:default }
+          [data-theme="dark"] .da-cell.zero, .da-cell.zero { background:rgba(255,255,255,0.04); color:transparent }
+          [data-theme="light"] .da-cell.zero { background:#F5F5F5 }
+
+          /* Insight callouts */
+          .da-callout { border-left:3px solid var(--blue); background:rgba(0,174,239,0.08); border-radius:6px; padding:12px 14px; margin-top:8px }
+          [data-theme="light"] .da-callout { background:#E8F7FC }
+          .da-callout-title { font-size:11px; font-weight:700; color:var(--blue); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px }
+          .da-callout-body { font-size:12px; color:var(--text); line-height:1.55 }
+          .da-callout-body b { color:var(--text) }
+          .da-callout-targets { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px }
+          .da-target-pill { font-size:10px; padding:3px 8px; border-radius:10px; background:rgba(0,174,239,0.12); color:var(--blue); cursor:pointer; font-weight:600 }
+          .da-target-pill:hover { background:rgba(0,174,239,0.25) }
+
+          /* Stacked bars */
+          .da-stacked-row { display:flex; align-items:center; margin-bottom:8px; gap:10px }
+          .da-stacked-label { width:80px; font-size:11px; font-weight:600; color:var(--text2); flex-shrink:0 }
+          .da-stacked-bar { flex:1; height:22px; display:flex; border-radius:4px; overflow:hidden; background:rgba(255,255,255,0.04) }
+          [data-theme="light"] .da-stacked-bar { background:rgba(0,74,100,0.05) }
+          .da-stacked-seg { height:100%; transition:opacity 200ms; cursor:pointer }
+          .da-stacked-seg:hover { opacity:0.85 }
+          .da-stacked-total { width:80px; text-align:right; font-family:var(--mono); font-size:11px; color:var(--text); font-weight:600; flex-shrink:0 }
+          .da-legend { display:flex; flex-wrap:wrap; gap:10px 14px; padding:10px 0 4px; font-size:10px; color:var(--text2); align-items:center }
+          .da-legend-dot { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:5px; vertical-align:middle }
+
+          /* Gap table */
+          .da-gap-tbl { width:100%; border-collapse:collapse; font-size:11px; margin-top:10px }
+          .da-gap-tbl th { text-align:right; padding:8px 10px; color:var(--text3); font-size:10px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; border-bottom:1px solid var(--glass-border) }
+          .da-gap-tbl th:first-child { text-align:left }
+          .da-gap-tbl td { padding:7px 10px; border-bottom:1px solid var(--divider); font-family:var(--mono); text-align:right; font-size:11px; color:var(--text) }
+          .da-gap-tbl td:first-child { font-family:inherit; text-align:left; font-weight:600; color:var(--text) }
+          .da-gap-tbl td.gap-under { background:rgba(255,199,44,0.18); color:var(--gold); font-weight:700 }
+          .da-gap-tbl td.gap-over  { background:rgba(151,215,0,0.16); color:var(--green); font-weight:700 }
+
+          /* BU mini-cards */
+          .da-bu-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px }
+          .da-bu-card { padding:12px 14px; border:1px solid var(--glass-border); border-radius:6px; background:rgba(255,255,255,0.02) }
+          [data-theme="light"] .da-bu-card { background:rgba(0,74,100,0.02) }
+          .da-bu-card .da-bu-label { font-size:10px; font-weight:700; color:var(--text3); letter-spacing:0.5px; text-transform:uppercase }
+          .da-bu-card .da-bu-num { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--text); margin-top:4px }
+          .da-bu-card .da-bu-sub { font-size:10px; color:var(--text2); margin-top:2px }
+
+          /* Pattern cards */
+          .da-pattern-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px }
+          .da-pattern-card { padding:14px; border:1px solid var(--glass-border); border-radius:8px; background:rgba(255,255,255,0.02); cursor:pointer; transition:transform 150ms, border-color 150ms }
+          [data-theme="light"] .da-pattern-card { background:rgba(0,74,100,0.02) }
+          .da-pattern-card:hover { transform:translateY(-2px) }
+          .da-pattern-card.on { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) }
+          .da-pattern-card .da-pattern-emoji { font-size:18px }
+          .da-pattern-card .da-pattern-name { font-size:10px; font-weight:700; letter-spacing:0.5px; margin-top:6px }
+          .da-pattern-card .da-pattern-count { font-family:var(--mono); font-size:24px; font-weight:700; color:var(--text); margin-top:6px }
+          .da-pattern-card .da-pattern-rev { font-size:10px; color:var(--text2); margin-top:2px; font-family:var(--mono) }
+          .da-pattern-card .da-pattern-int { font-size:10px; color:var(--text3); margin-top:2px }
+          .da-pp-regular   { color:var(--green) }
+          .da-pp-monthly   { color:var(--blue) }
+          .da-pp-lumpy     { color:var(--gold) }
+          .da-pp-declining { color:var(--red) }
+          .da-pp-erratic   { color:var(--text3) }
+
+          /* Pattern pills in table */
+          .da-ppill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:9px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase }
+          .da-ppill-regular   { background:rgba(151,215,0,0.18); color:var(--green) }
+          .da-ppill-monthly   { background:rgba(0,174,239,0.18); color:var(--blue) }
+          .da-ppill-lumpy     { background:rgba(255,199,44,0.22); color:var(--gold) }
+          .da-ppill-declining { background:rgba(239,68,68,0.20); color:var(--red) }
+          .da-ppill-erratic   { background:rgba(255,255,255,0.06); color:var(--text3) }
+          [data-theme="light"] .da-ppill-erratic { background:rgba(0,74,100,0.05) }
+
+          /* Spinner */
+          .da-loading { padding:30px; text-align:center; color:var(--text3); font-size:12px }
+          .da-loading::after { content:" ⏳" }
+
+          /* Mobile responsive */
+          @media (max-width:900px) {
+            .da-pattern-grid { grid-template-columns:repeat(2,1fr) }
+            .da-bu-grid      { grid-template-columns:1fr }
+            .da-heatmap-tbl th.da-cust-head, .da-heatmap-tbl td.da-cust-cell { min-width:160px; max-width:160px }
+          }
+        </style>
+
+        <!-- ===== SECTION 1 — SKU PENETRATION HEATMAP ===== -->
+        <div class="card da-section" id="sec-sku-matrix">
           <div class="card-hdr">
-            <div class="card-title">📊 Deeper Analytics — coming in v1.1</div>
-            <div style="font-size:9px;color:var(--text3);letter-spacing:0.3px">SKU Penetration · Buying Patterns · Brand Coverage</div>
+            <div>
+              <div class="card-title">📊 SKU PENETRATION HEATMAP</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Which customers buy which brands — and where are the whitespace gaps?</div>
+            </div>
+            <button class="export-btn" onclick="daExportSkuMatrix()">📊 Export</button>
           </div>
-          <div class="card-body" style="padding-top:10px;font-size:12px;color:var(--text2);line-height:1.7">
-            Advanced analytics (SKU Penetration Matrix, Buying-Pattern classifier, Brand Coverage gap report)
-            will return in <b style="color:var(--text)">v1.1</b>. The previous SKU matrix produced incorrect results
-            (all zeros for every customer) and was removed pending data-quality fixes. The behavioural-alerts
-            and pattern blocks have been replaced by the <b style="color:var(--red)">Rescue</b>,
-            <b style="color:var(--gold)">Early Warning</b>, and <b style="color:var(--text3)">Dormant</b> bands
-            above — they answer the same questions with higher signal-to-noise.
+          <div class="card-body">
+            <div class="da-controls">
+              <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:0.4px;text-transform:uppercase">Unit</span>
+              <div class="da-toggle" id="da-unit-toggle">
+                <button class="on" data-unit="volume" onclick="daSetUnit('volume')">By Volume (MT)</button>
+                <button data-unit="revenue" onclick="daSetUnit('revenue')">By Revenue (PHP)</button>
+              </div>
+              <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-left:10px">Region</span>
+              <select class="da-select" id="da-region-sel" onchange="daRefreshSku()">
+                <option value="ALL">All</option><option>Luzon</option><option>Visayas</option><option>Mindanao</option><option>Other</option>
+              </select>
+              <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:0.4px;text-transform:uppercase">BU</span>
+              <select class="da-select" id="da-bu-sel" onchange="daRefreshSku()">
+                <option value="ALL">All</option><option>DIST</option><option>KA</option><option>PET</option>
+              </select>
+            </div>
+            <div id="da-sku-status" class="da-loading">Loading SKU heatmap…</div>
+            <div class="da-heatmap-wrap"><table class="da-heatmap-tbl" id="da-heatmap"></table></div>
+            <div id="da-sku-callouts" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <!-- ===== SECTION 2 — BRAND COVERAGE GAPS ===== -->
+        <div class="card da-section" id="sec-brand-coverage">
+          <div class="card-hdr">
+            <div>
+              <div class="card-title">🎯 BRAND COVERAGE GAPS</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Where is our product portfolio under-sold by region and segment?</div>
+            </div>
+            <button class="export-btn" onclick="daExportBrandCoverage()">📊 Export</button>
+          </div>
+          <div class="card-body">
+            <div id="da-bc-status" class="da-loading">Loading brand coverage…</div>
+            <div id="da-bc-stacked" style="margin-top:6px"></div>
+            <div id="da-bc-legend" class="da-legend"></div>
+            <div style="margin-top:18px">
+              <div class="sec-hdr" style="font-size:11px;color:var(--text3);letter-spacing:0.5px;font-weight:700;text-transform:uppercase;margin-bottom:6px">Gap analysis vs national mix</div>
+              <table class="da-gap-tbl" id="da-bc-gap"></table>
+            </div>
+            <div id="da-bc-callouts" style="margin-top:14px"></div>
+            <div id="da-bc-bu" class="da-bu-grid"></div>
+          </div>
+        </div>
+
+        <!-- ===== SECTION 3 — BUYING PATTERN CLASSIFIER ===== -->
+        <div class="card da-section" id="sec-buying-patterns">
+          <div class="card-hdr">
+            <div>
+              <div class="card-title">⏱ BUYING PATTERN CLASSIFIER</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">What's each customer's ordering rhythm, and is it changing?</div>
+            </div>
+            <button class="export-btn" onclick="daExportBuyingPatterns()">📊 Export</button>
+          </div>
+          <div class="card-body">
+            <div id="da-bp-status" class="da-loading">Loading buying patterns…</div>
+            <div class="da-pattern-grid" id="da-bp-cards"></div>
+            <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center">
+              <div class="sec-hdr" style="font-size:11px;color:var(--text3);letter-spacing:0.5px;font-weight:700;text-transform:uppercase">Customer detail · sorted by impact</div>
+              <div id="da-bp-filter-info" style="font-size:11px;color:var(--text3)"></div>
+            </div>
+            <div style="overflow-x:auto"><table class="tbl" id="da-bp-tbl"></table></div>
           </div>
         </div>
 
@@ -5971,6 +6127,365 @@ async function loadIntelligence(){
 
     pulseRefresh('pg-insights');
   } catch(e) { console.error('Intelligence:', e); showError('pg-insights','Unable to load intelligence data'); }
+
+  // Deeper Analytics — built 2026-04-19 for Joel demo. Loads independently
+  // so an analytics failure cannot break the upper Intelligence bands.
+  loadDeeperAnalytics().catch(function(e){ console.error('DeeperAnalytics:', e); });
+}
+
+
+/* ====================================================================
+   DEEPER ANALYTICS — SKU heatmap + Brand coverage gaps + Buying patterns
+   3 sections in pg-insights. All fetch in parallel; sections render
+   independently so one failing endpoint does not blank the others.
+   ==================================================================== */
+
+var DA = { unit: 'volume', sku: null, bc: null, bp: null, bpFilter: null };
+
+// Color scale for heatmap cells — percentile within each brand column
+var DA_COLORS = ['#E8F7FC','#A8D8E8','#00C4E8','#00AEEF','#004A64'];
+
+function daPctToColor(pct) {
+  if (pct <= 0) return null;
+  if (pct >= 80) return DA_COLORS[4];
+  if (pct >= 60) return DA_COLORS[3];
+  if (pct >= 40) return DA_COLORS[2];
+  if (pct >= 20) return DA_COLORS[1];
+  return DA_COLORS[0];
+}
+function daTextColor(pct) { return pct >= 60 ? '#fff' : '#003B53'; }
+function daFmtPhpShort(n) {
+  if (n == null || isNaN(n)) return '—';
+  var a = Math.abs(n);
+  if (a >= 1e9) return '₱' + (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '₱' + (n/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return '₱' + Math.round(n/1e3) + 'K';
+  return '₱' + Math.round(n);
+}
+function daFmtMt(n) {
+  if (n == null || isNaN(n) || n === 0) return '';
+  if (n >= 1000) return Math.round(n/1000*10)/10 + 'k';
+  if (n >= 100) return Math.round(n);
+  return Math.round(n*10)/10;
+}
+
+async function loadDeeperAnalytics() {
+  // Fire all 3 in parallel; render each as it returns
+  var unit = DA.unit;
+  var region = (sel('da-region-sel') && sel('da-region-sel').value) || 'ALL';
+  var bu     = (sel('da-bu-sel')     && sel('da-bu-sel').value)     || 'ALL';
+
+  var pSku = getSkuMatrix({unit: unit, region: region, bu: bu})
+    .then(function(d){ DA.sku = d; renderSkuMatrix(d); })
+    .catch(function(e){ daShowErr('da-sku-status', e.message || 'Failed to load'); });
+
+  var pBc = getBrandCoverage({})
+    .then(function(d){ DA.bc = d; renderBrandCoverage(d); })
+    .catch(function(e){ daShowErr('da-bc-status', e.message || 'Failed to load'); });
+
+  var pBp = getBuyingPatterns({})
+    .then(function(d){ DA.bp = d; renderBuyingPatterns(d); })
+    .catch(function(e){ daShowErr('da-bp-status', e.message || 'Failed to load'); });
+
+  await Promise.all([pSku, pBc, pBp]);
+}
+
+function daShowErr(id, msg) {
+  var el = sel(id); if (!el) return;
+  el.style.display = 'block'; el.style.color = 'var(--red)';
+  el.textContent = 'Analytics temporarily unavailable: ' + msg;
+}
+function daHide(id) { var el = sel(id); if (el) el.style.display = 'none'; }
+
+/* ---------- SECTION 1 — SKU PENETRATION HEATMAP ---------- */
+function daSetUnit(unit) {
+  DA.unit = unit;
+  var btns = document.querySelectorAll('#da-unit-toggle button');
+  for (var i=0; i<btns.length; i++) {
+    btns[i].classList.toggle('on', btns[i].getAttribute('data-unit') === unit);
+  }
+  daRefreshSku();
+}
+function daRefreshSku() {
+  var status = sel('da-sku-status');
+  if (status) { status.style.display='block'; status.style.color=''; status.textContent='Refreshing…'; }
+  var unit = DA.unit;
+  var region = (sel('da-region-sel') && sel('da-region-sel').value) || 'ALL';
+  var bu     = (sel('da-bu-sel')     && sel('da-bu-sel').value)     || 'ALL';
+  getSkuMatrix({unit: unit, region: region, bu: bu})
+    .then(function(d){ DA.sku = d; renderSkuMatrix(d); })
+    .catch(function(e){ daShowErr('da-sku-status', e.message || 'Failed to load'); });
+}
+
+function renderSkuMatrix(d) {
+  if (!d || !d.customers || !d.brands) return daShowErr('da-sku-status', 'no data');
+  daHide('da-sku-status');
+  var tbl = sel('da-heatmap'); if (!tbl) return;
+  var unit = (d.meta && d.meta.unit) || 'volume';
+
+  // Compute per-column max for percentile coloring
+  var colMax = {};
+  d.brands.forEach(function(b){ colMax[b] = 0; });
+  d.customers.forEach(function(c){
+    var row = d.matrix[c.card_code] || {};
+    d.brands.forEach(function(b){
+      var v = row[b] || 0;
+      if (v > colMax[b]) colMax[b] = v;
+    });
+  });
+
+  var html = '<thead><tr><th class="da-cust-head">Customer · Region · BU</th>';
+  d.brands.forEach(function(b){ html += '<th class="da-brand-head">' + esc(b) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  d.customers.forEach(function(c){
+    html += '<tr><td class="da-cust-cell" onclick="openCust(' + JSON.stringify(c.card_code) + ')" title="Open Customer Detail">'
+         + esc(c.name)
+         + '<div class="da-cust-meta">' + esc(c.region) + ' · ' + esc(c.bu) + ' · '
+         + (unit==='revenue' ? daFmtPhpShort(c.ytd_total) : (Math.round(c.ytd_total).toLocaleString() + ' MT'))
+         + '</div></td>';
+    var row = d.matrix[c.card_code] || {};
+    var custTotal = c.ytd_total || 0;
+    d.brands.forEach(function(b){
+      var v = row[b] || 0;
+      if (v <= 0) {
+        html += '<td><div class="da-cell zero">—</div></td>';
+      } else {
+        var pct = colMax[b] > 0 ? (v / colMax[b]) * 100 : 0;
+        var bg = daPctToColor(pct);
+        var fg = daTextColor(pct);
+        var pctOfCust = custTotal > 0 ? Math.round(v / custTotal * 100) : 0;
+        var label = unit==='revenue'
+          ? daFmtPhpShort(v)
+          : daFmtMt(v);
+        var tip = esc(b) + ': ' + (unit==='revenue' ? daFmtPhpShort(v) : (Math.round(v*10)/10 + ' MT')) + ' · ' + pctOfCust + '% of customer total';
+        html += '<td><div class="da-cell" style="background:'+bg+';color:'+fg+'" '
+             +  'title="' + esc(tip) + '" '
+             +  'onclick="openCust(' + JSON.stringify(c.card_code) + ')">' + label + '</div></td>';
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+
+  // Whitespace callouts
+  var co = sel('da-sku-callouts'); if (!co) return;
+  if (!d.whitespace_callouts || !d.whitespace_callouts.length) {
+    co.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:10px 0">No whitespace callouts in current filter.</div>';
+    return;
+  }
+  co.innerHTML = d.whitespace_callouts.map(function(w, i){
+    var topNames = (w.top_targets || []).slice(0,3).map(function(t){
+      return '<span class="da-target-pill" onclick="openCust(' + JSON.stringify(t.card_code) + ')">'
+           + esc(t.name) + ' · ' + daFmtPhpShort(t.upside_php) + '</span>';
+    }).join('');
+    return '<div class="da-callout">'
+        + '<div class="da-callout-title">💡 Whitespace #' + (i+1) + ' — ' + esc(w.brand) + '</div>'
+        + '<div class="da-callout-body">'
+        +   '<b>' + w.customers_missing_count + '</b> of top 30 customers do NOT buy ' + esc(w.brand) + '. '
+        +   'Estimated <b>' + daFmtPhpShort(w.est_upside_php_yearly) + '/yr</b> addressable revenue '
+        +   '<span style="color:var(--text3)">(peer avg ' + w.peer_avg_volume_mt + ' MT/buyer × 0.4 ramp × ₱' + w.peer_avg_php_per_kg + '/kg)</span>'
+        +   '<div class="da-callout-targets">' + topNames + '</div>'
+        + '</div></div>';
+  }).join('');
+}
+
+/* ---------- SECTION 2 — BRAND COVERAGE GAPS ---------- */
+var DA_BRAND_COLORS = {
+  'VIEPRO MUSCLY':'#004A64','VIEPRO PREMIUM':'#00A8CF','VIEPRO PRIME':'#00AEEF',
+  'VIEPRO LAYER':'#00C4E8','VIEPRO BROILER':'#FFC72C','VIEPROMO':'#97D700',
+  'VIEPRO 3000':'#7AB800','VIEPRO 2000':'#A8D8E8','VIEPRO 1000':'#E8F7FC',
+  'VIEPRO PDP':'#5C6BC0','VIEPRO PROBOOST':'#EC407A','VIEPRO POWERBOOST':'#FF6B6B',
+  'VIETOP':'#26A69A','VIEPRO PULLET':'#AB47BC','VIEPRO OTHER':'#9E9E9E','OTHER':'#BDBDBD'
+};
+
+function renderBrandCoverage(d) {
+  if (!d || !d.national_mix) return daShowErr('da-bc-status', 'no data');
+  daHide('da-bc-status');
+
+  var brands = (d.meta && d.meta.brands_analyzed) || Object.keys(d.national_mix);
+  // Stacked bar per region
+  var stacked = sel('da-bc-stacked');
+  var regions = ['Luzon','Visayas','Mindanao','Other'];
+  var html = '<div style="font-size:11px;color:var(--text3);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Brand mix by region · trailing 12 months</div>';
+  regions.forEach(function(reg){
+    var rmix = d.by_region[reg] || {};
+    var total = (d.region_totals_mt && d.region_totals_mt[reg]) || 0;
+    html += '<div class="da-stacked-row"><div class="da-stacked-label">' + reg + '</div>'
+         + '<div class="da-stacked-bar">';
+    brands.forEach(function(b){
+      var p = rmix[b] || 0;
+      if (p <= 0) return;
+      html += '<div class="da-stacked-seg" style="width:' + p + '%;background:' + (DA_BRAND_COLORS[b]||'#888') + '" '
+           +  'title="' + esc(b) + ': ' + p + '% · ' + Math.round(total*p/100) + ' MT"></div>';
+    });
+    html += '</div><div class="da-stacked-total">' + Math.round(total).toLocaleString() + ' MT</div></div>';
+  });
+  stacked.innerHTML = html;
+
+  var legend = sel('da-bc-legend');
+  legend.innerHTML = brands.map(function(b){
+    return '<span><span class="da-legend-dot" style="background:' + (DA_BRAND_COLORS[b]||'#888') + '"></span>' + esc(b) + '</span>';
+  }).join('');
+
+  // Gap table — one row per brand, columns: Brand | National | Luzon | Visayas | Mindanao | Other
+  var gap = sel('da-bc-gap');
+  var thead = '<thead><tr><th>Brand</th><th>National</th><th>Luzon</th><th>Visayas</th><th>Mindanao</th><th>Other</th></tr></thead>';
+  var rows = brands.map(function(b){
+    var nat = d.national_mix[b] || 0;
+    var cells = regions.map(function(reg){
+      var rec = (d.gap_analysis || []).find(function(g){ return g.brand===b && g.region===reg; });
+      var v = rec ? rec.region_pct : 0;
+      var cls = rec && rec.status === 'under' ? 'gap-under' : (rec && rec.status === 'over' ? 'gap-over' : '');
+      var tip = rec ? ('Region ' + v + '% vs national ' + nat + '% (gap ' + (rec.gap_pp>=0?'+':'') + rec.gap_pp + 'pp)') : '';
+      return '<td class="' + cls + '" title="' + esc(tip) + '">' + v + '%</td>';
+    }).join('');
+    return '<tr><td>' + esc(b) + '</td><td>' + nat + '%</td>' + cells + '</tr>';
+  }).join('');
+  gap.innerHTML = thead + '<tbody>' + rows + '</tbody>';
+
+  // Insight callouts
+  var co = sel('da-bc-callouts');
+  if (!d.insight_callouts || !d.insight_callouts.length) {
+    co.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:10px 0">No significant gaps detected.</div>';
+  } else {
+    co.innerHTML = d.insight_callouts.map(function(g, i){
+      var pills = (g.targetable_customers || []).map(function(t){
+        return '<span class="da-target-pill" onclick="openCust(' + JSON.stringify(t.card_code) + ')">'
+            + esc(t.name) + ' · ' + Math.round(t.ytd_volume_mt) + ' MT</span>';
+      }).join('');
+      return '<div class="da-callout">'
+          + '<div class="da-callout-title">⚠️ Gap #' + (i+1) + ' — ' + esc(g.brand) + ' in ' + esc(g.region) + '</div>'
+          + '<div class="da-callout-body">'
+          +   'National mix <b>' + g.national_pct + '%</b> · ' + g.region + ' mix <b>' + g.region_pct + '%</b> · '
+          +   '<b style="color:var(--gold)">gap ' + g.gap_pp + ' pp</b>. '
+          +   'If ' + g.region + ' matched national, est. <b>' + daFmtPhpShort(g.upside_php_yearly) + '/yr</b> upside ('
+          +   g.upside_mt_yearly + ' MT).'
+          +   (pills ? '<div style="font-size:10px;color:var(--text3);margin-top:8px;font-weight:600">Top ' + g.region + ' customers NOT buying ' + esc(g.brand) + ':</div>'
+                    +  '<div class="da-callout-targets">' + pills + '</div>' : '')
+          + '</div></div>';
+    }).join('');
+  }
+
+  // BU mini-cards
+  var bu = sel('da-bc-bu');
+  bu.innerHTML = ['DIST','KA','PET'].map(function(label){
+    var b = (d.by_bu || {})[label] || { customers: 0, avg_brands_per_customer: 0 };
+    return '<div class="da-bu-card">'
+        +  '<div class="da-bu-label">' + label + '</div>'
+        +  '<div class="da-bu-num">' + (b.avg_brands_per_customer||0).toFixed(1) + ' <span style="font-size:11px;color:var(--text3);font-weight:500">brands/customer</span></div>'
+        +  '<div class="da-bu-sub">' + (b.customers||0) + ' customers · trailing 12 mo</div>'
+        +  '</div>';
+  }).join('');
+}
+
+/* ---------- SECTION 3 — BUYING PATTERN CLASSIFIER ---------- */
+function renderBuyingPatterns(d) {
+  if (!d || !d.summary) return daShowErr('da-bp-status', 'no data');
+  daHide('da-bp-status');
+
+  var s = d.summary;
+  var grid = sel('da-bp-cards');
+  var defs = [
+    { key:'regular',   emoji:'🟢', label:'REGULAR',   pp:'da-pp-regular' },
+    { key:'monthly',   emoji:'🟡', label:'MONTHLY',   pp:'da-pp-monthly' },
+    { key:'lumpy',     emoji:'🟠', label:'LUMPY',     pp:'da-pp-lumpy' },
+    { key:'declining', emoji:'🔴', label:'DECLINING', pp:'da-pp-declining' },
+    { key:'erratic',   emoji:'⚫', label:'ERRATIC',   pp:'da-pp-erratic' }
+  ];
+  grid.innerHTML = defs.map(function(p){
+    var b = s[p.key] || { count:0, total_revenue_php:0, avg_interval_d:null };
+    var on = DA.bpFilter === p.key ? 'on' : '';
+    return '<div class="da-pattern-card ' + on + '" onclick="daBpFilter(' + JSON.stringify(p.key) + ')">'
+        + '<span class="da-pattern-emoji">' + p.emoji + '</span>'
+        + '<div class="da-pattern-name ' + p.pp + '">' + p.label + '</div>'
+        + '<div class="da-pattern-count">' + (b.count||0) + '</div>'
+        + '<div class="da-pattern-rev">' + daFmtPhpShort(b.total_revenue_php) + ' rev</div>'
+        + '<div class="da-pattern-int">avg ' + (b.avg_interval_d != null ? b.avg_interval_d + 'd' : '—') + '</div>'
+        + '</div>';
+  }).join('');
+
+  daRenderBpTable();
+}
+
+function daBpFilter(pattern) {
+  DA.bpFilter = (DA.bpFilter === pattern) ? null : pattern;
+  if (DA.bp) renderBuyingPatterns(DA.bp);
+  // smooth scroll to table
+  var el = sel('da-bp-tbl');
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function daRenderBpTable() {
+  var d = DA.bp; if (!d) return;
+  var rows = (d.customers || []).slice();
+  if (DA.bpFilter) rows = rows.filter(function(r){ return r.pattern === DA.bpFilter; });
+  // Cap visible rows for performance — full data still in memory for export
+  var capped = rows.slice(0, 100);
+
+  var info = sel('da-bp-filter-info');
+  if (info) {
+    info.textContent = DA.bpFilter
+      ? 'Filtered: ' + DA.bpFilter.toUpperCase() + ' · showing ' + capped.length + ' of ' + rows.length
+      : 'Showing ' + capped.length + ' of ' + rows.length + ' customers (top by impact)';
+  }
+
+  var tbl = sel('da-bp-tbl');
+  var thead = '<thead><tr><th>#</th><th>Customer</th><th>Region</th><th>Sales Rep</th><th>Pattern</th>'
+            + '<th class="num">Avg Interval</th><th class="num">Recent</th><th class="num">Δ</th>'
+            + '<th class="num">Revenue</th><th>Action</th></tr></thead>';
+  var body = capped.map(function(r, i){
+    var pp = 'da-ppill-' + r.pattern;
+    var deltaTxt = (r.delta_pct == null) ? '—'
+                  : ((r.delta_pct > 0 ? '+' : '') + r.delta_pct + '%');
+    var deltaCol = (r.delta_pct == null) ? 'var(--text3)'
+                   : (r.delta_pct > 30 ? 'var(--red)' : (r.delta_pct < -10 ? 'var(--green)' : 'var(--text2)'));
+    return '<tr title="' + esc(r.reason || '') + '">'
+        + '<td>' + (i+1) + '</td>'
+        + '<td><a style="color:var(--blue);cursor:pointer" onclick="openCust(' + JSON.stringify(r.card_code) + ')">' + esc(r.name) + '</a></td>'
+        + '<td>' + esc(r.region) + '</td>'
+        + '<td style="font-size:10px">' + esc(r.sales_rep || '—') + '</td>'
+        + '<td><span class="da-ppill ' + pp + '">' + r.pattern + '</span></td>'
+        + '<td class="num">' + (r.avg_interval != null ? r.avg_interval + 'd' : '—') + '</td>'
+        + '<td class="num">' + (r.recent_avg_interval != null ? r.recent_avg_interval + 'd' : '—') + '</td>'
+        + '<td class="num" style="color:' + deltaCol + ';font-weight:600">' + deltaTxt + '</td>'
+        + '<td class="num">' + daFmtPhpShort(r.revenue_php) + '</td>'
+        + '<td style="font-size:10px;color:var(--text2)">' + esc(r.action || '') + '</td>'
+        + '</tr>';
+  }).join('');
+  tbl.innerHTML = thead + '<tbody>' + body + '</tbody>';
+}
+
+/* ---------- Exports — DOM tables via existing exportTableToXlsx helper ----------
+   The shared helper takes (DOMTable, filename) → builds .xlsx via SheetJS. We
+   reuse the rendered tables directly so what Joel sees is what he downloads. */
+function daExportSkuMatrix() {
+  var t = sel('da-heatmap'); if (!t) return;
+  exportTableToXlsx(t, 'SKU_Penetration_' + (DA.unit==='revenue'?'Revenue':'Volume'));
+}
+function daExportBrandCoverage() {
+  var t = sel('da-bc-gap'); if (!t) return;
+  exportTableToXlsx(t, 'Brand_Coverage_Gaps');
+}
+function daExportBuyingPatterns() {
+  // Export the FULL list (not capped at 100). Build a temporary table.
+  var d = DA.bp; if (!d || !d.customers) return;
+  var rows = (DA.bpFilter
+    ? d.customers.filter(function(r){ return r.pattern === DA.bpFilter })
+    : d.customers).slice(0);
+  var tmp = document.createElement('table');
+  tmp.innerHTML = '<thead><tr><th>#</th><th>Customer</th><th>Code</th><th>Region</th><th>Sales Rep</th>'
+                + '<th>Pattern</th><th>Avg Interval (d)</th><th>Recent (d)</th><th>Prior (d)</th>'
+                + '<th>Delta %</th><th>Revenue (PHP)</th><th>Volume (MT)</th><th>Action</th></tr></thead>'
+                + '<tbody>' + rows.map(function(r,i){
+                    return '<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.card_code)+'</td>'
+                         + '<td>'+esc(r.region)+'</td><td>'+esc(r.sales_rep||'')+'</td>'
+                         + '<td>'+r.pattern+'</td><td>'+(r.avg_interval||'')+'</td>'
+                         + '<td>'+(r.recent_avg_interval||'')+'</td><td>'+(r.prior_avg_interval||'')+'</td>'
+                         + '<td>'+(r.delta_pct||0)+'</td><td>'+(r.revenue_php||0)+'</td>'
+                         + '<td>'+(r.volume_mt||0)+'</td><td>'+esc(r.action||'')+'</td></tr>';
+                  }).join('') + '</tbody>';
+  exportTableToXlsx(tmp, 'Buying_Patterns' + (DA.bpFilter ? '_'+DA.bpFilter.toUpperCase() : ''));
 }
 
 
