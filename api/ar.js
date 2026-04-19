@@ -1,21 +1,82 @@
 const { query, queryH } = require('./_db')
-const { verifySession, applyRoleFilter } = require('./_auth')
+const { verifySession, verifyServiceToken, applyRoleFilter } = require('./_auth')
+const { scopeForUser, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
 
 // Finance-matching definitions (calibrated against Looker Studio dashboard 2026-04-17)
 const ACTIVE      = `(ISNULL(C.frozenFor,'N')<>'Y' AND C.U_BpStatus='Active')`
 const DELINQ_PRED = `(C.frozenFor='Y' OR C.U_BpStatus IN ('Delinquent','InActive'))`
 
+// Empty-state AR payload — same shape as the populated response so Patrol can
+// render a consistent zero-state view without branching.
+function emptyArPayload(scope) {
+  return {
+    dso: 0, dso_active: 0, dso_total: 0, dso_7d_ago: 0, dso_variation: 0,
+    total_balance: 0, active_balance: 0, delinquent_balance: 0,
+    ar_7d_ago: 0, ar_variation: 0,
+    ar_ly: 0, ar_ly_variation: 0, ar_ly_variation_pct: 0, overdue_ly: 0,
+    account_status: { active: 0, delinquent: 0, inactive: 0 },
+    active_customer_count: 0, delinquent_customer_count: 0,
+    buckets: { current: 0, d1_30: 0, d31_60: 0, d61_90: 0,
+               d91_120: 0, d121_365: 0, over_1y: 0 },
+    by_region: [],
+    clients: [],
+    formula: { dso: '', active: '', delinq: '' },
+    scope: {
+      userId: scope.userId,
+      role: scope.role || null,
+      is_empty: true,
+      slpCodes_count: 0,
+      ly_unscoped: true
+    }
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const session = await verifySession(req)
+  // Auth — service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `ar_v3_${req.url}_${session.role}_${session.region || 'ALL'}`
+  // Parse optional scope=user:<uuid>. Same pattern as /api/sales + /api/customers.
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      try {
+        scope = await scopeForUser(uuid)
+      } catch (err) {
+        console.error('[ar] scope resolve failed:', err.message)
+        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
+                  slpCodes: [], districtCodes: [] }
+      }
+    }
+  }
+
+  // Zero-state short-circuit — caller has no SlpCodes/districts assigned yet.
+  if (scope && scope.is_empty) {
+    return res.json(emptyArPayload(scope))
+  }
+
+  // Per-query filter builder.
+  //   bounded scope → EXISTS+CE%+SlpCode<>1 from buildScopeWhere
+  //   unbounded / no scope → defense-in-depth CE%+SlpCode<>1 inline
+  // Both variants append to an existing WHERE clause and never stand alone.
+  const scopeIsBounded = !!(scope && scope.slpCodes !== 'ALL' && !scope.is_empty)
+  const filterFor = (alias) => {
+    if (scopeIsBounded) return buildScopeWhere(scope, alias).sql
+    return ` AND ${alias}.CardCode NOT LIKE 'CE%'` +
+           ` AND EXISTS (SELECT 1 FROM OCRD SC WHERE SC.CardCode = ${alias}.CardCode AND SC.SlpCode <> 1)`
+  }
+
+  // Cache key includes the resolved scope so user A's rows can't leak to user B.
+  const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
+  const cacheKey = `ar_v3_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -29,6 +90,7 @@ module.exports = async (req, res) => {
       FROM (SELECT DISTINCT CardCode FROM OINV WHERE CANCELED='N' AND DocTotal > PaidToDate) S
       INNER JOIN OCRD C ON S.CardCode = C.CardCode
       WHERE C.CardType='C'
+        ${filterFor('C')}
     `)
 
     // -------------------- 2. AR + DSO --------------------
@@ -37,20 +99,20 @@ module.exports = async (req, res) => {
       DECLARE @ar_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE});
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE} ${filterFor('O')});
       DECLARE @ar_total DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate);
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate ${filterFor('O')});
       DECLARE @ar_delinq DECIMAL(18,2) = @ar_total - @ar_active;
       DECLARE @sales_90d_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE} ${filterFor('O')});
       DECLARE @sales_90d_total DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()));
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) ${filterFor('O')});
 
       SELECT
         @ar_active  AS active_balance,
@@ -72,6 +134,7 @@ module.exports = async (req, res) => {
         ISNULL(SUM(CASE WHEN DATEDIFF(DAY,O.DocDueDate,GETDATE()) > 365 THEN O.DocTotal - O.PaidToDate ELSE 0 END),0) AS over_1y
       FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
       WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE}
+        ${filterFor('O')}
     `)
 
     // -------------------- 4. REGIONAL DSO --------------------
@@ -89,6 +152,7 @@ module.exports = async (req, res) => {
         INNER JOIN OCRD C ON O.CardCode = C.CardCode
         INNER JOIN INV1 INV ON INV.DocEntry = O.DocEntry
         WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE}
+          ${filterFor('O')}
         GROUP BY
           CASE
             WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
@@ -108,6 +172,7 @@ module.exports = async (req, res) => {
         INNER JOIN OCRD C ON O.CardCode = C.CardCode
         INNER JOIN INV1 INV ON INV.DocEntry = O.DocEntry
         WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE}
+          ${filterFor('O')}
         GROUP BY
           CASE
             WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
@@ -152,11 +217,14 @@ module.exports = async (req, res) => {
       INNER JOIN OCRD C ON T0.CardCode = C.CardCode
       LEFT JOIN OCTG PT ON C.GroupNum = PT.GroupNum
       WHERE T0.CANCELED='N' AND T0.DocTotal > T0.PaidToDate
+        ${filterFor('T0')}
       GROUP BY T0.CardCode, T0.CardName
       ORDER BY balance DESC
     `)
 
     // -------------------- 6. 7-DAY COMPARISON (as of 7 days ago) --------------------
+    // Current-period comparison — scoped so a DSM's "DSO 7 days ago" reflects
+    // their own book, not national. LY snapshot (queryH below) stays unscoped.
     const comparison = await query(`
       DECLARE @ar_7d_ago DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
@@ -164,13 +232,15 @@ module.exports = async (req, res) => {
         WHERE O.CANCELED='N'
           AND O.DocDate <= DATEADD(DAY,-7,GETDATE())
           AND O.DocTotal > O.PaidToDate
-          AND ${ACTIVE});
+          AND ${ACTIVE}
+          ${filterFor('O')});
       DECLARE @sales_90d_7ago DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
         WHERE O.CANCELED='N'
           AND O.DocDate BETWEEN DATEADD(DAY,-97,GETDATE()) AND DATEADD(DAY,-7,GETDATE())
-          AND ${ACTIVE});
+          AND ${ACTIVE}
+          ${filterFor('O')});
       SELECT
         @ar_7d_ago AS ar_7d_ago,
         CASE WHEN @sales_90d_7ago > 0 THEN @ar_7d_ago / (@sales_90d_7ago/90.0) ELSE 0 END AS dso_7d_ago
@@ -239,6 +309,21 @@ module.exports = async (req, res) => {
         dso:    'Active AR / (Active 90d sales / 90)',
         active: `frozenFor <> 'Y' AND U_BpStatus = 'Active'`,
         delinq: `frozenFor = 'Y' OR U_BpStatus IN ('Delinquent','InActive')`
+      }
+    }
+    // Scope meta — only when the caller passed ?scope=user:<uuid>. Web dashboard
+    // (session auth, no scope) sees a byte-identical response shape.
+    // ly_unscoped=true flags that the Vienovo_Old historical snapshot stays
+    // national even when the current-period data is scoped — CardCodes were
+    // re-keyed during the Jan 2026 migration and perfect LY filtering would
+    // require name-based translation (deferred per spec).
+    if (scope) {
+      result.scope = {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: !!scope.is_empty,
+        slpCodes_count: scope.slpCodes === 'ALL' ? 'ALL' : (scope.slpCodes || []).length,
+        ly_unscoped: true
       }
     }
 
