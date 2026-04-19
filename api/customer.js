@@ -1,29 +1,93 @@
 const { query, queryH, queryBoth } = require('./_db')
-const { verifySession } = require('./_auth')
+const { verifySession, verifyServiceToken } = require('./_auth')
+const { scopeForUser } = require('./_scope')
 const { toHistoricalCode } = require('./lib/customer-map')
 const cache = require('../lib/cache')
+
+// Whitelist a list of numeric IDs for safe SQL inlining.
+// scope.slpCodes / districtCodes originate from our own Supabase users table
+// but we still integer-filter defensively (buildScopeWhere uses the same guard).
+function intList(arr, { excludeOne = false } = {}) {
+  return (arr || [])
+    .map(Number)
+    .filter(n => Number.isInteger(n) && n > 0 && (!excludeOne || n !== 1))
+}
 
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
-  const session = await verifySession(req)
+  // Auth — try service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   const { id } = req.query
   if (!id) return res.status(400).json({ error: 'Missing required parameter: id' })
 
-  // Cache check
-  const cacheKey = `customer_${id}_${session.role}_${session.region || 'ALL'}`
+  // Parse optional scope=user:<uuid>. When present, resolve to SlpCode / district
+  // whitelist and enforce access control BEFORE running the 360° query.
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      try {
+        scope = await scopeForUser(uuid)
+      } catch (err) {
+        console.error('[customer] scope resolve failed:', err.message)
+        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
+                  slpCodes: [], districtCodes: [] }
+      }
+    }
+  }
+
+  // Access control — short-circuit with 404 (privacy: never leak existence)
+  if (scope) {
+    // 1. No sap_slpcode mapped yet → the user has no scope → sees nothing
+    if (scope.is_empty) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+    // 2. Scope is bounded (not exec/ceo/service 'ALL') → verify cardcode falls in it
+    if (scope.slpCodes !== 'ALL') {
+      const slps  = intList(scope.slpCodes, { excludeOne: true })
+      const dists = intList(scope.districtCodes)
+      if (!slps.length && !dists.length) {
+        return res.status(404).json({ error: 'Customer not found' })
+      }
+      const orClauses = []
+      if (slps.length)  orClauses.push(`T.SlpCode IN (${slps.join(',')})`)
+      if (dists.length) orClauses.push(`T.U_districtName IN (${dists.join(',')})`)
+      const accessRows = await query(`
+        SELECT 1 AS in_scope
+        FROM OCRD T
+        WHERE T.CardCode = @id
+          AND T.validFor = 'Y'
+          AND T.CardType = 'C'
+          AND T.CardCode NOT LIKE 'CE%'
+          AND T.SlpCode <> 1
+          AND (${orClauses.join(' OR ')})
+      `, { id })
+      if (!accessRows.length) {
+        return res.status(404).json({ error: 'Customer not found' })
+      }
+    }
+  }
+
+  // Cache key MUST include the resolved scope user — otherwise user A's cached
+  // response could leak to user B on the next request with a different scope.
+  const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
+  const cacheKey = `customer_${id}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     // --- Customer info from OCRD ---
+    // Exclude employee self-invoicing (CE%) and SlpCode=1 (VPI house account)
+    // defensively — these should never appear in the UI customer list, so a
+    // direct request for one is almost certainly a mistake or probing.
     const infoRows = await query(`
       SELECT
         T0.CardCode,
@@ -40,6 +104,8 @@ module.exports = async (req, res) => {
       LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
       WHERE T0.CardCode = @id
         AND T0.CardType = 'C'
+        AND T0.CardCode NOT LIKE 'CE%'
+        AND T0.SlpCode <> 1
     `, { id })
 
     if (!infoRows.length) {
@@ -301,6 +367,17 @@ module.exports = async (req, res) => {
       account_age_days: trueAgeDays,
       first_order_date: trueFirstDate,
       rank_by_volume: rankRow[0]?.rank_num || 0
+    }
+    // Optional scope meta — only present when the caller passed ?scope=user:<uuid>.
+    // Omitted entirely on the no-scope path so the existing web dashboard response
+    // shape is byte-identical to pre-migration behavior.
+    if (scope) {
+      result.scope = {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: !!scope.is_empty,
+        access_granted: true
+      }
     }
 
     cache.set(cacheKey, result, 300)
