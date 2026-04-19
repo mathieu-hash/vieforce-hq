@@ -1,5 +1,6 @@
 const { query } = require('./_db')
-const { verifySession, applyRoleFilter } = require('./_auth')
+const { verifySession, verifyServiceToken, applyRoleFilter } = require('./_auth')
+const { scopeForUser } = require('./_scope')
 const cache = require('../lib/cache')
 const {
   countShippingDays,
@@ -9,6 +10,55 @@ const {
   getManilaToday,
   fmtISO
 } = require('./lib/shipping_days')
+
+// Speed scope filter = ODLN.SlpCode IN (...) direct.
+// Design decision locked: attribution follows the delivery's own SlpCode, not
+// the customer's home rep (OCRD.SlpCode). Aligns with Finance commission and
+// handles leave-coverage correctly. No district filtering — ODLN has no
+// U_districtName column.
+function buildSpeedScopeFilter(scope, alias = 'T0') {
+  if (!scope)                       return { sql: '', isEmpty: false }
+  if (scope.slpCodes === 'ALL')     return { sql: '', isEmpty: false }
+  if (scope.is_empty)               return { sql: '', isEmpty: true }
+  const raw = scope.slpCodes || []
+  if (!Array.isArray(raw) || raw.length === 0) return { sql: '', isEmpty: true }
+  // Integer whitelist — defense against SQL injection from a malformed scope.
+  const safe = raw.map(Number).filter(n => Number.isInteger(n) && n > 0 && n !== 1)
+  if (safe.length === 0)            return { sql: '', isEmpty: true }
+  return { sql: ` AND ${alias}.SlpCode IN (${safe.join(',')})`, isEmpty: false }
+}
+
+function emptySpeedPayload(period, todayPH, dateFrom, periodEnd, scope) {
+  return {
+    period,
+    current_date_ph: fmtISO(todayPH),
+    period_start:    fmtISO(dateFrom),
+    period_end:      fmtISO(periodEnd),
+    holidays_in_period: listHolidaysInPeriod(dateFrom, periodEnd),
+    period_volume_mt: 0,
+    shipping_days_elapsed: 0, shipping_days_total: 0, shipping_days_remaining: 0,
+    daily_pullout: 0, projected_period_volume: 0, vs_prior_period_pct: 0,
+    prior_period_volume_mt: 0, prior_period_daily_pullout: 0,
+    mtd_actual: 0, days_elapsed: 0, days_total: 0, days_remaining: 0, projected_mtd: 0,
+    last_month_full_mt: 0, last_month_same_day_mt: 0,
+    vs_last_month_volume: 0, vs_last_month_pct: 0,
+    actual_mt: 0, speed_per_day: 0, elapsed_days: 0, total_days: 0,
+    remaining_days: 0, projected_mt: 0,
+    target_mt: 0, pct_of_target: 0,
+    daily: [],
+    plant_breakdown: [],
+    rsm_speed: [],
+    feed_type_speed: [],
+    weekly_matrix: { weeks: [], plants: [], grid: [] },
+    scope: {
+      userId: scope.userId,
+      role: scope.role || null,
+      is_empty: true,
+      slpCodes_count: 0,
+      attribution: 'ODLN.SlpCode'
+    }
+  }
+}
 
 // 2026 Budget targets (from Sales Volume Budget 2026)
 // Annual: 188,266 MT | Q1: 41,800 | Q2: 45,184 | Q3: 49,389 | Q4: 51,893
@@ -85,30 +135,57 @@ function getPriorPeriodWindow(period, currentFrom, today) {
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
-  const session = await verifySession(req)
+  // Auth — service-token first (Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Cache
-  const cacheKey = `speed_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const { period = 'MTD' } = req.query
+
+  // Period bounds computed early so zero-state + cache key share them.
+  const todayPH = getManilaToday()
+  const { start: dateFrom, end: dateTo } = getPeriodBounds(period, todayPH)
+  const periodEnd = getPeriodEndBound(period, todayPH)
+
+  // Parse optional scope=user:<uuid>. Resolve once; each ODLN query gets its
+  // own filter fragment via buildSpeedScopeFilter (always alias T0 — every
+  // ODLN query in this file aliases it that way).
+  let scope = null
+  const scopeParam = req.query.scope
+  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
+    const uuid = scopeParam.slice(5).trim()
+    if (uuid) {
+      try {
+        scope = await scopeForUser(uuid)
+      } catch (err) {
+        console.error('[speed] scope resolve failed:', err.message)
+        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
+                  slpCodes: [], districtCodes: [] }
+      }
+    }
+  }
+  const speedFilter = buildSpeedScopeFilter(scope, 'T0')
+
+  // Zero-state short-circuit — no ODLN reads, no division math, no NaN risk.
+  if (speedFilter.isEmpty) {
+    return res.json(emptySpeedPayload(period, todayPH, dateFrom, periodEnd, scope))
+  }
+
+  // Cache key includes scope user so user A's rows cannot serve user B.
+  const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
+  const cacheKey = `speed_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const { period = 'MTD' } = req.query
-
-    // Period bounds — calendar-aware, today (Manila) counts as the upper bound.
-    const todayPH = getManilaToday()
-    const { start: dateFrom, end: dateTo } = getPeriodBounds(period, todayPH)
-    const periodEnd = getPeriodEndBound(period, todayPH)
-
-    // Actual MT shipped (from ODLN delivery notes, NOT OINV invoices)
+    // Actual MT shipped (from ODLN delivery notes, NOT OINV invoices).
+    // applyRoleFilter kept as a no-op pass-through for symmetry; the scope
+    // filter (speedFilter.sql) is where real scoping happens now.
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    const filteredWhere = baseWhere + speedFilter.sql
 
     const totalRow = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS actual_mt
@@ -129,7 +206,7 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
         GROUP BY FORMAT(T0.DocDate, 'yyyy-MM')
         ORDER BY ship_date ASC
       `, { dateFrom, dateTo })
@@ -142,7 +219,7 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
         GROUP BY DATEPART(ISO_WEEK, T0.DocDate)
         ORDER BY MIN(T0.DocDate) ASC
       `, { dateFrom, dateTo })
@@ -155,7 +232,7 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
         GROUP BY CONVERT(VARCHAR(10), T0.DocDate, 120), DATENAME(WEEKDAY, T0.DocDate)
         ORDER BY ship_date ASC
       `, { dateFrom, dateTo })
@@ -188,7 +265,7 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
       GROUP BY T1.WhsCode
       ORDER BY mtd DESC
     `, { dateFrom, dateTo })
@@ -202,7 +279,7 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
       GROUP BY S.SlpName
       ORDER BY current_vol DESC
     `, { dateFrom, dateTo })
@@ -215,7 +292,7 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
       GROUP BY T1.Dscription
       ORDER BY current_vol DESC
     `, { dateFrom, dateTo })
@@ -229,7 +306,7 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= DATEADD(WEEK, -6, GETDATE()) AND T0.CANCELED = 'N'
+      WHERE T0.DocDate >= DATEADD(WEEK, -6, GETDATE()) AND T0.CANCELED = 'N'${speedFilter.sql}
       GROUP BY DATEPART(ISO_WEEK, T0.DocDate), T1.WhsCode
       ORDER BY MIN(T0.DocDate) ASC
     `)
@@ -256,7 +333,7 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lmStart AND @lmEnd AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @lmStart AND @lmEnd AND T0.CANCELED='N'${speedFilter.sql}
     `, { lmStart: lastMonthStart, lmEnd: lastMonthEnd, lmSameDay: lastMonthSameDay })
 
     const lm_full = lastMonthRow[0]?.mt_full || 0
@@ -271,7 +348,7 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${speedFilter.sql}
     `, { pFrom: prior.from, pTo: prior.to })
 
     const prior_period_volume = priorRow[0]?.mt || 0
@@ -321,7 +398,14 @@ module.exports = async (req, res) => {
       plant_breakdown,
       rsm_speed,
       feed_type_speed,
-      weekly_matrix
+      weekly_matrix,
+      ...(scope ? { scope: {
+        userId: scope.userId,
+        role: scope.role || null,
+        is_empty: !!scope.is_empty,
+        slpCodes_count: scope.slpCodes === 'ALL' ? 'ALL' : (scope.slpCodes || []).length,
+        attribution: 'ODLN.SlpCode'
+      }} : {})
     }
 
     cache.set(cacheKey, result, 300)
