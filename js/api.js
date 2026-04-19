@@ -77,3 +77,9 @@ function silenceAlert(payload)   { return apiPost('silence',   payload); }
 function unsilenceAlert(payload) { return apiPost('unsilence', payload); }
 function getSilenced()           { return apiFetch('silenced'); }
 function getDsmHome()            { return apiFetch('dsm/home'); }
+
+// Deeper Analytics (Customer Intelligence v1.1) — SKU heatmap, brand coverage gaps,
+// buying-pattern classifier. Each endpoint cached server-side at 30 min.
+function getSkuMatrix(params)       { return apiFetch('analytics/sku-matrix', params); }
+function getBrandCoverage(params)   { return apiFetch('analytics/brand-coverage', params); }
+function getBuyingPatterns(params)  { return apiFetch('analytics/buying-patterns', params); }

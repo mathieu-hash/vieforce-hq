@@ -51,6 +51,9 @@ const silenceHandler = require('./api/silence')
 const unsilenceHandler = require('./api/unsilence')
 const silencedHandler = require('./api/silenced')
 const dsmHomeHandler = require('./api/dsm-home')
+const skuMatrixHandler        = require('./api/analytics-sku-matrix')
+const brandCoverageHandler    = require('./api/analytics-brand-coverage')
+const buyingPatternsHandler   = require('./api/analytics-buying-patterns')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -73,6 +76,9 @@ app.post('/api/silence', silenceHandler)
 app.post('/api/unsilence', unsilenceHandler)
 app.get('/api/silenced', silencedHandler)
 app.get('/api/dsm/home', dsmHomeHandler)
+app.get('/api/analytics/sku-matrix',      skuMatrixHandler)
+app.get('/api/analytics/brand-coverage',  brandCoverageHandler)
+app.get('/api/analytics/buying-patterns', buyingPatternsHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
