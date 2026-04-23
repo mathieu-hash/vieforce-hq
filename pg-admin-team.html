@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VieForce HQ — Team Hierarchy Manager</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+<link rel="shortcut icon" href="/assets/favicon.ico">
+<meta name="theme-color" content="#00293A">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/pg-admin-team.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <a href="/app.html" class="brand-link">
+      <span class="brand-mark">▌▍</span>
+      <span class="brand-name">VieForce HQ</span>
+    </a>
+    <span class="brand-sep">·</span>
+    <span class="page-title">Team Hierarchy Manager</span>
+  </div>
+  <div class="top-actions">
+    <span class="user-badge" id="userBadge">—</span>
+    <button id="logoutBtn" class="btn-ghost">Log out</button>
+  </div>
+</header>
+
+<main class="content">
+
+  <section class="page-header">
+    <div>
+      <h1>Team Hierarchy Manager</h1>
+      <p class="subtitle">
+        Map SAP sales reps to Supabase users. Phones are provisional
+        (<span class="mono">09180000</span> + padded SlpCode) — replace with real numbers as collected.
+        Default PIN is <span class="mono">1234</span>.
+      </p>
+    </div>
+    <div class="header-stats">
+      <div class="stat">
+        <span class="stat-num" id="statMapped">—</span>
+        <span class="stat-label">Mapped</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="statUnmapped">—</span>
+        <span class="stat-label">Unmapped</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="statTotal">—</span>
+        <span class="stat-label">Total SAP reps</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="toolbar">
+    <div class="filter-chips" id="filterChips">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="unmapped">Unmapped</button>
+      <button class="chip" data-filter="mapped">Mapped</button>
+      <button class="chip" data-filter="vacant">Vacant</button>
+      <button class="chip" data-filter="unsaved">Unsaved</button>
+    </div>
+    <div class="toolbar-actions">
+      <span class="unsaved-count" id="unsavedCount"></span>
+      <button id="saveAllBtn" class="btn-primary" disabled>Save All</button>
+    </div>
+  </section>
+
+  <section class="table-wrap">
+    <div id="loadingState" class="loading-state">Loading SAP reps…</div>
+    <div id="errorState" class="error-state hidden">
+      <span id="errorMsg"></span>
+      <button id="retryBtn" class="btn-ghost">Retry</button>
+    </div>
+    <table id="repsTable" class="reps-table hidden">
+      <thead>
+        <tr>
+          <th>SlpCode</th>
+          <th>Name</th>
+          <th>SAP Manager</th>
+          <th>Role</th>
+          <th>Manager</th>
+          <th>Phone</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="repsBody"></tbody>
+    </table>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Confirmation modal (Reset PIN / Remove) -->
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="confirmTitle">Confirm</h3>
+      <p id="confirmBody"></p>
+      <div class="modal-actions">
+        <button id="confirmCancel" class="btn-ghost">Cancel</button>
+        <button id="confirmOk" class="btn-danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/js/auth.js"></script>
+<script src="/js/pg-admin-team.js"></script>
+</body>
+</html>

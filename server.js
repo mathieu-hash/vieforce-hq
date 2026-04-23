@@ -18,7 +18,7 @@ app.use(cors({
     // Block everything else
     callback(new Error('CORS not allowed from ' + origin));
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['x-session-id', 'authorization', 'content-type']
 }))
 
@@ -54,6 +54,10 @@ const dsmHomeHandler = require('./api/dsm-home')
 const skuMatrixHandler        = require('./api/analytics-sku-matrix')
 const brandCoverageHandler    = require('./api/analytics-brand-coverage')
 const buyingPatternsHandler   = require('./api/analytics-buying-patterns')
+const adminSapRepsHandler     = require('./api/admin/sap-reps')
+const adminUpsertUserHandler  = require('./api/admin/upsert-user')
+const adminResetPinHandler    = require('./api/admin/reset-pin')
+const adminRemoveUserHandler  = require('./api/admin/remove-user')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -79,6 +83,12 @@ app.get('/api/dsm/home', dsmHomeHandler)
 app.get('/api/analytics/sku-matrix',      skuMatrixHandler)
 app.get('/api/analytics/brand-coverage',  brandCoverageHandler)
 app.get('/api/analytics/buying-patterns', buyingPatternsHandler)
+
+// Admin portal — /pg-admin-team.html
+app.get('/api/admin/sap-reps',     adminSapRepsHandler)
+app.post('/api/admin/upsert-user', adminUpsertUserHandler)
+app.post('/api/admin/reset-pin',   adminResetPinHandler)
+app.delete('/api/admin/remove-user', adminRemoveUserHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
