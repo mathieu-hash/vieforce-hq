@@ -173,6 +173,7 @@ module.exports = async (req, res) => {
       name,
       role,
       phone,
+      pin_hash: DEFAULT_PIN,       // NOT NULL column; HQ js/auth.js compares plaintext
       sap_slpcode: slp_code,
       manager_id,
       is_active: true,
@@ -201,6 +202,7 @@ module.exports = async (req, res) => {
     name,
     role,
     phone,
+    pin_hash: DEFAULT_PIN,
     sap_slpcode: slp_code,
     manager_id,
     is_active: true,
