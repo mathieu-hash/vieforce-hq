@@ -21,6 +21,14 @@ const { requireAdmin, getAdminSupabase, setCors, adminConfigError } = require('.
 const VALID_ROLES = new Set(['tsr', 'dsm', 'rsm', 'director', 'exec', 'ceo', 'exclude'])
 const DEFAULT_PIN = '1234'
 
+// Convert PH local format (09xxxxxxxxx) to E.164 (+639xxxxxxxxx) for Supabase
+// Auth, which requires E.164. public.users.phone stays in local format so the
+// existing login flow in js/auth.js (phone=cleaned) still works.
+function toE164PH(local) {
+  if (!/^09\d{9}$/.test(local)) return null
+  return '+63' + local.slice(1)
+}
+
 function badRequest(res, msg) { return res.status(400).json({ error: msg }) }
 
 module.exports = async (req, res) => {
@@ -118,9 +126,12 @@ module.exports = async (req, res) => {
     }
 
     if (existing.phone !== phone) {
-      const phoneUpd = await supabase.auth.admin.updateUserById(existing.id, { phone }).catch(e => ({ error: e }))
-      if (phoneUpd && phoneUpd.error) {
-        console.warn('[admin/upsert] auth phone update failed (public row updated):', phoneUpd.error.message)
+      const e164 = toE164PH(phone)
+      if (e164) {
+        const phoneUpd = await supabase.auth.admin.updateUserById(existing.id, { phone: e164 }).catch(e => ({ error: e }))
+        if (phoneUpd && phoneUpd.error) {
+          console.warn('[admin/upsert] auth phone update failed (public row updated):', phoneUpd.error.message)
+        }
       }
     }
 
@@ -129,8 +140,11 @@ module.exports = async (req, res) => {
 
   // ── Branch 3a: CREATE with auth user ─────────────────────────────────
   if (create_auth_user) {
+    const e164 = toE164PH(phone)
+    if (!e164) return badRequest(res, 'phone must be PH local format 09XXXXXXXXX')
+
     const createRes = await supabase.auth.admin.createUser({
-      phone,
+      phone: e164,
       password: DEFAULT_PIN,
       phone_confirm: true,
       user_metadata: {
