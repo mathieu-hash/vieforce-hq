@@ -157,7 +157,9 @@ test('upsert_creates_auth_and_public_user_atomically', async () => {
   assert.equal(res.body.success, true)
   assert.equal(res.body.action, 'created')
   assert.equal(calls.authCreated.length, 1)
-  assert.equal(calls.authCreated[0].phone, '09180000017')
+  // auth.users.phone is E.164 (Supabase Auth requires it); public.users.phone
+  // stays local format so js/auth.js login (phone=cleaned) still matches.
+  assert.equal(calls.authCreated[0].phone, '+639180000017')
   assert.equal(calls.authCreated[0].password, '1234')
   assert.equal(calls.insert.length, 1)
   assert.equal(calls.insert[0].id, 'new-auth-uuid')
