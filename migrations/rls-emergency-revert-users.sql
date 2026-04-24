@@ -1,0 +1,31 @@
+-- ==============================================================
+-- HOTFIX — disable RLS on public.users to unblock login
+--
+-- Context: migrations/admin-portal-rls.sql (applied Sunday 2026-04-23)
+-- created `admin_users_full_access` with a USING clause that SELECTs
+-- FROM public.users — the same table the policy guards. Postgres
+-- evaluates the nested SELECT under RLS → infinite recursion →
+-- HTTP 500 on every anon SELECT against public.users → HQ login
+-- returns "Invalid phone number" for every user (js/auth.js:24-26
+-- treats any error as "phone not found").
+--
+-- Impact: total HQ login lockout for all users since Sunday night.
+-- /api/admin/* endpoints kept working because they use the service
+-- role key which bypasses RLS entirely.
+--
+-- Fix: restore the pre-Sunday posture (RLS off; writes gated at the
+-- API layer via requireAdmin() in api/admin/_admin.js). Matches the
+-- HQ convention documented at migrations/supabase_silenced_alerts.sql:46
+-- ("RLS OFF for internal tool; backend session verification is the gate").
+--
+-- Follow-up: migrations/rls-admin-users-proper.sql re-enables RLS
+-- with a SECURITY DEFINER helper to avoid the recursion. Apply that
+-- once login is verified working.
+-- ==============================================================
+
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+
+-- Verify:
+--   SELECT relrowsecurity FROM pg_class
+--    WHERE relname='users' AND relnamespace=(SELECT oid FROM pg_namespace WHERE nspname='public');
+--   -- Expected: f
