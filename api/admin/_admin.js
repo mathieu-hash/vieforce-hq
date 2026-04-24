@@ -20,7 +20,10 @@
 const { createClient } = require('@supabase/supabase-js')
 const { verifySession, verifyServiceToken } = require('../_auth')
 
-const ALLOWED_ROLES = new Set(['service', 'exec', 'ceo'])
+// 'admin' is a non-SAP app-level role (e.g. Sales Assistant) and is granted
+// portal access equivalent to exec/ceo. 'service' is the synthetic session
+// used by Bearer HQ_SERVICE_TOKEN calls from Patrol/internal proxies.
+const ALLOWED_ROLES = new Set(['service', 'exec', 'ceo', 'admin'])
 
 async function requireAdmin(req, res) {
   const session = await verifyServiceToken(req) || await verifySession(req)

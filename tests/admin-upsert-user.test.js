@@ -63,6 +63,10 @@ function makeSupabase(scenario) {
         if (filters.some(([c]) => c === 'sap_slpcode')) {
           return Promise.resolve({ data: scenario.existingBySlp || null, error: null })
         }
+        if (filters.some(([c]) => c === 'phone')) {
+          // Non-SAP upsert path looks up existing row by phone.
+          return Promise.resolve({ data: scenario.existingByPhone || null, error: null })
+        }
         return Promise.resolve({ data: null, error: null })
       },
       single() {
@@ -268,4 +272,99 @@ test('upsert_rejects_bad_phone_format', async () => {
     slp_code: 17, name: 'X', role: 'dsm', manager_id: null, phone: '+63 917 12345'
   }), res)
   assert.equal(res.statusCode, 400)
+})
+
+// ── Non-SAP upsert (admin/exec/ceo/evp with null slp_code) ───────────────
+test('upsert_creates_non_sap_admin_with_null_slp_code', async () => {
+  const { handler, calls } = buildEnv({
+    scenario: {
+      existingByPhone: null,
+      managerExists: true,
+      createUserResult: { data: { user: { id: 'jed-auth-uuid' } }, error: null }
+    }
+  })
+  const res = mockRes()
+  await handler(req({
+    slp_code: null, name: 'Jed Mag-Uyon', role: 'admin',
+    manager_id: null, phone: '09170000200'
+  }), res)
+
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.success, true)
+  assert.equal(res.body.action, 'created')
+  // Auth created with E.164, password '1234'
+  assert.equal(calls.authCreated.length, 1)
+  assert.equal(calls.authCreated[0].phone, '+639170000200')
+  // Public insert has sap_slpcode=null (non-SAP staff)
+  assert.equal(calls.insert.length, 1)
+  assert.equal(calls.insert[0].sap_slpcode, null)
+  assert.equal(calls.insert[0].role, 'admin')
+  assert.equal(calls.insert[0].pin_hash, '1234')
+})
+
+test('upsert_updates_existing_non_sap_user_by_phone_lookup', async () => {
+  const { handler, calls } = buildEnv({
+    scenario: {
+      existingByPhone: {
+        id: 'jed-existing-uuid', name: 'Jed Old Name', role: 'admin',
+        phone: '09170000200', sap_slpcode: null, manager_id: null
+      },
+      managerExists: true
+    }
+  })
+  const res = mockRes()
+  await handler(req({
+    slp_code: null, name: 'Jed Mag-Uyon (updated)', role: 'admin',
+    manager_id: null, phone: '09170000200'
+  }), res)
+
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.action, 'updated')
+  assert.equal(calls.update.length, 1)
+  assert.equal(calls.update[0].name, 'Jed Mag-Uyon (updated)')
+  assert.equal(calls.authCreated.length, 0, 'no new auth user on update path')
+})
+
+test('upsert_rejects_null_slp_code_for_sap_roles', async () => {
+  // dsm / rsm / tsr / director still REQUIRE a slp_code. Only admin/exec/ceo/evp
+  // may have null — they are not OSLP reps.
+  for (const role of ['dsm', 'rsm', 'tsr', 'director']) {
+    const { handler } = buildEnv({ scenario: {} })
+    const res = mockRes()
+    await handler(req({
+      slp_code: null, name: 'X', role, manager_id: null, phone: '09180000001'
+    }), res)
+    assert.equal(res.statusCode, 400, `role=${role} with null slp_code should 400`)
+    assert.match(res.body.error, /slp_code required/, `role=${role} error message`)
+  }
+})
+
+test('upsert_rejects_null_slp_code_for_exclude_role', async () => {
+  // Exclude path still needs a slp_code to locate the row. Non-SAP deletes
+  // go through /api/admin/remove-user.
+  const { handler } = buildEnv({ scenario: {} })
+  const res = mockRes()
+  await handler(req({
+    slp_code: null, name: '', role: 'exclude', manager_id: null, phone: ''
+  }), res)
+  assert.equal(res.statusCode, 400)
+  assert.match(res.body.error, /slp_code required/)
+})
+
+test('upsert_non_sap_ceo_with_null_slp_code_succeeds', async () => {
+  // Parametric coverage: 'ceo' also allowed without slp_code.
+  const { handler, calls } = buildEnv({
+    scenario: {
+      existingByPhone: null, managerExists: true,
+      createUserResult: { data: { user: { id: 'ceo-auth-uuid' } }, error: null }
+    }
+  })
+  const res = mockRes()
+  await handler(req({
+    slp_code: null, name: 'New CEO', role: 'ceo', manager_id: null, phone: '09170000101'
+  }), res)
+
+  assert.equal(res.statusCode, 200)
+  assert.equal(calls.insert[0].sap_slpcode, null)
+  assert.equal(calls.insert[0].role, 'ceo')
 })
