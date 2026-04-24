@@ -1,24 +1,32 @@
 // POST /api/admin/upsert-user
-// Create or update a Supabase user for a given OSLP SlpCode.
+// Create or update a Supabase user for a given OSLP SlpCode or non-SAP role.
 //
 // Body:
-//   { slp_code: int, name: string, role: string, manager_id: uuid|null,
+//   { slp_code: int|null, name: string, role: string, manager_id: uuid|null,
 //     phone: string, create_auth_user?: bool }
 //
+// slp_code is REQUIRED for SAP roles (tsr/dsm/rsm/director) and exclude.
+// slp_code may be null for non-SAP roles (admin/exec/ceo/evp) — these staff
+// do not have an OSLP entry (Sales assistants, EVP, CEO, system admins).
+//
 // Logic:
-//   - role === 'exclude'            → delete the user (auth + public)
-//   - row exists (by sap_slpcode)  → UPDATE public.users, and auth.users
-//                                     phone if it changed
-//   - row missing, create_auth=true → createUser in auth, then insert public
+//   - role === 'exclude'            → delete the user (auth + public), keyed
+//                                     by sap_slpcode (use /api/admin/remove-user
+//                                     for non-SAP deletes).
+//   - SAP role, slp_code set       → find existing by sap_slpcode, UPDATE
+//                                     or CREATE.
+//   - Non-SAP role, slp_code null  → find existing by phone, UPDATE or CREATE.
+//   - CREATE with auth user        → createUser in auth, then insert public
 //                                     (rolls back the auth row if the insert
-//                                      fails — atomic pairing is the point)
-//   - row missing, create_auth=false→ insert public.users with a fresh UUID,
+//                                      fails — atomic pairing is the point).
+//   - CREATE without auth user     → insert public.users with a fresh UUID,
 //                                     no auth row (lets us map vacants /
-//                                     service codes without burning a login)
+//                                     service codes without burning a login).
 
 const { requireAdmin, getAdminSupabase, setCors, adminConfigError } = require('./_admin')
 
-const VALID_ROLES = new Set(['tsr', 'dsm', 'rsm', 'director', 'exec', 'ceo', 'exclude'])
+const VALID_ROLES = new Set(['tsr', 'dsm', 'rsm', 'director', 'exec', 'ceo', 'admin', 'evp', 'exclude'])
+const NON_SAP_ROLES = new Set(['admin', 'exec', 'ceo', 'evp'])
 const DEFAULT_PIN = '1234'
 
 // Convert PH local format (09xxxxxxxxx) to E.164 (+639xxxxxxxxx) for Supabase
@@ -49,15 +57,29 @@ module.exports = async (req, res) => {
 
   // ── Validate body ─────────────────────────────────────────────────────
   const body = req.body || {}
-  const slp_code = Number(body.slp_code)
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const role = typeof body.role === 'string' ? body.role.trim().toLowerCase() : ''
   const manager_id = body.manager_id || null
   const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
   const create_auth_user = body.create_auth_user !== false  // default true
 
-  if (!Number.isInteger(slp_code) || slp_code <= 0) return badRequest(res, 'Invalid slp_code')
   if (!VALID_ROLES.has(role)) return badRequest(res, 'Invalid role')
+
+  // slp_code is optional for non-SAP roles (admin/exec/ceo/evp), required for
+  // SAP roles (tsr/dsm/rsm/director) and for the 'exclude' delete path.
+  const rawSlp = body.slp_code
+  const slpProvided = rawSlp !== null && rawSlp !== undefined && rawSlp !== ''
+  const isNonSap = NON_SAP_ROLES.has(role)
+  const slp_code = slpProvided ? Number(rawSlp) : null
+
+  if (slpProvided && (!Number.isInteger(slp_code) || slp_code <= 0)) {
+    return badRequest(res, 'Invalid slp_code')
+  }
+  if (!slpProvided && !isNonSap) {
+    // SAP roles + exclude still require a SlpCode.
+    return badRequest(res, 'slp_code required for ' + role + ' role')
+  }
+
   if (role !== 'exclude') {
     if (!name) return badRequest(res, 'Missing name')
     if (!phone) return badRequest(res, 'Missing phone')
@@ -74,12 +96,18 @@ module.exports = async (req, res) => {
     if (mgrErr || !mgr) return badRequest(res, 'manager_id does not match any user')
   }
 
-  // ── Look up existing row by sap_slpcode ───────────────────────────────
-  const { data: existing, error: findErr } = await supabase
+  // ── Look up existing row ──────────────────────────────────────────────
+  // SAP path: find by sap_slpcode (unique per OSLP rep).
+  // Non-SAP path: find by phone (unique per user; sap_slpcode is null).
+  const existingQuery = supabase
     .from('users')
     .select('id, name, role, phone, sap_slpcode, manager_id')
-    .eq('sap_slpcode', slp_code)
-    .maybeSingle()
+
+  const { data: existing, error: findErr } = await (
+    slp_code != null
+      ? existingQuery.eq('sap_slpcode', slp_code).maybeSingle()
+      : existingQuery.eq('phone', phone).maybeSingle()
+  )
 
   if (findErr) {
     console.error('[admin/upsert] find failed:', findErr.message)
