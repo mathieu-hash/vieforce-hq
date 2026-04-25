@@ -1,5 +1,5 @@
 const { query } = require('./_db')
-const { verifySession, verifyServiceToken, applyRoleFilter } = require('./_auth')
+const { verifySession, verifyServiceToken } = require('./_auth')
 const { scopeForUser } = require('./_scope')
 const cache = require('../lib/cache')
 const {

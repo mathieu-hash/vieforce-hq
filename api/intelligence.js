@@ -1,5 +1,5 @@
 const { query, queryH, queryBoth } = require('./_db')
-const { verifySession, applyRoleFilter } = require('./_auth')
+const { verifySession } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
@@ -736,5 +736,4 @@ module.exports = async (req, res) => {
   }
 }
 
-void applyRoleFilter
 void excludeNonCustomers

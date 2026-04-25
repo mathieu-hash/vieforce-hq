@@ -1,6 +1,11 @@
 // POST /api/admin/reset-pin
 // Body: { user_id: uuid, new_pin?: string (defaults to '1234') }
-// Calls supabase.auth.admin.updateUserById(user_id, { password: new_pin }).
+//
+// Resets the PIN in BOTH places it lives:
+//   1. auth.users.password — Supabase Auth login (Patrol via Edge Fn)
+//   2. public.users.pin_hash — HQ dashboard login (js/auth.js plaintext compare)
+// They MUST stay in sync; updating only one breaks one of the two login
+// paths. See memory feedback_hq_users_pin_hash.md for the historical why.
 
 const { requireAdmin, getAdminSupabase, setCors, adminConfigError } = require('./_admin')
 
@@ -28,15 +33,33 @@ module.exports = async (req, res) => {
 
   if (!user_id) return res.status(400).json({ error: 'Missing user_id' })
 
-  const result = await supabase.auth.admin.updateUserById(user_id, { password: new_pin })
+  // Step 1 — auth.users.password
+  const authResult = await supabase.auth.admin.updateUserById(user_id, { password: new_pin })
     .catch(e => ({ error: e }))
 
-  if (result.error) {
-    const msg = result.error.message || 'reset failed'
+  if (authResult.error) {
+    const msg = authResult.error.message || 'reset failed'
     if (/not.*found/i.test(msg)) return res.status(404).json({ error: 'User not found' })
-    console.error('[admin/reset-pin] failed:', msg)
+    console.error('[admin/reset-pin] auth update failed:', msg)
     return res.status(500).json({ error: 'Reset failed', detail: msg })
   }
 
-  return res.json({ success: true })
+  // Step 2 — public.users.pin_hash (kept in sync with auth password so the
+  // HQ phone+PIN login path in js/auth.js continues to match). If the row
+  // somehow doesn't exist (target had auth.users only), warn but treat the
+  // overall reset as successful — the auth path is already updated.
+  const { error: pubErr, count } = await supabase
+    .from('users')
+    .update({ pin_hash: new_pin }, { count: 'exact' })
+    .eq('id', user_id)
+
+  if (pubErr) {
+    console.error('[admin/reset-pin] public.users update failed:', pubErr.message)
+    return res.status(500).json({ error: 'Reset partially failed', detail: 'auth updated but public.users sync failed: ' + pubErr.message })
+  }
+  if (count === 0) {
+    console.warn('[admin/reset-pin] no public.users row for', user_id, '— auth-only reset')
+  }
+
+  return res.json({ success: true, public_synced: count > 0 })
 }
