@@ -75,6 +75,35 @@ test('exec_scope_returns_ALL', async () => {
   assert.equal(s.is_empty, false)
 })
 
+// 2026-04-25: director + evp added to elevated allowlist.
+// Pre-fix, both fell through to the unknown-role catch-all and got
+// is_empty=true (Joel Durano + Joel Comex saw zero-state on Patrol
+// despite being above RSMs in the org chart).
+const JOEL_DURANO = 'aaaaaaaa-1111-1111-1111-111111111111'
+const JOEL_COMEX  = 'bbbbbbbb-2222-2222-2222-222222222222'
+const ELEVATED_FIXTURE = {
+  users: [
+    { id: JOEL_DURANO, role: 'director', name: 'Joel Durano', manager_id: null, sap_slpcode: 3, sap_district_code: null, district_label: null, is_active: true },
+    { id: JOEL_COMEX,  role: 'evp',      name: 'Joel Comex',  manager_id: null, sap_slpcode: null, sap_district_code: null, district_label: null, is_active: true }
+  ]
+}
+
+test('director_scope_returns_ALL', async () => {
+  const supa = makeMock(ELEVATED_FIXTURE)
+  const s = await scopeForUser(JOEL_DURANO, supa)
+  assert.equal(s.role, 'director')
+  assert.equal(s.slpCodes, 'ALL', 'director sees national book')
+  assert.equal(s.is_empty, false, 'director NOT in zero-state')
+})
+
+test('evp_scope_returns_ALL', async () => {
+  const supa = makeMock(ELEVATED_FIXTURE)
+  const s = await scopeForUser(JOEL_COMEX, supa)
+  assert.equal(s.role, 'evp')
+  assert.equal(s.slpCodes, 'ALL', 'evp sees national book')
+  assert.equal(s.is_empty, false, 'evp NOT in zero-state')
+})
+
 test('dsm_scope_returns_tsrs_plus_own_plus_district', async () => {
   const supa = makeMock(FIXTURE)
   const s = await scopeForUser(JEFREY, supa)

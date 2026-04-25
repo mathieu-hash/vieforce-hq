@@ -75,8 +75,13 @@ async function scopeForUser(userId, supabaseClient) {
     district_label: user.district_label
   }
 
-  // ── exec / ceo / service: no filter ─────────────────────────────────
-  if (['exec', 'ceo', 'service', 'admin'].includes(user.role)) {
+  // ── exec / ceo / director / evp / service / admin: no filter ────────
+  // 2026-04-25: added 'director' (Joel Durano, SlpCode 3 — top of OSLP
+  // chain) and 'evp' (Joel Comex). Both sit above RSMs in the org and
+  // see the full national book on Patrol/HQ. Pre-fix, both fell through
+  // to the unknown-role branch and got is_empty=true (memory:
+  // feedback_director_role_scope_gap.md).
+  if (['exec', 'ceo', 'director', 'evp', 'service', 'admin'].includes(user.role)) {
     return { ...ctx, slpCodes: 'ALL', districtCodes: [], is_empty: false }
   }
 
