@@ -46,6 +46,13 @@ module.exports = async (req, res) => {
     const { period = 'MTD', region = 'ALL' } = req.query
     const { dateFrom, dateTo } = getPeriodDates(period)
 
+    // Patrol-only opt-in blocks. Web dashboard never sends include= so its response
+    // stays byte-identical. Patrol passes ?include=whitespace,at_risk.
+    const includeRaw = typeof req.query.include === 'string' ? req.query.include : ''
+    const include = new Set(includeRaw.split(',').map(s => s.trim()).filter(Boolean))
+    const wantWhitespace = include.has('whitespace')
+    const wantAtRisk     = include.has('at_risk')
+
     const scopeSql = scopeFilter.sql    // '' when ALL or no scope
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'` + scopeSql
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
@@ -215,6 +222,87 @@ module.exports = async (req, res) => {
       }))
     }
 
+    // --- Patrol-only: whitespace (BPs in scope with no invoices in period) ---
+    let whitespace = []
+    if (wantWhitespace) {
+      // Only meaningful for SlpCode-scoped callers (DSMs/RSMs). For ALL/region
+      // scope, returning every empty BP nationally is too noisy — skip.
+      if (scope && Array.isArray(scope.slpCodes) && scope.slpCodes.length > 0) {
+        // SAFETY: scope.slpCodes comes from Supabase users table (server-side),
+        // not user input. Safe to interpolate as comma-joined ints.
+        const slpList = scope.slpCodes.map(n => parseInt(n, 10)).filter(Number.isFinite).join(',')
+        if (slpList) {
+          const wsRows = await query(
+            `SELECT TOP 10
+               c.CardCode,
+               c.CardName,
+               c.Phone1
+             FROM OCRD c
+             WHERE c.SlpCode IN (${slpList})
+               AND c.validFor = 'Y'
+               AND c.CardCode NOT IN (
+                 SELECT DISTINCT T0.CardCode FROM OINV T0
+                 WHERE T0.SlpCode IN (${slpList})
+                   AND T0.CANCELED = 'N'
+                   AND T0.DocDate BETWEEN @dateFrom AND @dateTo
+               )
+             ORDER BY c.CardName`,
+            { dateFrom, dateTo }
+          )
+          whitespace = wsRows.map(r => ({
+            cardcode: r.CardCode,
+            name: r.CardName,
+            phone: r.Phone1 || null
+          }))
+        }
+      }
+    }
+
+    // --- Patrol-only: at_risk (BPs in scope with last order > 14 days ago) ---
+    let at_risk = []
+    if (wantAtRisk) {
+      if (scope && Array.isArray(scope.slpCodes) && scope.slpCodes.length > 0) {
+        const slpList = scope.slpCodes.map(n => parseInt(n, 10)).filter(Number.isFinite).join(',')
+        if (slpList) {
+          const arRows = await query(
+            `SELECT TOP 10
+               c.CardCode,
+               c.CardName,
+               li.last_date,
+               DATEDIFF(day, li.last_date, GETDATE()) AS days_since
+             FROM OCRD c
+             LEFT JOIN (
+               SELECT CardCode, MAX(DocDate) AS last_date
+               FROM OINV
+               WHERE SlpCode IN (${slpList})
+                 AND CANCELED = 'N'
+               GROUP BY CardCode
+             ) li ON li.CardCode = c.CardCode
+             WHERE c.SlpCode IN (${slpList})
+               AND c.validFor = 'Y'
+               AND (li.last_date IS NULL OR DATEDIFF(day, li.last_date, GETDATE()) > 14)
+             ORDER BY days_since DESC`
+          )
+          const tier = (d) => {
+            if (d == null) return 'no_history'
+            if (d > 30)    return 'at_risk'
+            if (d >= 15)   return 'slowing'
+            return 'healthy'
+          }
+          at_risk = arRows.map(r => {
+            const days = r.days_since == null ? null : Number(r.days_since)
+            return {
+              cardcode: r.CardCode,
+              name: r.CardName,
+              last_date: r.last_date ? new Date(r.last_date).toISOString().slice(0, 10) : null,
+              days_since_last_order: days,
+              tier: tier(days)
+            }
+          })
+        }
+      }
+    }
+
     // --- Top-level summary KPIs for Sales hero strip ---
     const kpiCurrent = await query(`
       SELECT
@@ -337,6 +425,9 @@ module.exports = async (req, res) => {
                      volume_mt: kpis.volume_mt, volume_bags: kpis.volume_bags,
                      revenue: kpis.revenue, gmt: kpis.gmt,
                      ytd_volume_mt: kpis.ytd_volume_mt, ytd_revenue: kpis.ytd_revenue }
+
+    if (wantWhitespace) result.whitespace = whitespace
+    if (wantAtRisk)     result.at_risk    = at_risk
 
     // Include scope metadata only when the caller asked for it.
     // Keeps the existing no-scope response shape byte-identical for web dashboard.
