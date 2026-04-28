@@ -3,51 +3,45 @@
 
 var SESSION_KEY = 'vf_session';
 var SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
+var AUTH_API = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api/auth/login';
 
 /**
- * Login with phone + PIN against Supabase users table (v1 direct query)
- * Returns { ok, user, error }
+ * Login with phone + PIN — calls the server-side endpoint that compares pin_hash
+ * with the service-role Supabase client, so the anon key (and any browser
+ * inspector) never sees pin_hash. Server enforces 5/min IP rate limit.
+ * Returns { ok, user, error, retryAfterSeconds? }
  */
 async function login(phone, pin) {
   try {
-    var cleaned = phone.replace(/\D/g, '');
-    // Keep local format (09xx) — that's how phones are stored in Supabase
-    if (cleaned.startsWith('63') && cleaned.length > 11) {
-      cleaned = '0' + cleaned.slice(2);
+    var res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phone, pin: pin })
+    });
+
+    var data = null;
+    try { data = await res.json(); } catch(e) {}
+
+    // Rate-limited
+    if (res.status === 429) {
+      return { ok: false, error: (data && data.error) || 'Too many attempts. Try again in a minute.', retryAfterSeconds: data && data.retryAfterSeconds };
+    }
+    // Disabled account
+    if (res.status === 403) {
+      return { ok: false, error: (data && data.error) || 'Account is disabled' };
+    }
+    // Invalid (generic — don't distinguish phone vs PIN to defeat enumeration)
+    if (res.status === 401) {
+      return { ok: false, error: 'Invalid credentials' };
+    }
+    // Other errors
+    if (!res.ok || !data || !data.ok) {
+      return { ok: false, error: (data && data.error) || ('Login failed (' + res.status + ')') };
     }
 
-    var { data, error } = await supabaseClient
-      .from('users')
-      .select('id, name, role, region, district, territory, pin_hash, is_active')
-      .eq('phone', cleaned)
-      .single();
-
-    if (error || !data) {
-      return { ok: false, error: 'Invalid phone number' };
-    }
-
-    if (!data.is_active) {
-      return { ok: false, error: 'Account is disabled' };
-    }
-
-    if (String(data.pin_hash) !== String(pin)) {
-      return { ok: false, error: 'Incorrect PIN' };
-    }
-
-    var now = Date.now();
-    var session = {
-      id: data.id,
-      name: data.name,
-      role: data.role,
-      region: data.region || null,
-      district: data.district || null,
-      territory: data.territory || null,
-      loggedInAt: now,
-      expiresAt: now + SESSION_TTL
-    };
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return { ok: true, user: session };
+    // Success — server returns the same session shape we used to build client-side
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+    return { ok: true, user: data.user };
   } catch (err) {
     return { ok: false, error: err.message || 'Login failed' };
   }

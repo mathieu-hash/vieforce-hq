@@ -12,9 +12,17 @@ function getApiHeaders() {
 
 async function apiFetch(endpoint, params) {
   params = params || {};
+  // Strip undefined/null params so URLSearchParams doesn't stringify them as the literal "undefined".
+  // Without this, calls like apiFetch('dashboard', {period: state.period}) before state init fire
+  // /api/dashboard?period=undefined and the backend has to silently coerce. See QG report 2026-04-28.
+  var clean = {};
+  for (var k in params) {
+    var v = params[k];
+    if (v !== undefined && v !== null && v !== 'undefined' && v !== 'null') clean[k] = v;
+  }
   // Cache-buster guarantees browser + CDN do not return stale responses when period/filter changes
-  params._t = Date.now();
-  var qs = new URLSearchParams(params).toString();
+  clean._t = Date.now();
+  var qs = new URLSearchParams(clean).toString();
   var url = API_BASE + '/' + endpoint + (qs ? '?' + qs : '');
 
   console.log('[API]', endpoint, 'params=', params);
