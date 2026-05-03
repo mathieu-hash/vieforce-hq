@@ -30,4 +30,15 @@ Derived from Patrol repo tests and HQ handlers — keep stable:
 
 ---
 
+## Acknowledgment
+
+| Track | Statement | Date |
+|-------|-----------|------|
+| **HQ (`vieforce-hq`)** | **Acknowledged.** The VieForce HQ codebase and API maintainers accept this document as the working contract for Patrol integration: `HQ_SERVICE_TOKEN` for S2S auth, `scope=user:<uuid>` for territory-scoped SAP reads, breaking-change protocol above, and no reliance on `/api/diag` from mobile. | 2026-05-03 |
+| **Patrol (`vieforce-patrol`)** | *Recommended:* Patrol owner adds a one-line confirmation (PR comment, issue, or edit to this table) when the mobile track has read and agrees. | — |
+
+*Recorded at user request via Cursor; HQ side treated as binding for future HQ changes affecting Patrol.*
+
+---
+
 *Last updated: 2026-05-03*
