@@ -59,6 +59,7 @@ const adminUpsertUserHandler  = require('./api/admin/upsert-user')
 const adminResetPinHandler    = require('./api/admin/reset-pin')
 const adminRemoveUserHandler  = require('./api/admin/remove-user')
 const authLoginHandler        = require('./api/auth/login')
+const authGoogleBridgeHandler = require('./api/auth/google-bridge')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -87,6 +88,7 @@ app.get('/api/analytics/buying-patterns', buyingPatternsHandler)
 
 // Auth — server-side PIN verification (rate-limited)
 app.post('/api/auth/login', authLoginHandler)
+app.post('/api/auth/google-bridge', authGoogleBridgeHandler)
 
 // Admin portal — /pg-admin-team.html
 app.get('/api/admin/sap-reps',     adminSapRepsHandler)

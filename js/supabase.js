@@ -1,3 +1,6 @@
 var HQ_SUPABASE_URL = 'https://yolxcmeoovztuindrglk.supabase.co';
 var HQ_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbHhjbWVvb3Z6dHVpbmRyZ2xrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MzAwMjksImV4cCI6MjA5MTEwNjAyOX0.uTXWaYLKjFCQv6MLcwQT6SjjmVum0hBiALvYMyG3OI0';
+window.HQ_SUPABASE_URL = HQ_SUPABASE_URL;
+window.HQ_SUPABASE_KEY = HQ_SUPABASE_KEY;
 var supabaseClient = window.supabase.createClient(HQ_SUPABASE_URL, HQ_SUPABASE_KEY);
+window.supabaseClient = supabaseClient;

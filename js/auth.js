@@ -4,6 +4,42 @@
 var SESSION_KEY = 'vf_session';
 var SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
 var AUTH_API = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api/auth/login';
+var GOOGLE_BRIDGE_API = AUTH_API.replace(/\/login\/?$/i, '') + '/google-bridge';
+var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
+
+function getHqOAuthRedirectUrl() {
+  var host = '';
+  try {
+    host = String(window.location.hostname || '').toLowerCase();
+  } catch (e) {}
+  var origin = '';
+  try {
+    origin = String(window.location.origin || '').replace(/\/$/, '');
+  } catch (e2) {}
+  if (host === 'localhost' || host === '127.0.0.1') {
+    origin = 'https://vieforce-hq.vercel.app';
+  }
+  if (!origin) origin = 'https://vieforce-hq.vercel.app';
+  return origin + '/index.html';
+}
+
+async function isGoogleProviderEnabled() {
+  if (!window.supabaseClient || !window.HQ_SUPABASE_URL || !window.HQ_SUPABASE_KEY) return null;
+  try {
+    var settingsUrl = HQ_SUPABASE_URL + '/auth/v1/settings?apikey=' + encodeURIComponent(HQ_SUPABASE_KEY);
+    var res = await fetch(settingsUrl);
+    if (!res.ok) return null;
+    var data = await res.json();
+    return !!(data && data.external && data.external.google);
+  } catch (e) {
+    return null;
+  }
+}
+
+function normalizeHqEmail(raw) {
+  if (!raw) return '';
+  return String(raw).trim().toLowerCase();
+}
 
 /**
  * Login with phone + PIN — calls the server-side endpoint that compares pin_hash
@@ -84,11 +120,165 @@ function requireAuth() {
 }
 
 /**
- * Logout — clear session and redirect
+ * Logout — clear HQ session, Supabase OAuth session if any, redirect
  */
-function logout() {
-  localStorage.removeItem(SESSION_KEY);
+async function logout() {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch (e) {}
+  try {
+    if (window.supabaseClient && supabaseClient.auth) {
+      await supabaseClient.auth.signOut();
+    }
+  } catch (e2) {}
   window.location.href = 'index.html';
+}
+
+/**
+ * Google OAuth (same Supabase project as Patrol). After redirect, call maybeHandleGoogleLoginOnLoad().
+ */
+async function loginWithGoogle() {
+  if (!window.supabaseClient || !supabaseClient.auth) {
+    return {
+      ok: false,
+      error: 'Google login is not configured. Check supabase.js and Supabase Google provider.'
+    };
+  }
+  var providerEnabled = await isGoogleProviderEnabled();
+  if (providerEnabled === false) {
+    return {
+      ok: false,
+      error: 'Google sign-in is off in this project. Use phone + PIN or enable Google in Supabase Auth.'
+    };
+  }
+  var redirectTo = getHqOAuthRedirectUrl();
+  var result = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: redirectTo,
+      queryParams: {
+        hd: GOOGLE_ALLOWED_DOMAIN,
+        prompt: 'select_account'
+      }
+    }
+  });
+  if (result.error) {
+    return { ok: false, error: result.error.message || 'Google sign-in failed to start.' };
+  }
+  return { ok: true, pendingRedirect: true };
+}
+
+async function bridgeGoogleSession(accessToken) {
+  var res = await fetch(GOOGLE_BRIDGE_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ access_token: accessToken })
+  });
+  var data = null;
+  try {
+    data = await res.json();
+  } catch (e) {}
+  if (!res.ok || !data || !data.ok) {
+    return { ok: false, error: (data && data.error) || ('Google login failed (' + res.status + ')') };
+  }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+  return { ok: true, user: data.user };
+}
+
+/**
+ * Run on index.html after OAuth redirect: exchange code / restore session, then bridge to vf_session.
+ * @returns {{ handled: boolean, ok?: boolean, error?: string }}
+ */
+async function maybeHandleGoogleLoginOnLoad() {
+  if (!window.supabaseClient || !supabaseClient.auth) {
+    return { handled: false };
+  }
+
+  var query = new URLSearchParams(window.location.search || '');
+  var oauthError = query.get('error');
+  var oauthErrorDescription = query.get('error_description');
+  if (oauthError || oauthErrorDescription) {
+    if (window.history && typeof window.history.replaceState === 'function') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    return {
+      handled: true,
+      ok: false,
+      error: decodeURIComponent(oauthErrorDescription || oauthError || 'Google sign-in failed.')
+    };
+  }
+
+  var authSession = null;
+  var pkceCode = query.get('code');
+  if (pkceCode) {
+    var exchanged = await supabaseClient.auth.exchangeCodeForSession(pkceCode);
+    if (window.history && typeof window.history.replaceState === 'function') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (exchanged.error) {
+      return {
+        handled: true,
+        ok: false,
+        error: exchanged.error.message || 'Could not complete Google sign-in.'
+      };
+    }
+    authSession = exchanged.data && exchanged.data.session;
+  }
+
+  if (!authSession || !authSession.access_token) {
+    var rawHash = (window.location.hash || '').replace(/^#/, '');
+    if (rawHash.indexOf('access_token=') !== -1) {
+      var hp = new URLSearchParams(rawHash);
+      var at = hp.get('access_token');
+      var rt = hp.get('refresh_token');
+      if (at && rt) {
+        var setRes = await supabaseClient.auth.setSession({ access_token: at, refresh_token: rt });
+        if (window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        if (setRes.error) {
+          return {
+            handled: true,
+            ok: false,
+            error: setRes.error.message || 'Could not restore Google session.'
+          };
+        }
+        authSession = setRes.data && setRes.data.session;
+      }
+    }
+  }
+
+  if (!authSession || !authSession.access_token) {
+    var existing = await supabaseClient.auth.getSession();
+    if (!existing.error && existing.data && existing.data.session) {
+      authSession = existing.data.session;
+    }
+  }
+
+  if (!authSession || !authSession.access_token) {
+    return { handled: false };
+  }
+
+  var email = normalizeHqEmail(authSession.user && authSession.user.email);
+  if (!email || !email.endsWith('@' + GOOGLE_ALLOWED_DOMAIN)) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (so) {}
+    return {
+      handled: true,
+      ok: false,
+      error: 'Only @' + GOOGLE_ALLOWED_DOMAIN + ' Google accounts are allowed.'
+    };
+  }
+
+  var bridge = await bridgeGoogleSession(authSession.access_token);
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (so2) {}
+  if (!bridge.ok) {
+    return { handled: true, ok: false, error: bridge.error };
+  }
+  return { handled: true, ok: true, user: bridge.user };
 }
 
 /**

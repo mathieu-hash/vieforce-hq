@@ -1,5 +1,20 @@
 # Deploy & operations runbook (OPS-01 — OPS-03)
 
+## Google Sign-In (HQ + Patrol)
+
+Shared Supabase project: enable **Google** provider under Authentication → Providers (already on for Patrol).
+
+**Redirect URLs** (Authentication → URL Configuration) must include:
+
+- `https://vieforce-hq.vercel.app/index.html`
+- `https://vieforce-patrol.vercel.app/index.html` (Patrol)
+
+**User records:** `public.users.email` must match the person’s **@vienovo.ph** Google email or bridge returns *not linked*. Manager/staff roles allowed for Google on HQ: `dsm`, `rsm`, `director`, `exec`, `admin`, `ceo`, `evp`, `marketing` (TSR/champion: phone + PIN).
+
+**API:** `POST /api/auth/google-bridge` on Cloud Run validates the Supabase JWT and returns the same session shape as PIN login.
+
+---
+
 ## Auto-deploy from `master`
 
 | Target | How |
