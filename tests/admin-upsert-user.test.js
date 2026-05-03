@@ -122,14 +122,14 @@ function makeSupabase(scenario) {
   }
 }
 
-function buildEnv({ session = { id: 'mat-uuid', role: 'exec' }, scenario = {} } = {}) {
+function buildEnv({ session = { id: 'mat-uuid', role: 'ceo' }, scenario = {} } = {}) {
   const handlerPath = resetHandler()
   const adminDir = path.join(__dirname, '..', 'api', 'admin')
   const sup = makeSupabase(scenario)
   registerMock(handlerPath, path.join(adminDir, '_admin.js'), {
     requireAdmin: async (_req, res) => {
       if (!session) { res.status(401).json({ error: 'Unauthorized' }); return null }
-      if (!['service','exec','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
+      if (!['service','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
       return session
     },
     getAdminSupabase: () => sup,
@@ -233,6 +233,17 @@ test('upsert_exclude_role_deletes_both_auth_and_public_row', async () => {
 test('upsert_rejects_non_exec_session', async () => {
   const { handler } = buildEnv({
     session: { id: 'dsm-uuid', role: 'dsm' }, scenario: {}
+  })
+  const res = mockRes()
+  await handler(req({
+    slp_code: 17, name: 'X', role: 'dsm', manager_id: null, phone: '09180000017'
+  }), res)
+  assert.equal(res.statusCode, 403)
+})
+
+test('upsert_rejects_exec_session', async () => {
+  const { handler } = buildEnv({
+    session: { id: 'exec-uuid', role: 'exec' }, scenario: {}
   })
   const res = mockRes()
   await handler(req({

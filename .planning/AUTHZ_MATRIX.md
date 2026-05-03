@@ -11,7 +11,7 @@
 | **Service token** | `Authorization: Bearer <HQ_SERVICE_TOKEN>` → synthetic `service` session (`api/_auth.js`) |
 | **applyRoleFilter** | Legacy SQL fragment helper — **national visibility** for many roles until OSLP work completes (`api/_auth.js`) |
 | **scope / _scope.js** | `scope=user:<uuid>` query param — resolves user → `slpCodes` / districts for SAP WHERE clauses (`api/_scope.js`) |
-| **requireAdmin** | `service` \| `exec` \| `ceo` \| `admin` (Sales Admin) \| `evp` (EV Sales) \| `marketing` (Marketing Manager) (`api/admin/_admin.js`) |
+| **requireAdmin** | `service` \| `ceo` \| `admin` (Sales Admin) \| `evp` (EV Sales) \| `marketing` (Marketing Manager) — **not** `exec` (`api/admin/_admin.js`) |
 | **requireDiagAccess** | `exec` \| `ceo` \| `admin` \| `evp` \| `director` OR optional service token if `DIAG_ALLOW_SERVICE_TOKEN=1`; **DISABLE_DIAG=1** → 404 (`api/lib/require-diag-access.js`) |
 
 ## Matrix by route group

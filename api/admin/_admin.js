@@ -21,8 +21,8 @@ const { createClient } = require('@supabase/supabase-js')
 const { verifySession, verifyServiceToken } = require('../_auth')
 
 // 'admin' = Sales Admin; 'evp' = EV Sales leadership; 'marketing' = Marketing Manager.
-// 'exec' / 'ceo' = executive. 'service' = Bearer HQ_SERVICE_TOKEN (Patrol / proxies).
-const ALLOWED_ROLES = new Set(['service', 'exec', 'ceo', 'admin', 'evp', 'marketing'])
+// 'ceo' only among exec-level staff (non-CEO exec is not a user admin). 'service' = Patrol / proxies.
+const ALLOWED_ROLES = new Set(['service', 'ceo', 'admin', 'evp', 'marketing'])
 
 async function requireAdmin(req, res) {
   const session = await verifyServiceToken(req) || await verifySession(req)

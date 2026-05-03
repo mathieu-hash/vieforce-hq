@@ -57,14 +57,14 @@ function makeSupabase(targetRow) {
   }
 }
 
-function buildEnv({ session = { id: 'mat-uuid', role: 'exec' }, targetRow = null } = {}) {
+function buildEnv({ session = { id: 'mat-uuid', role: 'ceo' }, targetRow = null } = {}) {
   const handlerPath = resetHandler()
   const adminDir = path.join(__dirname, '..', 'api', 'admin')
   const sup = makeSupabase(targetRow)
   registerMock(handlerPath, path.join(adminDir, '_admin.js'), {
     requireAdmin: async (_req, res) => {
       if (!session) { res.status(401).json({ error: 'Unauthorized' }); return null }
-      if (!['service','exec','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
+      if (!['service','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
       return session
     },
     getAdminSupabase: () => sup,
@@ -79,7 +79,7 @@ function req(body) { return { method: 'DELETE', headers: {}, body } }
 // ─────────────────────────────────────────────────────────────────────────
 test('remove_user_cannot_delete_self', async () => {
   const { handler, calls } = buildEnv({
-    session: { id: 'mat-uuid', role: 'exec' }
+    session: { id: 'mat-uuid', role: 'ceo' }
   })
   const res = mockRes()
   await handler(req({ user_id: 'mat-uuid' }), res)

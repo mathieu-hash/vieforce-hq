@@ -45,7 +45,7 @@
     state.session = requireAuth();
     if (!state.session) return;
 
-    var allowed = ['exec', 'ceo', 'admin', 'evp', 'marketing'];
+    var allowed = ['ceo', 'admin', 'evp', 'marketing'];
     if (allowed.indexOf(state.session.role) === -1) {
       // Redirect to dashboard with a toast — this page is admin-only.
       alert('Admin access required — redirecting to dashboard.');
