@@ -14,8 +14,8 @@ progress:
 
 Phase: **All roadmap phases — artifacts complete in-repo**  
 Plan: `.planning/ROADMAP.md`  
-Status: Requirements checklist satisfied (see `REQUIREMENTS.md`). Remaining human steps: run **`ADMIN_VALIDATION_CHECKLIST`** on staging; **`npm run smoke`** against prod/staging URL; Patrol owner acknowledges **`PATROL_HQ_CONTRACT.md`**.  
-Last activity: 2026-05-03 — `GCP_SA_KEY` + Cloud Run auto-deploy green; run-sources bucket IAM; Patrol `docs/HQ_API_CONTRACT.md`; smoke + checklist pre-checks recorded
+Status: Requirements checklist satisfied (see `REQUIREMENTS.md`). **GSD execution lane:** roadmap phases 1–4 are **closed in-repo** — you are in **UAT / milestone closeout** (not a numbered roadmap phase). Remaining human steps: complete **`ADMIN_VALIDATION_CHECKLIST`** flows A1–A6 on staging; confirm Patrol stakeholder read of **`PATROL_HQ_CONTRACT.md`** (mirror: `vieforce-patrol` `docs/HQ_API_CONTRACT.md`). Automated pre-checks (smoke, deploy workflow) are already recorded in that checklist.  
+Last activity: 2026-05-03 — GSD resume; session continuity updated
 
 ## Accumulated context
 
@@ -29,3 +29,10 @@ Last activity: 2026-05-03 — `GCP_SA_KEY` + Cloud Run auto-deploy green; run-so
 ## Working assumptions
 
 - Beta targets **controlled user group** (internal + pilot DSM/TSR), not open internet scale.
+
+## Session continuity
+
+- **Last session:** 2026-05-03 — resumed GSD after deploy + Patrol doc work.  
+- **Stopped at:** Milestone **v1.0 Beta** — `ready-for-uat`; no `HANDOFF.json`, no `.planning/phases/*` checkpoints.  
+- **Resume file:** none (flat `.planning/` only).  
+- **Next up:** run **`/gsd-verify-work`** (or walk `.planning/ADMIN_VALIDATION_CHECKLIST.md`), then **`/gsd-audit-milestone`** → **`/gsd-complete-milestone`** when sign-off is real.
