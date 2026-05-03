@@ -5,24 +5,28 @@
  * Symptom if HQ is missing: after Google OAuth, Supabase shows a black page
  * "Error: Forbidden" — redirectTo is not in uri_allow_list.
  *
- * Patrol's OAuth uses vieforce-patrol.vercel.app; HQ uses vieforce-hq.vercel.app.
- * Both must appear in the same project config.
+ * Patrol OAuth uses redirectTo → vieforce-patrol (must stay in uri_allow_list).
+ * HQ OAuth uses redirectTo → vieforce-hq; Supabase **site_url** should be HQ so
+ * GoTrue’s hostname check accepts HQ redirects (see supabase/auth GetReferrer).
  *
  * Usage (PowerShell):
  *   $env:SUPABASE_ACCESS_TOKEN = "<PAT from https://supabase.com/dashboard/account/tokens>"
  *   node scripts/patch-supabase-auth-url.mjs
  *
  * Optional overrides:
- *   SUPABASE_PROJECT_REF   (default: yolxcmeoovztuindrglk — must match js/supabase.js project)
- *   PATROL_SITE_URL        primary site_url (default: https://vieforce-patrol.vercel.app)
- *   AUTH_URI_ALLOW_LIST    comma-separated patterns (default merges Patrol + HQ + localhost)
+ *   SUPABASE_PROJECT_REF     (default: yolxcmeoovztuindrglk — must match js/supabase.js project)
+ *   SUPABASE_AUTH_SITE_URL   auth site_url (default: https://vieforce-hq.vercel.app) — see header comment
+ *   AUTH_URI_ALLOW_LIST      comma-separated patterns (default merges Patrol + HQ + localhost)
  */
 const API = 'https://api.supabase.com'
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'yolxcmeoovztuindrglk'
-const SITE_URL = (process.env.PATROL_SITE_URL || 'https://vieforce-patrol.vercel.app').replace(
-  /\/$/,
-  ''
-)
+// MUST be vieforce-hq hostname so GoTrue accepts redirect_to from HQ without relying on glob
+// matching (shared project used to set this to Patrol → OAuth always returned to Patrol).
+const SITE_URL = (
+  process.env.SUPABASE_AUTH_SITE_URL ||
+  process.env.PATROL_SITE_URL ||
+  'https://vieforce-hq.vercel.app'
+).replace(/\/$/, '')
 const URI_ALLOW_LIST =
   process.env.AUTH_URI_ALLOW_LIST ||
   [
