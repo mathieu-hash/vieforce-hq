@@ -19,6 +19,9 @@
     { v: 'director',  label: 'Director' },
     { v: 'exec',      label: 'Exec' },
     { v: 'ceo',       label: 'CEO' },
+    { v: 'evp',       label: 'EVP / EV Sales' },
+    { v: 'marketing', label: 'Marketing Manager' },
+    { v: 'admin',     label: 'Sales Admin' },
     { v: 'exclude',   label: '— Exclude' }
   ];
 
@@ -42,7 +45,7 @@
     state.session = requireAuth();
     if (!state.session) return;
 
-    var allowed = ['exec', 'ceo', 'admin'];
+    var allowed = ['exec', 'ceo', 'admin', 'evp', 'marketing'];
     if (allowed.indexOf(state.session.role) === -1) {
       // Redirect to dashboard with a toast — this page is admin-only.
       alert('Admin access required — redirecting to dashboard.');

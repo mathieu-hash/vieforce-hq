@@ -1,7 +1,7 @@
 // Shared helpers for /api/admin/* endpoints.
 //
 // - requireAdmin(req, res): resolves session via service-token OR user session,
-//   then enforces role ∈ ('service','exec','ceo'). Returns the session on
+//   then enforces role ∈ ALLOWED_ROLES (see below). Returns the session on
 //   success; calls res.status(...).json(...) and returns null on failure so
 //   the caller can early-return with a terse `if (!session) return`.
 //
@@ -20,10 +20,9 @@
 const { createClient } = require('@supabase/supabase-js')
 const { verifySession, verifyServiceToken } = require('../_auth')
 
-// 'admin' is a non-SAP app-level role (e.g. Sales Assistant) and is granted
-// portal access equivalent to exec/ceo. 'service' is the synthetic session
-// used by Bearer HQ_SERVICE_TOKEN calls from Patrol/internal proxies.
-const ALLOWED_ROLES = new Set(['service', 'exec', 'ceo', 'admin'])
+// 'admin' = Sales Admin; 'evp' = EV Sales leadership; 'marketing' = Marketing Manager.
+// 'exec' / 'ceo' = executive. 'service' = Bearer HQ_SERVICE_TOKEN (Patrol / proxies).
+const ALLOWED_ROLES = new Set(['service', 'exec', 'ceo', 'admin', 'evp', 'marketing'])
 
 async function requireAdmin(req, res) {
   const session = await verifyServiceToken(req) || await verifySession(req)
