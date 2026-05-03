@@ -1,5 +1,12 @@
 # Deploy & operations runbook (OPS-01 — OPS-03)
 
+## Auto-deploy from `master`
+
+| Target | How |
+|--------|-----|
+| **Static UI (Vercel)** | Git repository is connected to the Vercel project. GitHub **default branch is `master`** — pushes to `master` trigger production deployments. Confirm in Vercel → Project → Settings → Git: production branch matches `master`. |
+| **API (Cloud Run)** | Workflow **`.github/workflows/deploy-cloud-run.yml`** runs on every push to `master`. Add GitHub Actions secret **`GCP_SA_KEY`** (JSON key for a service account that can deploy to Cloud Run and run Cloud Build for `--source` deploys). Without the secret, that workflow fails until you add it; **CI** (tests) is unchanged. After deploy, the workflow runs **`gcloud run services update-traffic … --to-latest`** so traffic is not left on an old revision. |
+
 ## Deploy order (OPS-01)
 
 1. **Supabase** — apply pending SQL from `migrations/` (RLS, locks). Confirm with `supabase db push` or dashboard SQL if not automated.  
