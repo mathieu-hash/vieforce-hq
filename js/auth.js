@@ -8,32 +8,37 @@ var GOOGLE_BRIDGE_API = AUTH_API.replace(/\/login\/?$/i, '') + '/google-bridge';
 var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
 
 /**
- * OAuth redirect target after Google → Supabase callback.
- * MUST appear verbatim (or via matching wildcard) in Supabase Dashboard → Auth → URL Configuration.
- * If this URL is not allowed, Supabase sends the user to the project Site URL (Patrol) instead.
+ * OAuth redirect after Google → Supabase (PKCE ?code= lands here).
+ * Add EXACT production URL to Supabase Redirect URLs:
+ *   https://vieforce-hq.vercel.app/auth/callback.html
+ * Also set Site URL to https://vieforce-hq.vercel.app — otherwise GoTrue may fall back
+ * to Patrol and you will never hit this page.
  */
 function getHqOAuthRedirectUrl() {
   var host = '';
   try {
     host = String(window.location.hostname || '').toLowerCase();
   } catch (e) {}
-  var origin = '';
-  try {
-    origin = String(window.location.origin || '').replace(/\/$/, '');
-  } catch (e2) {}
-  // Local dev: OAuth must finish on the deployed HTTPS origin (same as index.html Google button).
+  var path = '/auth/callback.html';
   if (host === 'localhost' || host === '127.0.0.1') {
-    origin = 'https://vieforce-hq.vercel.app';
+    return 'https://vieforce-hq.vercel.app' + path;
   }
-  if (!origin) origin = 'https://vieforce-hq.vercel.app';
-  // Production + Vercel previews: use this page’s origin so redirect_to matches allow-list entries.
-  if (host === 'vieforce-hq.vercel.app' || host.indexOf('vieforce-hq') !== -1) {
+  if (host === 'vieforce-hq.vercel.app') {
+    return 'https://vieforce-hq.vercel.app' + path;
+  }
+  if (host.indexOf('vieforce-hq') !== -1) {
+    var origin = '';
     try {
       origin = String(window.location.origin || '').replace(/\/$/, '');
-    } catch (e3) {}
-    if (!origin) origin = 'https://vieforce-hq.vercel.app';
+    } catch (e2) {}
+    if (origin) return origin + path;
   }
-  return origin + '/index.html';
+  var o = '';
+  try {
+    o = String(window.location.origin || '').replace(/\/$/, '');
+  } catch (e3) {}
+  if (o) return o + path;
+  return 'https://vieforce-hq.vercel.app' + path;
 }
 
 async function isGoogleProviderEnabled() {

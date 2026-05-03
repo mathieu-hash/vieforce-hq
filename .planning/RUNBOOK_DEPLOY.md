@@ -16,7 +16,8 @@ Configure:
 1. **Site URL** (Authentication → URL Configuration): `https://vieforce-hq.vercel.app`  
 2. **Redirect URLs** (additional allow list), at least:
    - `https://vieforce-patrol.vercel.app/**` (required for Patrol `redirectTo`)
-   - `https://vieforce-hq.vercel.app/**` (previews / extra paths)
+   - `https://vieforce-hq.vercel.app/auth/callback.html**` (HQ Google return; `**` matches `?code=…` from Supabase)
+   - `https://vieforce-hq.vercel.app/**` (previews / fallback)
    - `http://localhost:3000/**` (optional dev)
 
 **Trade-off:** Auth email links that use the default Site URL now point at HQ, not Patrol. If you rely on Patrol-specific email flows, customize templates or set `emailRedirectTo` in those calls.

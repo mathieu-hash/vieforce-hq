@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VieForce HQ — Signing in</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+</head>
+<body style="font-family: Montserrat, system-ui, sans-serif; background: #003350; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0;">
+  <p id="hqOauthMsg" style="font-size: 15px; opacity: 0.9;">Completing sign-in…</p>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/js/supabase.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    (async function () {
+      try {
+        if (typeof maybeHandleGoogleLoginOnLoad !== 'function') {
+          window.location.replace('/index.html');
+          return;
+        }
+        var oauth = await maybeHandleGoogleLoginOnLoad();
+        if (oauth && oauth.ok) {
+          window.location.replace('/app.html');
+          return;
+        }
+        if (oauth && oauth.handled && oauth.error) {
+          try {
+            sessionStorage.setItem('hq_google_oauth_err', oauth.error);
+          } catch (e) {}
+          window.location.replace('/index.html');
+          return;
+        }
+        window.location.replace('/index.html');
+      } catch (e) {
+        try {
+          sessionStorage.setItem('hq_google_oauth_err', (e && e.message) ? e.message : 'Sign-in failed');
+        } catch (e2) {}
+        window.location.replace('/index.html');
+      }
+    })();
+  </script>
+</body>
+</html>
