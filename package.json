@@ -6,7 +6,8 @@
     "start": "node server.js",
     "test": "node scripts/run-tests.mjs",
     "ci:scan": "node scripts/ci-scan-client.mjs",
-    "smoke": "node scripts/smoke-api.mjs"
+    "smoke": "node scripts/smoke-api.mjs",
+    "fix:supabase-auth-url": "node scripts/patch-supabase-auth-url.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

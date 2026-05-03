@@ -4,10 +4,16 @@
 
 Shared Supabase project: enable **Google** provider under Authentication → Providers (already on for Patrol).
 
-**Redirect URLs** (Authentication → URL Configuration) must include:
+**Redirect URLs** (Authentication → URL Configuration → **Redirect URLs**) must allow **both** apps. If HQ is missing, Google OAuth ends on a Supabase page **“Error: Forbidden”** (HTTP 403) with an empty **ID** — that is *not* the google-bridge API; it is the redirect URL blocked before your app loads.
 
-- `https://vieforce-hq.vercel.app/index.html`
-- `https://vieforce-patrol.vercel.app/index.html` (Patrol)
+Add at least:
+
+- `https://vieforce-hq.vercel.app/**` (covers `index.html` and query params)
+- `https://vieforce-patrol.vercel.app/**` (Patrol)
+
+**One-shot via Management API** (merges both origins; requires `SUPABASE_ACCESS_TOKEN`):
+
+`npm run fix:supabase-auth-url` (see `scripts/patch-supabase-auth-url.mjs`).
 
 **User records:** `public.users.email` must match the person’s **@vienovo.ph** Google email or bridge returns *not linked*. Manager/staff roles allowed for Google on HQ: `dsm`, `rsm`, `director`, `exec`, `admin`, `ceo`, `evp`, `marketing` (TSR/champion: phone + PIN).
 
