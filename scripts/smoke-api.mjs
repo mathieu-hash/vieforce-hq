@@ -13,8 +13,8 @@ const TIMEOUT_MS = 15000
 
 const PATHS = [
   { path: '/', allowed: [200] },
-  // After Phase 1 deploy: expect 401 only. 200 = legacy open diag (warn); 404 = DISABLE_DIAG.
-  { path: '/api/diag', allowed: [200, 401, 404], warnStatus: 200 },
+  // Gated diag: unauthenticated must not see SAP probes (401). 404 = DISABLE_DIAG=1.
+  { path: '/api/diag', allowed: [401, 404] },
   { path: '/api/dashboard?period=MTD&region=ALL', allowed: [200, 401] },
   { path: '/api/sales?period=MTD&region=ALL', allowed: [200, 401] }
 ]
@@ -41,7 +41,7 @@ async function main() {
   }
 
   let failed = false
-  for (const { path: rel, allowed, warnStatus } of PATHS) {
+  for (const { path: rel, allowed } of PATHS) {
     let status
     try {
       status = await probe(rel)
@@ -54,11 +54,7 @@ async function main() {
       console.error(`FAIL ${rel}: HTTP ${status} (expected one of ${allowed.join(',')})`)
       failed = true
     } else {
-      const tag = warnStatus === status ? 'WARN' : 'OK '
-      console.log(`${tag}  ${rel}: HTTP ${status}`)
-      if (warnStatus === status) {
-        console.warn('      ↑ Deploy gated /api/diag — open diagnostic still reachable')
-      }
+      console.log(`OK   ${rel}: HTTP ${status}`)
     }
   }
 

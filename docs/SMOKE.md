@@ -11,7 +11,7 @@ HQ_API_URL=https://<your-cloud-run-host>.run.app node scripts/smoke-api.mjs
 | Path | Expected (no session) |
 |------|------------------------|
 | `GET /` | 200 |
-| `GET /api/diag` | **401** once Phase 1 is deployed; **200** prints a WARN until then (legacy open diag) |
+| `GET /api/diag` | **401** unauthenticated (gated); **404** if `DISABLE_DIAG=1` |
 | `GET /api/dashboard?...` | 401 or 200 depending on route auth |
 | `GET /api/sales?...` | 401 or 200 |
 
