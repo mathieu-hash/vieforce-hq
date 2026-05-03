@@ -2,6 +2,13 @@
 
 Run against **staging** Supabase + SAP connectivity (or dry-run with test users only). Check each box when verified.
 
+## Automated pre-checks (before manual flows)
+
+| Check | Command / link | Record |
+|-------|----------------|--------|
+| API smoke (no auth) | `HQ_API_URL=https://vieforce-hq-api-1057619753074.asia-southeast1.run.app npm run smoke` | 2026-05-03 — all probes OK (401 on `/api/diag`, 401 on protected API paths) |
+| GitHub deploy | [Deploy Cloud Run (API) workflow](https://github.com/mathieu-hash/vieforce-hq/actions/workflows/deploy-cloud-run.yml) green on `master` | Verify latest run after your push |
+
 ## Preconditions
 
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, SAP vars set on API runtime  

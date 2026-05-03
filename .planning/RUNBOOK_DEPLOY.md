@@ -5,7 +5,7 @@
 | Target | How |
 |--------|-----|
 | **Static UI (Vercel)** | Git repository is connected to the Vercel project. GitHub **default branch is `master`** — pushes to `master` trigger production deployments. Confirm in Vercel → Project → Settings → Git: production branch matches `master`. |
-| **API (Cloud Run)** | Workflow **`.github/workflows/deploy-cloud-run.yml`** runs on every push to `master`. Add GitHub Actions secret **`GCP_SA_KEY`** (JSON key for a service account that can deploy to Cloud Run and run Cloud Build for `--source` deploys). Without the secret, that workflow fails until you add it; **CI** (tests) is unchanged. After deploy, the workflow runs **`gcloud run services update-traffic … --to-latest`** so traffic is not left on an old revision. |
+| **API (Cloud Run)** | Workflow **`.github/workflows/deploy-cloud-run.yml`** runs on every push to `master`. Uses GitHub secret **`GCP_SA_KEY`** (JSON for **`github-vieforce-hq-deploy@vieforce-vpi.iam.gserviceaccount.com`** or a replacement SA with the same duties). **GCP setup:** enable **Cloud Resource Manager API** on the project; grant the SA `run.admin`, `cloudbuild.builds.editor`, `iam.serviceAccountUser`, `artifactregistry.writer`, and **`storage.admin` on bucket `gs://run-sources-vieforce-vpi-asia-southeast1`** (Cloud Run’s source staging bucket uses legacy ACLs tied to `projectEditor`, so project-level `storage.admin` alone is not enough). After deploy, the workflow runs **`gcloud run services update-traffic … --to-latest`**. |
 
 ## Deploy order (OPS-01)
 

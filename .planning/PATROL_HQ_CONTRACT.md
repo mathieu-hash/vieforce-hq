@@ -48,7 +48,7 @@ Patrol maintainers confirm in substance:
 - **Change discipline:** additive vs semantic changes per protocol above; coordinate and update Patrol tests / CHANGELOG when behavior or response shapes break.  
 - **Diagnostics:** `GET /api/diag` is **not** part of the mobile contract; HQ-side / diagnostics only when explicitly allowed by HQ env.
 
-*Optional mirror:* a one-line pointer in `vieforce-patrol` (e.g. `docs/HQ_API_CONTRACT.md` linking here) can be added separately.
+*Patrol mirror:* [`vieforce-patrol` → `docs/HQ_API_CONTRACT.md`](https://github.com/mathieu-hash/vieforce-patrol/blob/main/docs/HQ_API_CONTRACT.md) points here.
 
 ---
 
