@@ -15,7 +15,7 @@ progress:
 Phase: **All roadmap phases — artifacts complete in-repo**  
 Plan: `.planning/ROADMAP.md`  
 Status: Requirements checklist satisfied (see `REQUIREMENTS.md`). Remaining human steps: run **`ADMIN_VALIDATION_CHECKLIST`** on staging; **`npm run smoke`** against prod/staging URL; Patrol owner acknowledges **`PATROL_HQ_CONTRACT.md`**.  
-Last activity: 2026-05-03 — Vercel Git connected; Cloud Run deploy workflow on `master`; smoke, Patrol contract, README
+Last activity: 2026-05-03 — `GCP_SA_KEY` + Cloud Run auto-deploy green; run-sources bucket IAM; Patrol `docs/HQ_API_CONTRACT.md`; smoke + checklist pre-checks recorded
 
 ## Accumulated context
 
