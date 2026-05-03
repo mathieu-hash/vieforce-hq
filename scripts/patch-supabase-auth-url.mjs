@@ -28,6 +28,8 @@ const URI_ALLOW_LIST =
   [
     'https://vieforce-patrol.vercel.app/**',
     'https://vieforce-hq.vercel.app/**',
+    // Exact path avoids wildcard edge cases where redirect_to falls back to Site URL (Patrol).
+    'https://vieforce-hq.vercel.app/index.html',
     'http://localhost:3000/**',
     'http://127.0.0.1:3000/**',
   ].join(',')

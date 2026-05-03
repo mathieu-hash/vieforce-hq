@@ -4,11 +4,17 @@
 
 Shared Supabase project: enable **Google** provider under Authentication → Providers (already on for Patrol).
 
-**Redirect URLs** (Authentication → URL Configuration → **Redirect URLs**) must allow **both** apps. If HQ is missing, Google OAuth ends on a Supabase page **“Error: Forbidden”** (HTTP 403) with an empty **ID** — that is *not* the google-bridge API; it is the redirect URL blocked before your app loads.
+**Redirect URLs** (Authentication → URL Configuration → **Redirect URLs**) must allow **both** apps.
+
+| Symptom | Cause |
+|--------|--------|
+| **“Error: Forbidden”** (black page, empty ID) | `redirect_to` not allowed at all. |
+| **Google finishes but you land on Patrol** | `redirect_to` for HQ still not accepted; Supabase falls back to **Site URL** (often set to Patrol). Add the **exact** callback below and/or fix the list (no typos, no missing `https`). |
 
 Add at least:
 
-- `https://vieforce-hq.vercel.app/**` (covers `index.html` and query params)
+- `https://vieforce-hq.vercel.app/**`
+- `https://vieforce-hq.vercel.app/index.html` (explicit — recommended)
 - `https://vieforce-patrol.vercel.app/**` (Patrol)
 
 **One-shot via Management API** (merges both origins; requires `SUPABASE_ACCESS_TOKEN`):

@@ -7,6 +7,11 @@ var AUTH_API = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/ap
 var GOOGLE_BRIDGE_API = AUTH_API.replace(/\/login\/?$/i, '') + '/google-bridge';
 var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
 
+/**
+ * OAuth redirect target after Google → Supabase callback.
+ * MUST appear verbatim (or via matching wildcard) in Supabase Dashboard → Auth → URL Configuration.
+ * If this URL is not allowed, Supabase sends the user to the project Site URL (Patrol) instead.
+ */
 function getHqOAuthRedirectUrl() {
   var host = '';
   try {
@@ -16,10 +21,18 @@ function getHqOAuthRedirectUrl() {
   try {
     origin = String(window.location.origin || '').replace(/\/$/, '');
   } catch (e2) {}
+  // Local dev: OAuth must finish on the deployed HTTPS origin (same as index.html Google button).
   if (host === 'localhost' || host === '127.0.0.1') {
     origin = 'https://vieforce-hq.vercel.app';
   }
   if (!origin) origin = 'https://vieforce-hq.vercel.app';
+  // Production + Vercel previews: use this page’s origin so redirect_to matches allow-list entries.
+  if (host === 'vieforce-hq.vercel.app' || host.indexOf('vieforce-hq') !== -1) {
+    try {
+      origin = String(window.location.origin || '').replace(/\/$/, '');
+    } catch (e3) {}
+    if (!origin) origin = 'https://vieforce-hq.vercel.app';
+  }
   return origin + '/index.html';
 }
 
