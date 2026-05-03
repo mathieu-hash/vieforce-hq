@@ -35,9 +35,20 @@ Derived from Patrol repo tests and HQ handlers — keep stable:
 | Track | Statement | Date |
 |-------|-----------|------|
 | **HQ (`vieforce-hq`)** | **Acknowledged.** The VieForce HQ codebase and API maintainers accept this document as the working contract for Patrol integration: `HQ_SERVICE_TOKEN` for S2S auth, `scope=user:<uuid>` for territory-scoped SAP reads, breaking-change protocol above, and no reliance on `/api/diag` from mobile. | 2026-05-03 |
-| **Patrol (`vieforce-patrol`)** | *Recommended:* Patrol owner adds a one-line confirmation (PR comment, issue, or edit to this table) when the mobile track has read and agrees. | — |
+| **Patrol (`vieforce-patrol`)** | **Acknowledged.** The VieForce Patrol track accepts this document as the working integration contract: server-side calls use `Authorization: Bearer <HQ_SERVICE_TOKEN>`; territory-scoped SAP reads use `scope=user:<supabase_user_uuid>`; additive vs semantic changes follow the breaking-change protocol above; Patrol mobile does not rely on `GET /api/diag` (diag remains server/diagnostics only per HQ env). | 2026-05-01 |
 
-*Recorded at user request via Cursor; HQ side treated as binding for future HQ changes affecting Patrol.*
+*HQ row recorded 2026-05-03; Patrol row recorded 2026-05-01 (Patrol session). Both tracks binding for coordinated changes.*
+
+### Patrol track sign-off (detail)
+
+Patrol maintainers confirm in substance:
+
+- **S2S auth:** `Authorization: Bearer <HQ_SERVICE_TOKEN>` for Patrol → HQ.  
+- **Territory scope:** `scope=user:<supabase_user_uuid>` for scoped SAP reads (aligned with HQ `api/_scope.js`).  
+- **Change discipline:** additive vs semantic changes per protocol above; coordinate and update Patrol tests / CHANGELOG when behavior or response shapes break.  
+- **Diagnostics:** `GET /api/diag` is **not** part of the mobile contract; HQ-side / diagnostics only when explicitly allowed by HQ env.
+
+*Optional mirror:* a one-line pointer in `vieforce-patrol` (e.g. `docs/HQ_API_CONTRACT.md` linking here) can be added separately.
 
 ---
 
