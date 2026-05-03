@@ -4,7 +4,9 @@
   "description": "VieForce HQ — Sales Intelligence & BI Dashboard",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/"
+    "test": "node scripts/run-tests.mjs",
+    "ci:scan": "node scripts/ci-scan-client.mjs",
+    "smoke": "node scripts/smoke-api.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

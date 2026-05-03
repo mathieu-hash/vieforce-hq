@@ -58,6 +58,7 @@ const adminSapRepsHandler     = require('./api/admin/sap-reps')
 const adminUpsertUserHandler  = require('./api/admin/upsert-user')
 const adminResetPinHandler    = require('./api/admin/reset-pin')
 const adminRemoveUserHandler  = require('./api/admin/remove-user')
+const authLoginHandler        = require('./api/auth/login')
 
 // Mount routes
 app.get('/api/dashboard', dashboardHandler)
@@ -83,6 +84,9 @@ app.get('/api/dsm/home', dsmHomeHandler)
 app.get('/api/analytics/sku-matrix',      skuMatrixHandler)
 app.get('/api/analytics/brand-coverage',  brandCoverageHandler)
 app.get('/api/analytics/buying-patterns', buyingPatternsHandler)
+
+// Auth — server-side PIN verification (rate-limited)
+app.post('/api/auth/login', authLoginHandler)
 
 // Admin portal — /pg-admin-team.html
 app.get('/api/admin/sap-reps',     adminSapRepsHandler)
