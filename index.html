@@ -224,6 +224,15 @@
 
     (async function initIndexAuth() {
       try {
+        var pendingErr = '';
+        try {
+          pendingErr = sessionStorage.getItem('hq_google_oauth_err') || '';
+          if (pendingErr) sessionStorage.removeItem('hq_google_oauth_err');
+        } catch (se) {}
+        if (pendingErr) {
+          errorEl.textContent = pendingErr;
+          errorEl.classList.add('visible');
+        }
         if (typeof maybeHandleGoogleLoginOnLoad === 'function') {
           var oauth = await maybeHandleGoogleLoginOnLoad();
           if (oauth && oauth.handled && oauth.error) {
