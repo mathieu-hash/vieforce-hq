@@ -12,7 +12,7 @@ Run against **staging** Supabase + SAP connectivity (or dry-run with test users 
 ## Preconditions
 
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, SAP vars set on API runtime  
-- [ ] Logged in as **exec** or **ceo** session in `pg-admin-team.html`  
+- [ ] Logged in with a role that may manage users: **CEO**, **exec**, **evp** (EV Sales), **marketing** (Marketing Manager), **admin** (Sales Admin), or **service** token — see `.planning/AUTHZ_MATRIX.md`  
 - [ ] Test phone numbers are **not** production exec phones unless agreed  
 
 ## Flows

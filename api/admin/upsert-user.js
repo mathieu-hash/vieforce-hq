@@ -6,7 +6,7 @@
 //     phone: string, create_auth_user?: bool }
 //
 // slp_code is REQUIRED for SAP roles (tsr/dsm/rsm/director) and exclude.
-// slp_code may be null for non-SAP roles (admin/exec/ceo/evp) — these staff
+// slp_code may be null for non-SAP roles (admin/exec/ceo/evp/marketing) — these staff
 // do not have an OSLP entry (Sales assistants, EVP, CEO, system admins).
 //
 // Logic:
@@ -25,8 +25,8 @@
 
 const { requireAdmin, getAdminSupabase, setCors, adminConfigError } = require('./_admin')
 
-const VALID_ROLES = new Set(['tsr', 'dsm', 'rsm', 'director', 'exec', 'ceo', 'admin', 'evp', 'exclude'])
-const NON_SAP_ROLES = new Set(['admin', 'exec', 'ceo', 'evp'])
+const VALID_ROLES = new Set(['tsr', 'dsm', 'rsm', 'director', 'exec', 'ceo', 'admin', 'evp', 'marketing', 'exclude'])
+const NON_SAP_ROLES = new Set(['admin', 'exec', 'ceo', 'evp', 'marketing'])
 const DEFAULT_PIN = '1234'
 
 // Convert PH local format (09xxxxxxxxx) to E.164 (+639xxxxxxxxx) for Supabase
@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
 
   if (!VALID_ROLES.has(role)) return badRequest(res, 'Invalid role')
 
-  // slp_code is optional for non-SAP roles (admin/exec/ceo/evp), required for
+  // slp_code is optional for non-SAP roles (admin/exec/ceo/evp/marketing), required for
   // SAP roles (tsr/dsm/rsm/director) and for the 'exclude' delete path.
   const rawSlp = body.slp_code
   const slpProvided = rawSlp !== null && rawSlp !== undefined && rawSlp !== ''

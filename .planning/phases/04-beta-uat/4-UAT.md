@@ -3,22 +3,26 @@ status: testing
 phase: 04-beta-uat
 source: ADMIN_VALIDATION_CHECKLIST.md, ROADMAP.md (Phases 3–4)
 started: 2026-05-03T12:15:00Z
-updated: 2026-05-03T12:15:00Z
+updated: 2026-05-03T12:45:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: Staging preconditions (env + session)
+number: 2
+name: A1 — SAP reps list
 expected: |
-  On the **staging** API you will use for admin UAT: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and SAP-related env vars are set on the runtime. In the browser you have an **exec** or **ceo** session open on `pg-admin-team.html` (or the same admin surface you use for team management) against that API. Test phone numbers are **not** production exec phones unless you have explicitly agreed to that risk.
+  As an authorized user managing the team (CEO, exec, evp / EV Sales, marketing / Marketing Manager, admin / Sales Admin, or service token), loading or calling `/api/admin/sap-reps` returns SAP rep rows consistent with your staging SAP data (not an auth error).
 awaiting: user response
+
+## Stakeholder notes (2026-05-03)
+
+- **User management page:** intended roles — **CEO**, **exec**, **evp** (EV Sales), **marketing** (Marketing Manager), **admin** (Sales Admin). Implemented in `api/admin/_admin.js` + `marketing` upsert support in `api/admin/upsert-user.js`; matrix updated in `.planning/AUTHZ_MATRIX.md`.
 
 ## Tests
 
 ### 1. Staging preconditions (env + session)
 expected: Staging API has Supabase + SAP env configured; exec/ceo admin UI session; safe test phones only.
-result: [pending]
+result: pass
 
 ### 2. A1 — SAP reps list
 expected: As authorized admin, `/api/admin/sap-reps` returns SAP rep rows (matches your staging SAP data).
@@ -40,16 +44,16 @@ result: [pending]
 expected: Remove returns 200; user can no longer log in; rows cleaned per API semantics.
 result: [pending]
 
-### 7. A6 — Non-exec cannot upsert
-expected: A non-exec / unprivileged session calling the admin upsert (or equivalent) gets **403 or 401**, not success.
+### 7. A6 — Field role cannot manage users
+expected: A session with a **field role** (e.g. **tsr**, **dsm**, **rsm**) calling admin upsert or `/api/admin/sap-reps` gets **403 or 401**, not a successful mutate/list that only exec-level staff should have.
 result: [pending]
 
 ## Summary
 
 total: 7
-passed: 0
+passed: 1
 issues: 0
-pending: 7
+pending: 6
 skipped: 0
 blocked: 0
 

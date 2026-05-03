@@ -73,7 +73,7 @@ function buildEnv({ session = { id: 'mat-uuid', role: 'exec' }, scenario = {} } 
   registerMock(handlerPath, path.join(adminDir, '_admin.js'), {
     requireAdmin: async (_req, res) => {
       if (!session) { res.status(401).json({ error: 'Unauthorized' }); return null }
-      if (!['service','exec','ceo','admin'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
+      if (!['service','exec','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
       return session
     },
     getAdminSupabase: () => sup,
