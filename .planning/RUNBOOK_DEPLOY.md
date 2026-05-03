@@ -9,17 +9,19 @@ Shared Supabase project: enable **Google** provider under Authentication → Pro
 | Symptom | Cause |
 |--------|--------|
 | **“Error: Forbidden”** (black page, empty ID) | `redirect_to` not allowed at all. |
-| **Google finishes but you land on Patrol** | `redirect_to` for HQ still not accepted; Supabase falls back to **Site URL** (often set to Patrol). Add the **exact** callback below and/or fix the list (no typos, no missing `https`). |
+| **Google finishes but you land on Patrol** | Supabase **Site URL** was set to Patrol. During OAuth, if `redirect_to` is not treated as valid, GoTrue stores **Site URL** as the return target — so you always end on Patrol. **Fix:** set **Site URL** to `https://vieforce-hq.vercel.app` (HQ). GoTrue then accepts any `redirect_to` on that **same hostname** without glob edge cases. Keep Patrol in **Redirect URLs** so Patrol’s Google flow still works. |
 
-Add at least:
+Configure:
 
-- `https://vieforce-hq.vercel.app/**`
-- `https://vieforce-hq.vercel.app/index.html` (explicit — recommended)
-- `https://vieforce-patrol.vercel.app/**` (Patrol)
+1. **Site URL** (Authentication → URL Configuration): `https://vieforce-hq.vercel.app`  
+2. **Redirect URLs** (additional allow list), at least:
+   - `https://vieforce-patrol.vercel.app/**` (required for Patrol `redirectTo`)
+   - `https://vieforce-hq.vercel.app/**` (previews / extra paths)
+   - `http://localhost:3000/**` (optional dev)
 
-**One-shot via Management API** (merges both origins; requires `SUPABASE_ACCESS_TOKEN`):
+**Trade-off:** Auth email links that use the default Site URL now point at HQ, not Patrol. If you rely on Patrol-specific email flows, customize templates or set `emailRedirectTo` in those calls.
 
-`npm run fix:supabase-auth-url` (see `scripts/patch-supabase-auth-url.mjs`).
+**One-shot (Management API):** `SUPABASE_ACCESS_TOKEN=sbp_... npm run fix:supabase-auth-url` — sets `site_url` to HQ and merged `uri_allow_list` (see `scripts/patch-supabase-auth-url.mjs`).
 
 **User records:** `public.users.email` must match the person’s **@vienovo.ph** Google email or bridge returns *not linked*. Manager/staff roles allowed for Google on HQ: `dsm`, `rsm`, `director`, `exec`, `admin`, `ceo`, `evp`, `marketing` (TSR/champion: phone + PIN).
 
