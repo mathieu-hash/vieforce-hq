@@ -1,0 +1,39 @@
+# Production API on Google Cloud Run. Runs on every push to master (after CI).
+# Requires repo secret: GCP_SA_KEY (JSON for a service account with Cloud Run +
+# Cloud Build permissions for source deploys). Until that secret exists, this
+# workflow fails independently of CI — see .planning/RUNBOOK_DEPLOY.md.
+
+name: Deploy Cloud Run (API)
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloud-run-master
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: vieforce-vpi
+  REGION: asia-southeast1
+  SERVICE: vieforce-hq-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy service from source and route traffic to latest
+        run: |
+          set -euo pipefail
+          gcloud config set project "$GCP_PROJECT"
+          gcloud run deploy "$SERVICE" --source . --region "$REGION" --quiet
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest --quiet

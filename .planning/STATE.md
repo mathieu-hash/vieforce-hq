@@ -15,11 +15,11 @@ progress:
 Phase: **All roadmap phases — artifacts complete in-repo**  
 Plan: `.planning/ROADMAP.md`  
 Status: Requirements checklist satisfied (see `REQUIREMENTS.md`). Remaining human steps: run **`ADMIN_VALIDATION_CHECKLIST`** on staging; **`npm run smoke`** against prod/staging URL; Patrol owner acknowledges **`PATROL_HQ_CONTRACT.md`**.  
-Last activity: 2026-05-03 — Phases 2–4: CI Windows job, smoke script, session strategy, Beta scope, runbook, Patrol contract, README
+Last activity: 2026-05-03 — Vercel Git connected; Cloud Run deploy workflow on `master`; smoke, Patrol contract, README
 
 ## Accumulated context
 
-- HQ git branch: `design-upgrade` (confirm before production deploy).
+- HQ production git branch: **`master`**. Vercel auto-deploys from Git; Cloud Run uses `.github/workflows/deploy-cloud-run.yml` once **`GCP_SA_KEY`** is set.
 - Patrol (`vieforce-patrol` v3.1.0-beta.1) developed in parallel — coordinate API contract changes.
 
 ## Blockers
