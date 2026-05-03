@@ -58,7 +58,7 @@ const OSLP_ROWS = [
   { SlpCode: 34, SlpName: 'VACANT - ILOCOS',     U_rsm: 10, U_director: 3, Memo: 'EDFREY BUENAVENTURA', Active: 'Y' }
 ]
 
-function buildEnv({ session = { id: 'mat-uuid', role: 'exec' }, supabaseUsers = [] } = {}) {
+function buildEnv({ session = { id: 'mat-uuid', role: 'ceo' }, supabaseUsers = [] } = {}) {
   const handlerPath = resetHandler()
   const apiDir = path.join(__dirname, '..', 'api')
   const adminDir = path.join(apiDir, 'admin')
@@ -67,7 +67,7 @@ function buildEnv({ session = { id: 'mat-uuid', role: 'exec' }, supabaseUsers = 
   registerMock(handlerPath, path.join(adminDir, '_admin.js'), {
     requireAdmin: async (_req, res) => {
       if (!session) { res.status(401).json({ error: 'Unauthorized' }); return null }
-      if (!['service','exec','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
+      if (!['service','ceo','admin','evp','marketing'].includes(session.role)) { res.status(403).json({ error: 'Admin access required' }); return null }
       return session
     },
     getAdminSupabase: () => makeSupabaseStub(supabaseUsers),
@@ -108,6 +108,15 @@ test('admin_sap_reps_returns_all_reps_with_provisional_phones', async () => {
 
 test('admin_sap_reps_rejects_non_admin_session', async () => {
   const handler = buildEnv({ session: { id: 'tsr-uuid', role: 'tsr' } })
+  const req = { method: 'GET', headers: {}, query: {} }
+  const res = mockRes()
+  await handler(req, res)
+  assert.equal(res.statusCode, 403)
+  assert.equal(res.body.error, 'Admin access required')
+})
+
+test('admin_sap_reps_rejects_exec_session', async () => {
+  const handler = buildEnv({ session: { id: 'exec-uuid', role: 'exec' } })
   const req = { method: 'GET', headers: {}, query: {} }
   const res = mockRes()
   await handler(req, res)

@@ -11,17 +11,17 @@ updated: 2026-05-03T12:45:00Z
 number: 2
 name: A1 — SAP reps list
 expected: |
-  As an authorized user managing the team (CEO, exec, evp / EV Sales, marketing / Marketing Manager, admin / Sales Admin, or service token), loading or calling `/api/admin/sap-reps` returns SAP rep rows consistent with your staging SAP data (not an auth error).
+  As an authorized user managing the team (CEO, evp / EV Sales, marketing / Marketing Manager, admin / Sales Admin, or service token — not `exec`), loading or calling `/api/admin/sap-reps` returns SAP rep rows consistent with your staging SAP data (not an auth error).
 awaiting: user response
 
 ## Stakeholder notes (2026-05-03)
 
-- **User management page:** intended roles — **CEO**, **exec**, **evp** (EV Sales), **marketing** (Marketing Manager), **admin** (Sales Admin). Implemented in `api/admin/_admin.js` + `marketing` upsert support in `api/admin/upsert-user.js`; matrix updated in `.planning/AUTHZ_MATRIX.md`.
+- **User management page:** **CEO**, **evp** (EV Sales), **marketing** (Marketing Manager), **admin** (Sales Admin); **`exec` excluded** from admin portal by policy. `marketing` upsert in `api/admin/upsert-user.js`; matrix `.planning/AUTHZ_MATRIX.md`.
 
 ## Tests
 
 ### 1. Staging preconditions (env + session)
-expected: Staging API has Supabase + SAP env configured; exec/ceo admin UI session; safe test phones only.
+expected: Staging API has Supabase + SAP env configured; user-admin UI session (ceo / evp / marketing / admin); safe test phones only.
 result: pass
 
 ### 2. A1 — SAP reps list
@@ -44,8 +44,8 @@ result: [pending]
 expected: Remove returns 200; user can no longer log in; rows cleaned per API semantics.
 result: [pending]
 
-### 7. A6 — Field role cannot manage users
-expected: A session with a **field role** (e.g. **tsr**, **dsm**, **rsm**) calling admin upsert or `/api/admin/sap-reps` gets **403 or 401**, not a successful mutate/list that only exec-level staff should have.
+### 7. A6 — Non–user-admin roles cannot manage users
+expected: Sessions with **field roles** (e.g. **tsr**, **dsm**, **rsm**) or **`exec`** (non-CEO executive) calling admin upsert or `/api/admin/sap-reps` get **403** (or **401** if unauthenticated), not success.
 result: [pending]
 
 ## Summary
