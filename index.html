@@ -144,15 +144,20 @@
       cursor: not-allowed;
     }
 
+    /* Must contrast with white .login-card — not the page gradient */
     .login-btn-secondary {
-      background: transparent;
-      color: #fff;
-      border: 2px solid rgba(255, 255, 255, 0.45);
+      background: #fff;
+      color: #004D71;
+      border: 2px solid #004D71;
       margin-top: 14px;
     }
 
     .login-btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(0, 77, 113, 0.08);
+    }
+
+    .login-btn-secondary:disabled {
+      opacity: 0.55;
     }
 
     .login-error {
