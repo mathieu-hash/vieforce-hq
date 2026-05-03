@@ -1,10 +1,14 @@
 const { query, queryH } = require('./_db')
 const { getCustomerMap, toHistoricalCode } = require('./lib/customer-map')
+const { requireDiagAccess } = require('./lib/require-diag-access')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type, authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  const gate = await requireDiagAccess(req, res)
+  if (!gate) return
 
   // LY sanity: end-to-end demonstrates the mapping actually resolves to real LY numbers.
   if (req.query.ly_sanity === '1') {
