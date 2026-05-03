@@ -52,6 +52,11 @@ test.describe('API Health — Cloud Run backend responds (or rejects unauthorize
     });
   }
 
+  test('C-diag — unauthenticated /api/diag must be 401 (not open diagnostic)', async ({ request }) => {
+    const resp = await request.get(`${API_URL}/api/diag`);
+    expect(resp.status(), '/api/diag should reject anonymous').toBe(401);
+  });
+
   test('C-undefined-bug — initial dashboard call should NOT use literal "undefined"', async ({ request }) => {
     // KNOWN BUG documented in QG report 2026-04-28:
     // Frontend fires /api/dashboard?period=undefined&region=undefined on initial load.

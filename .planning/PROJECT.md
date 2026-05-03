@@ -15,11 +15,12 @@ VieForce HQ is the **sales intelligence and BI web desktop** for Vienovo: execut
 - ✓ Server-side PIN login path (`api/auth/login.js`) replacing client-side PIN exposure — `migrations/lock-users-rls.sql` direction.
 - ✓ SAP dual-database queries with migration cutoff (`api/_db.js`).
 - ✓ Patrol proxy consumption via `HQ_SERVICE_TOKEN` + `api/_scope.js` resolution.
-- ✓ Automated regression suite for scope + admin APIs (`npm test` — 65 tests).
+- ✓ Automated regression suite for scope + admin APIs (`npm test` — 71+ tests; CI on Ubuntu + Windows).
+- ✓ Milestone v1.0 Beta planning artifacts: session strategy, Beta scope, runbook, Patrol contract, smoke + admin checklists (see `.planning/`).
 
 ### Active (Current Milestone: v1.0 Beta)
 
-See `.planning/REQUIREMENTS.md` for checkbox traceability.
+In-repo requirements are **closed** in `REQUIREMENTS.md` — remaining work is **human UAT** (admin checklist, stakeholder sign-off, deploy gated API to Cloud Run, Patrol acknowledgment of `PATROL_HQ_CONTRACT.md`).
 
 ### Out of Scope (this Beta)
 
@@ -35,7 +36,7 @@ See `.planning/REQUIREMENTS.md` for checkbox traceability.
 
 ## Constraints
 
-- **Security:** Beta cannot expose `/api/diag` publicly without admin/IP gate.
+- **Security:** `/api/diag` is gated in code — **deploy** to Cloud Run to replace legacy open 200; optional `DISABLE_DIAG=1` for hard-off.
 - **SAP:** Query timeouts and pool sizes tuned for internal concurrency (`api/_db.js`).
 - **Compliance:** Session upgrade path should avoid long-lived opaque UUID sessions for external auditors.
 
