@@ -144,6 +144,17 @@
       cursor: not-allowed;
     }
 
+    .login-btn-secondary {
+      background: transparent;
+      color: #fff;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      margin-top: 14px;
+    }
+
+    .login-btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
     .login-error {
       display: none;
       background: #fff0f0;
@@ -191,6 +202,7 @@
         </div>
         <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
       </form>
+      <button type="button" class="login-btn login-btn-secondary" id="googleLoginBtn">Continue with Google (@vienovo.ph)</button>
     </div>
 
     <div class="login-footer">Sales Intelligence &middot; VieForce HQ v1.0</div>
@@ -201,14 +213,51 @@
   <script src="js/supabase.js"></script>
   <script src="js/auth.js"></script>
   <script>
-    // If already logged in, redirect
-    if (getSession()) {
-      window.location.href = 'app.html';
-    }
-
     var form = document.getElementById('loginForm');
     var errorEl = document.getElementById('loginError');
     var btn = document.getElementById('loginBtn');
+
+    (async function initIndexAuth() {
+      try {
+        if (typeof maybeHandleGoogleLoginOnLoad === 'function') {
+          var oauth = await maybeHandleGoogleLoginOnLoad();
+          if (oauth && oauth.handled && oauth.error) {
+            errorEl.textContent = oauth.error;
+            errorEl.classList.add('visible');
+          } else if (oauth && oauth.ok) {
+            window.location.href = 'app.html';
+            return;
+          }
+        }
+      } catch (e) {
+        errorEl.textContent = (e && e.message) ? e.message : 'Sign-in check failed.';
+        errorEl.classList.add('visible');
+      }
+      if (getSession()) {
+        window.location.href = 'app.html';
+        return;
+      }
+      var hash = '';
+      try {
+        hash = String(window.location.hash || '');
+      } catch (h) {}
+      if (hash === '#hq_google' || hash === '#hq_google=1') {
+        try {
+          history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        } catch (h2) {}
+        var hhost = '';
+        try {
+          hhost = String(window.location.hostname || '').toLowerCase();
+        } catch (h3) {}
+        if (hhost !== 'localhost' && hhost !== '127.0.0.1' && typeof loginWithGoogle === 'function') {
+          var gr = await loginWithGoogle();
+          if (!gr || !gr.ok) {
+            errorEl.textContent = (gr && gr.error) ? gr.error : 'Google sign-in failed.';
+            errorEl.classList.add('visible');
+          }
+        }
+      }
+    })();
 
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -228,6 +277,36 @@
         errorEl.classList.add('visible');
         btn.disabled = false;
         btn.textContent = 'Sign In';
+      }
+    });
+
+    document.getElementById('googleLoginBtn').addEventListener('click', async function() {
+      var hostLc = '';
+      try {
+        hostLc = String(window.location.hostname || '').toLowerCase();
+      } catch (e) {}
+      if (hostLc === 'localhost' || hostLc === '127.0.0.1') {
+        window.location.href = 'https://vieforce-hq.vercel.app/index.html#hq_google=1';
+        return;
+      }
+      errorEl.classList.remove('visible');
+      errorEl.textContent = '';
+      var gbtn = this;
+      gbtn.disabled = true;
+      var prev = gbtn.textContent;
+      gbtn.textContent = 'Opening Google…';
+      try {
+        var result = await loginWithGoogle();
+        if (!result || !result.ok) {
+          errorEl.textContent = (result && result.error) || 'Google sign-in failed.';
+          errorEl.classList.add('visible');
+        }
+      } catch (err) {
+        errorEl.textContent = err.message || 'Google sign-in failed.';
+        errorEl.classList.add('visible');
+      } finally {
+        gbtn.disabled = false;
+        gbtn.textContent = prev;
       }
     });
   </script>
