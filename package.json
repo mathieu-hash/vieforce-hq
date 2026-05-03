@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node scripts/run-tests.mjs",
-    "ci:scan": "node scripts/ci-scan-client.mjs"
+    "ci:scan": "node scripts/ci-scan-client.mjs",
+    "smoke": "node scripts/smoke-api.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

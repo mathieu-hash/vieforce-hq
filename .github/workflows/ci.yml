@@ -5,6 +5,7 @@ on:
     branches: [master, main, design-upgrade]
   pull_request:
     branches: [master, main, design-upgrade]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -24,4 +25,24 @@ jobs:
         run: npm test
 
       - name: Client bundle secret scan (SEC-04)
+        run: node scripts/ci-scan-client.mjs
+
+  # ENG-02 — same suite on Windows (path/glob differences)
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Client bundle secret scan
         run: node scripts/ci-scan-client.mjs

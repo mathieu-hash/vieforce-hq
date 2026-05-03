@@ -23,6 +23,8 @@
 
 **Goal:** Every PR runs tests; standardized developer workflow.
 
+**Status (2026-05-03):** CI jobs **`test`** (Ubuntu) + **`test-windows`**; **`README.md`**; **`npm run smoke`** + **`docs/SMOKE.md`**; Playwright **`tests/e2e/03-api-health.spec.ts`** includes strict **`/api/diag` → 401** test.
+
 | REQ-IDs | Success criteria |
 |---------|------------------|
 | ENG-01, ENG-02 | CI green on sample PR; `npm test` passes clean checkout Win + Linux. |
@@ -34,6 +36,8 @@
 
 **Goal:** UX honesty + admin readiness — no silent partial reports.
 
+**Status (2026-05-03):** **`.planning/BETA_SCOPE.md`**, **`.planning/ADMIN_VALIDATION_CHECKLIST.md`**.
+
 | REQ-IDs | Success criteria |
 |---------|------------------|
 | PROD-01 | Written Beta scope statement: which tabs are GA vs beta vs hidden. |
@@ -44,6 +48,8 @@
 ## Phase 4 — Ops + Patrol handshake
 
 **Goal:** Deploy safely; coordinate with Patrol agent.
+
+**Status (2026-05-03):** **`.planning/RUNBOOK_DEPLOY.md`**, **`.planning/PATROL_HQ_CONTRACT.md`**.
 
 | REQ-IDs | Success criteria |
 |---------|------------------|
