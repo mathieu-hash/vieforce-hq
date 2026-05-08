@@ -30,15 +30,21 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `dashboard_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
+
+  const cacheKey = `dashboard_v2_${refMonthKey}_${req.query.period || 'MTD'}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const { period = 'MTD', region = 'ALL' } = req.query
-    const { dateFrom, dateTo } = getPeriodDates(period)
+    const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+    const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
 
-    const now = new Date()
+    // "As of" calendar day for YTD slice, budget month index, and previous month — aligned to period end (ref_month aware)
+    const now = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate())
     const year = now.getFullYear()
     const monthIdx = now.getMonth()
     const ytdFrom = new Date(year, 0, 1)

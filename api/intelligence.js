@@ -1,5 +1,6 @@
 const { query, queryH, queryBoth } = require('./_db')
 const { verifySession } = require('./_auth')
+const { resolveRefMonthAnchor } = require('./lib/shipping_days')
 const cache = require('../lib/cache')
 const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
@@ -50,12 +51,19 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
+  const anchorDate = resolveRefMonthAnchor(refMonthKey === 'live' ? '' : refMonthKey)
+  const anchorMs = anchorDate.getTime()
+
   // Cache key includes userId so silences are user-scoped.
-  const cacheKey = `intelligence_v3_${session.id}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `intelligence_v4_${session.id}_${refMonthKey}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
+    const anchorParams = { anchor: anchorDate }
     // Pull user's active silences up-front (Supabase; independent of SAP)
     const silences  = await getActiveSilences(session.id)
     const silenceIdx = buildSilenceIndex(silences)
@@ -76,8 +84,7 @@ module.exports = async (req, res) => {
 
     // ============== Q1: per-customer activity (36mo) + 2024+ flag =========
     // 36-mo scan spans the 2026-01-01 cutoff. Run against BOTH DBs and merge by CardCode.
-    // Rolling-window columns (vol_30d / vol_90d / rev_30d / rev_90d) are entirely post-cutoff
-    // so the historical DB returns 0 for them (DATEADD(DAY,-30,GETDATE()) is >= 2026-03-19).
+    // Rolling-window columns use @anchor (Manila as-of day; ref_month overrides “today”).
     // CardName / frozen_for / bp_status come from OCRD — prefer current over historical.
     const Q1_SQL = `
       SELECT
@@ -90,25 +97,25 @@ module.exports = async (req, res) => {
         SUM(CASE WHEN T0.DocDate >= '2024-01-01' THEN 1 ELSE 0 END)              AS orders_since_2024,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)              AS vol_36m_mt,
         ISNULL(SUM(T1.LineTotal), 0)                                              AS rev_36m,
-        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,GETDATE())
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,@anchor)
             THEN T1.Quantity * ISNULL(I.NumInSale,1) ELSE 0 END) / 1000.0, 0)      AS vol_30d_mt,
-        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,GETDATE())
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,@anchor)
             THEN T1.Quantity * ISNULL(I.NumInSale,1) ELSE 0 END) / 1000.0, 0)      AS vol_90d_mt,
-        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,GETDATE())
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-30,@anchor)
             THEN T1.LineTotal ELSE 0 END), 0)                                      AS rev_30d,
-        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,GETDATE())
+        ISNULL(SUM(CASE WHEN T0.DocDate >= DATEADD(DAY,-90,@anchor)
             THEN T1.LineTotal ELSE 0 END), 0)                                      AS rev_90d
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
       LEFT JOIN OCRD OC  ON T0.CardCode = OC.CardCode
-      WHERE T0.DocDate >= DATEADD(MONTH, -36, GETDATE())
+      WHERE T0.DocDate >= DATEADD(MONTH, -36, @anchor)
         AND T0.CANCELED = 'N'
       GROUP BY T0.CardCode
     `
     const [actCurrent, actHistoricalRaw] = await Promise.all([
-      query(Q1_SQL).catch(e => { console.warn('[intelligence] Q1 current failed:', e.message); return [] }),
-      queryH(Q1_SQL).catch(e => { console.warn('[intelligence] Q1 historical failed:', e.message); return [] })
+      query(Q1_SQL, anchorParams).catch(e => { console.warn('[intelligence] Q1 current failed:', e.message); return [] }),
+      queryH(Q1_SQL, anchorParams).catch(e => { console.warn('[intelligence] Q1 historical failed:', e.message); return [] })
     ])
     const actHistorical = rekey(actHistoricalRaw)  // translate CL00xxx → CA000xxx
     const actMap = new Map()
@@ -159,12 +166,11 @@ module.exports = async (req, res) => {
         })
       }
     }
-    // Recompute days_silent from merged last_order_date
-    const today = new Date()
+    // Recompute days_silent from merged last_order_date (as-of anchor, not wall clock)
     const actBase = [...actMap.values()].map(r => ({
       ...r,
       days_silent: r.last_order_date
-        ? Math.floor((today - new Date(r.last_order_date)) / 86400000)
+        ? Math.floor((anchorMs - new Date(r.last_order_date)) / 86400000)
         : 9999
     }))
 
@@ -184,7 +190,7 @@ module.exports = async (req, res) => {
           ) AS rn
         FROM OINV T0
         LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate >= DATEADD(MONTH, -36, GETDATE())
+        WHERE T0.DocDate >= DATEADD(MONTH, -36, @anchor)
           AND T0.CANCELED = 'N'
       )
       SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpName AS sales_rep
@@ -192,8 +198,8 @@ module.exports = async (req, res) => {
       WHERE rn = 1
     `
     const [loCurrent, loHistoricalRaw] = await Promise.all([
-      query(Q2_SQL).catch(() => []),
-      queryH(Q2_SQL).catch(() => [])
+      query(Q2_SQL, anchorParams).catch(() => []),
+      queryH(Q2_SQL, anchorParams).catch(() => [])
     ])
     const loHistorical = rekey(loHistoricalRaw)
     const loMap = new Map()
@@ -219,7 +225,7 @@ module.exports = async (req, res) => {
         SUM(T1.LineTotal) AS region_rev
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+      WHERE T0.DocDate >= DATEADD(MONTH, -12, @anchor)
         AND T0.CANCELED = 'N'
       GROUP BY
         T0.CardCode,
@@ -232,8 +238,8 @@ module.exports = async (req, res) => {
     `
     // Run explicitly on each DB so we can rekey historical rows before merging.
     const [regCur, regHistRaw] = await Promise.all([
-      query(Q3_SQL).catch(() => []),
-      queryH(Q3_SQL).catch(() => [])
+      query(Q3_SQL, anchorParams).catch(() => []),
+      queryH(Q3_SQL, anchorParams).catch(() => [])
     ])
     const regionsUnion = [...regCur, ...rekey(regHistRaw)]
     // Sum rev by (CardCode, region), then pick the region with highest rev per CardCode
@@ -273,13 +279,13 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+      WHERE T0.DocDate >= DATEADD(MONTH, -12, @anchor)
         AND T0.CANCELED = 'N'
       GROUP BY T0.CardCode, T1.Dscription
     `
     const [bbCur, bbHistRaw] = await Promise.all([
-      query(Q5_SQL).catch(() => []),
-      queryH(Q5_SQL).catch(() => [])
+      query(Q5_SQL, anchorParams).catch(() => []),
+      queryH(Q5_SQL, anchorParams).catch(() => [])
     ])
     const brandBasketRaw = [...bbCur, ...rekey(bbHistRaw)]
     const bbMap = new Map()
@@ -653,7 +659,7 @@ module.exports = async (req, res) => {
         last_inv_date:   c.last_order_date,
         ar_balance:      Math.round(c.ar_balance),
         years_silent:    c.last_order_date
-          ? Math.round((Date.now() - new Date(c.last_order_date).getTime()) / (365.25 * 86400000) * 10) / 10
+          ? Math.round((anchorMs - new Date(c.last_order_date).getTime()) / (365.25 * 86400000) * 10) / 10
           : null
       }))
 
@@ -724,6 +730,8 @@ module.exports = async (req, res) => {
         dormant_active_pool_size: dormantActiveAll.length,
         legacy_ar_pool_size:      legacyArAll.length,
         non_customer_filter_applied: true,
+        ref_month:                refMonthKey === 'live' ? null : refMonthKey,
+        anchor_as_of:             anchorDate.toISOString(),
         generated_at:             new Date().toISOString()
       }
     }

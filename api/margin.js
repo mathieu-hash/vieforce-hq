@@ -15,14 +15,18 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
   // Cache key includes userId so silence filter is user-scoped.
-  const cacheKey = `margin_v3_${session.id}_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `margin_v3_${session.id}_${refMonthKey}_${req.query.period || 'YTD'}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const { period = 'YTD' } = req.query
-    const { dateFrom, dateTo } = getPeriodDates(period)
+    const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+    const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
 
     // Silence index for this user (used on critical/warning lists below)
     const silences   = await getActiveSilences(session.id)

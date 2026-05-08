@@ -18,7 +18,7 @@
 // CRITICAL: no customer-code exclusion. CCPC and similar are real customers.
 
 const { query, queryH, queryBoth } = require('./_db')
-const { verifySession, verifyServiceToken } = require('./_auth')
+const { verifySession, verifyServiceToken, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
 
 // FY2026 monthly volume budget (mirrors api/dashboard.js + api/budget.js).
@@ -69,16 +69,28 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `team_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
+  const period = String(req.query.period || 'YTD').toUpperCase()
+  const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+
+  const cacheKey = `team_v3_${refMonthKey}_${period}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const today    = new Date()
-    const ytdStart = new Date(today.getFullYear(), 0, 1)
-    const lyStart  = new Date(today.getFullYear() - 1, 0, 1)
-    const lyEnd    = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
+    const today = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate())
+
+    const lyStart = new Date(dateFrom)
+    lyStart.setFullYear(lyStart.getFullYear() - 1)
+    const lyEnd = new Date(dateTo)
+    lyEnd.setFullYear(lyEnd.getFullYear() - 1)
+
+    const mtdBounds = getPeriodDates('MTD', periodOpts)
+    const monthStart = mtdBounds.dateFrom
+    const monthEnd = mtdBounds.dateTo
 
     // ───────────────────────────────────────────────────────────────────────
     // 1. NATIONAL TOTALS — single query, no rep filter, no customer exclusions
@@ -93,16 +105,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= @ytdStart AND T0.CANCELED = 'N'
-    `, { ytdStart })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+    `, { dateFrom, dateTo })
 
     const nationalOdln = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ytd_vol
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= @ytdStart AND T0.CANCELED = 'N'
-    `, { ytdStart })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+    `, { dateFrom, dateTo })
 
     // YTD-LY (entire prior year through same M-D) — historical DB.
     // Pull both OINV (revenue/GM) and ODLN (volume of record) so vs-LY
@@ -159,12 +171,12 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate >= @ytdStart AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
       GROUP BY S.U_rsm
-    `, { ytdStart })
+    `, { dateFrom, dateTo })
     const rsmYtdMap = Object.fromEntries(rsmYtd.map(r => [r.rsm_code, r]))
 
-    // MTD ODLN per RSM (current calendar month)
+    // MTD ODLN per RSM (calendar month of anchor)
     const rsmMtdOdln = await query(`
       SELECT
         S.U_rsm                                                          AS rsm_code,
@@ -174,12 +186,12 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate >= @monthStart AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N'
       GROUP BY S.U_rsm
-    `, { monthStart })
+    `, { monthStart, monthEnd })
     const rsmMtdMap = Object.fromEntries(rsmMtdOdln.map(r => [r.rsm_code, r.mtd_vol_odln]))
 
-    // YTD ODLN per RSM (for YTD-speed denominator)
+    // Period ODLN per RSM (speed denominator)
     const rsmYtdOdln = await query(`
       SELECT
         S.U_rsm                                                          AS rsm_code,
@@ -189,9 +201,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate >= @ytdStart AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
       GROUP BY S.U_rsm
-    `, { ytdStart })
+    `, { dateFrom, dateTo })
     const rsmYtdOdlnMap = Object.fromEntries(rsmYtdOdln.map(r => [r.rsm_code, r.ytd_vol_odln]))
 
     // LY rollup per RSM — historical DB, JOIN on SlpName because SlpCodes can
@@ -247,9 +259,10 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.U_rsm IS NOT NULL
-        AND T0.DocDate >= DATEADD(MONTH, -6, GETDATE()) AND T0.CANCELED = 'N'
+        AND T0.DocDate >= DATEADD(MONTH, -6, @anchor) AND T0.CANCELED = 'N'
+        AND T0.DocDate <= @anchor
       GROUP BY S.U_rsm, FORMAT(T0.DocDate, 'yyyy-MM')
-    `).catch(e => { console.warn('[team] monthly grid failed:', e.message); return [] })
+    `, { anchor: today }).catch(e => { console.warn('[team] monthly grid failed:', e.message); return [] })
     // Note: queryBoth concatenates current + historical rows. Historical rep's
     // U_rsm is from OLD OSLP — could be different from current. Best-effort:
     // sum by (rsm_code, month). Where the same rep moved across RSMs at
@@ -274,9 +287,9 @@ module.exports = async (req, res) => {
       FROM OSLP S
       INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
       WHERE S.Active='Y' AND S.U_rsm IS NOT NULL
-        AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,GETDATE())
+        AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,@anchor) AND T0.DocDate <= @anchor
       GROUP BY S.U_rsm
-    `).catch(() => [])
+    `, { anchor: today }).catch(() => [])
     const rsmDsoMap = Object.fromEntries(rsmDso.map(r => [r.rsm_code, r.dso]))
 
     const rsmSilent = await query(`
@@ -286,12 +299,12 @@ module.exports = async (req, res) => {
         FROM OSLP S
         INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
         WHERE S.Active='Y' AND S.U_rsm IS NOT NULL
-          AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,GETDATE())
+          AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,@anchor) AND T0.DocDate <= @anchor
         GROUP BY S.U_rsm, T0.CardCode
-        HAVING DATEDIFF(DAY, MAX(T0.DocDate), GETDATE()) >= 30
+        HAVING DATEDIFF(DAY, MAX(T0.DocDate), @anchor) >= 30
       ) sub
       GROUP BY rsm_code
-    `).catch(() => [])
+    `, { anchor: today }).catch(() => [])
     const rsmSilentMap = Object.fromEntries(rsmSilent.map(r => [r.rsm_code, r.silent_count]))
 
     const rsmNeg = await query(`
@@ -302,12 +315,12 @@ module.exports = async (req, res) => {
         INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
         INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
         WHERE S.Active='Y' AND S.U_rsm IS NOT NULL
-          AND T0.CANCELED='N' AND T0.DocDate >= @ytdStart
+          AND T0.CANCELED='N' AND T0.DocDate BETWEEN @dateFrom AND @dateTo
         GROUP BY S.U_rsm, T0.CardCode
         HAVING SUM(T1.GrssProfit) < 0
       ) sub
       GROUP BY rsm_code
-    `, { ytdStart }).catch(() => [])
+    `, { dateFrom, dateTo }).catch(() => [])
     const rsmNegMap = Object.fromEntries(rsmNeg.map(r => [r.rsm_code, r.neg_margin_count]))
 
     // ───────────────────────────────────────────────────────────────────────
@@ -327,11 +340,191 @@ module.exports = async (req, res) => {
     const achPct    = ytdBudget > 0 ? Math.round((ytdVol / ytdBudget) * 1000) / 10 : 0
     const vsLyPct   = lyVol > 0 ? Math.round(((ytdVol - lyVol) / lyVol) * 1000) / 10 : null
 
-    const shipDays  = countShippingDays(ytdStart, today)
+    const shipDays  = countShippingDays(dateFrom, today)
     const ytdSpeed  = shipDays > 0 ? Math.round(ytdVol / shipDays) : 0
 
     // GM/Ton — must use OINV invoiced volume as denominator (Mat's rule)
     const gmTon = ytdInvVol > 0 ? Math.round(ytdGm / ytdInvVol) : 0
+
+    // ───────────────────────────────────────────────────────────────────────
+    // 6b. DSM roster — reps whose U_rsm is an RSM and who manage ≥1 subordinate
+    //     (matches pg-admin-team inferDefaultRole: DSM vs leaf TSR).
+    //     Territory rollup: DSM row ∪ reps where U_rsm = DSM SlpCode.
+    // ───────────────────────────────────────────────────────────────────────
+    const dsmRosterRows = await query(`
+      SELECT S.SlpCode AS dsm_code, S.SlpName AS dsm_name, S.U_rsm AS rsm_code,
+             NULLIF(LTRIM(RTRIM(S.Memo)), '') AS memo
+      FROM OSLP S
+      WHERE S.Active = 'Y'
+        AND S.U_rsm IS NOT NULL
+        AND S.SlpCode <> S.U_rsm
+        AND EXISTS (
+          SELECT 1 FROM OSLP C
+          WHERE C.Active = 'Y' AND C.U_rsm = S.SlpCode AND C.SlpCode <> C.U_rsm
+        )
+        AND S.U_rsm IN (
+          SELECT R.SlpCode FROM OSLP R
+          WHERE R.Active = 'Y' AND R.SlpCode = R.U_rsm
+            AND R.SlpCode <> @director AND R.SlpCode > 0
+        )
+      ORDER BY S.U_rsm, S.SlpName
+    `, { director: DIRECTOR_SLPCODE }).catch(() => [])
+
+    const dsmCodes = [...new Set(dsmRosterRows.map(r => Number(r.dsm_code)).filter(n => n > 0))]
+    const dsmInList = dsmCodes.length ? dsmCodes.join(',') : ''
+
+    let dsmYtdMap = {}
+    let dsmYtdOdlnMap = {}
+    let dsmMtdOdlnMap = {}
+    let dsmLyMap = {}
+    let dsmDsoMap = {}
+    let dsmSilentMap = {}
+    let dsmNegMap = {}
+
+    if (dsmInList) {
+      const caseRollup = `(CASE WHEN S.SlpCode IN (${dsmInList}) THEN S.SlpCode ELSE S.U_rsm END)`
+      const territoryWhere =
+        `S.Active = 'Y' AND (S.SlpCode IN (${dsmInList}) OR S.U_rsm IN (${dsmInList})) ` +
+        `AND ${caseRollup} IN (${dsmInList})`
+
+      const dsmYtdRows = await query(`
+        SELECT ${caseRollup} AS dsm_key,
+          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)   AS ytd_vol,
+          ISNULL(SUM(T1.LineTotal), 0)                                    AS ytd_revenue,
+          ISNULL(SUM(T1.GrssProfit), 0)                                   AS ytd_gm,
+          COUNT(DISTINCT T0.CardCode)                                     AS active_customers,
+          COUNT(DISTINCT T0.SlpCode)                                      AS reports_count
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        GROUP BY ${caseRollup}
+      `, { dateFrom, dateTo })
+      dsmYtdMap = Object.fromEntries(dsmYtdRows.map(r => [Number(r.dsm_key), r]))
+
+      const dsmOdlnYtd = await query(`
+        SELECT ${caseRollup} AS dsm_key,
+          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ytd_vol_odln
+        FROM ODLN T0
+        INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        GROUP BY ${caseRollup}
+      `, { dateFrom, dateTo })
+      dsmYtdOdlnMap = Object.fromEntries(dsmOdlnYtd.map(r => [Number(r.dsm_key), r.ytd_vol_odln]))
+
+      const dsmOdlnMtd = await query(`
+        SELECT ${caseRollup} AS dsm_key,
+          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS mtd_vol_odln
+        FROM ODLN T0
+        INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N' AND ${territoryWhere}
+        GROUP BY ${caseRollup}
+      `, { monthStart, monthEnd })
+      dsmMtdOdlnMap = Object.fromEntries(dsmOdlnMtd.map(r => [Number(r.dsm_key), r.mtd_vol_odln]))
+
+      const dsmLyRows = await queryH(`
+        SELECT ${caseRollup} AS dsm_key,
+          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ly_vol
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N' AND ${territoryWhere}
+        GROUP BY ${caseRollup}
+      `, { lyStart, lyEnd }).catch(e => {
+        console.warn('[team] DSM LY failed:', e.message); return []
+      })
+      dsmLyMap = Object.fromEntries(dsmLyRows.map(r => [Number(r.dsm_key), Number(r.ly_vol || 0)]))
+
+      const dsmDsoRows = await query(`
+        SELECT dsm_key, dso FROM (
+          SELECT ${caseRollup} AS dsm_key,
+            CASE WHEN SUM(T0.DocTotal) > 0
+              THEN SUM(CASE WHEN T0.DocTotal > T0.PaidToDate
+                            THEN T0.DocTotal - T0.PaidToDate ELSE 0 END)
+                   / (SUM(T0.DocTotal) / 365.0)
+              ELSE 0 END AS dso
+          FROM OSLP S
+          INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
+          WHERE ${territoryWhere}
+            AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,@anchor) AND T0.DocDate <= @anchor
+          GROUP BY ${caseRollup}
+        ) x WHERE x.dsm_key IN (${dsmInList})
+      `, { anchor: today }).catch(() => [])
+      dsmDsoMap = Object.fromEntries(dsmDsoRows.map(r => [Number(r.dsm_key), r.dso]))
+
+      const dsmSilentRows = await query(`
+        SELECT dsm_key, COUNT(*) AS silent_count FROM (
+          SELECT ${caseRollup} AS dsm_key, T0.CardCode
+          FROM OSLP S
+          INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
+          WHERE ${territoryWhere}
+            AND T0.CANCELED='N' AND T0.DocDate >= DATEADD(YEAR,-1,@anchor) AND T0.DocDate <= @anchor
+          GROUP BY ${caseRollup}, T0.CardCode
+          HAVING DATEDIFF(DAY, MAX(T0.DocDate), @anchor) >= 30
+        ) sub
+        GROUP BY dsm_key
+      `, { anchor: today }).catch(() => [])
+      dsmSilentMap = Object.fromEntries(dsmSilentRows.map(r => [Number(r.dsm_key), r.silent_count]))
+
+      const dsmNegRows = await query(`
+        SELECT dsm_key, COUNT(*) AS neg_margin_count FROM (
+          SELECT ${caseRollup} AS dsm_key, T0.CardCode
+          FROM OSLP S
+          INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
+          INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
+          WHERE ${territoryWhere}
+            AND T0.CANCELED='N' AND T0.DocDate BETWEEN @dateFrom AND @dateTo
+          GROUP BY ${caseRollup}, T0.CardCode
+          HAVING SUM(T1.GrssProfit) < 0
+        ) sub
+        GROUP BY dsm_key
+      `, { dateFrom, dateTo }).catch(() => [])
+      dsmNegMap = Object.fromEntries(dsmNegRows.map(r => [Number(r.dsm_key), r.neg_margin_count]))
+    }
+
+    function buildDsmScorecardRow (row) {
+      const dc = Number(row.dsm_code)
+      const ytd = dsmYtdMap[dc] || {}
+      const ytdVolD = Number(ytd.ytd_vol || 0)
+      const ytdGmD = Number(ytd.ytd_gm || 0)
+      const ytdRevD = Number(ytd.ytd_revenue || 0)
+      const lyVolD = dsmLyMap[dc] || 0
+      const mtdD = Number(dsmMtdOdlnMap[dc] || 0)
+      const ytdOdD = Number(dsmYtdOdlnMap[dc] || 0)
+      const dsoD = Number(dsmDsoMap[dc] || 0)
+      const silentD = Number(dsmSilentMap[dc] || 0)
+      const negD = Number(dsmNegMap[dc] || 0)
+      const gmTonD = ytdVolD > 0 ? Math.round(ytdGmD / ytdVolD) : 0
+      const vsLyD = lyVolD > 0 ? Math.round(((ytdVolD - lyVolD) / lyVolD) * 1000) / 10 : null
+      const speedD = shipDays > 0 ? Math.round(ytdOdD / shipDays) : 0
+      const memo = row.memo ? String(row.memo).trim() : ''
+      return {
+        slp_code:      dc,
+        name:          row.dsm_name,
+        region:        memo || '—',
+        bu:            '—',
+        ytd_vol:       Math.round(ytdVolD),
+        ytd_revenue:   Math.round(ytdRevD),
+        ytd_target:    0,
+        ach_pct:       0,
+        vs_ly:         vsLyD,
+        ly_vol:        Math.round(lyVolD),
+        speed:         speedD,
+        mtd_speed:     Math.round(mtdD),
+        gm_ton:        gmTonD,
+        dso:           Math.round(dsoD),
+        customers:     Number(ytd.active_customers || 0),
+        reports:       Number(ytd.reports_count || 0),
+        silent:        silentD,
+        neg_margin:    negD
+      }
+    }
 
     // ───────────────────────────────────────────────────────────────────────
     // 7. RSMS array — one row per OSLP RSM (Mat = N=9 in current OSLP)
@@ -355,6 +548,10 @@ module.exports = async (req, res) => {
       const vsLyR   = lyVolR > 0 ? Math.round(((ytdVolR - lyVolR) / lyVolR) * 1000) / 10 : null
       // Per-RSM YTD speed: OdlnVol / shipping_days_elapsed
       const speedR  = shipDays > 0 ? Math.round(ytdOdR / shipDays) : 0
+      const dsmsForRsm = dsmRosterRows
+        .filter(d => Number(d.rsm_code) === Number(rc))
+        .map(buildDsmScorecardRow)
+        .sort((a, b) => b.ytd_vol - a.ytd_vol)
       return {
         slp_code:  rc,
         name:      r.rsm_name,
@@ -371,7 +568,8 @@ module.exports = async (req, res) => {
         customers: Number(ytd.active_customers || 0),
         reports:   Number(ytd.reports_count || 0),
         silent:    silentR,
-        neg_margin: negR
+        neg_margin: negR,
+        dsms:      dsmsForRsm
       }
     }).sort((a, b) => b.ytd_vol - a.ytd_vol)
 
@@ -422,10 +620,13 @@ module.exports = async (req, res) => {
       account_health,
       meta: {
         generated_at: today.toISOString(),
-        ytd_start:    ytdStart.toISOString(),
+        period,
+        ref_month:    refMonthKey === 'live' ? null : refMonthKey,
+        period_start: dateFrom.toISOString(),
+        period_end:   dateTo.toISOString(),
         ly_window:    [lyStart.toISOString(), lyEnd.toISOString()],
         director_slpcode_excluded: DIRECTOR_SLPCODE,
-        sources:      'OINV (revenue+GM) · ODLN (volume of record) · OSLP.U_rsm (hierarchy)'
+        sources:      'OINV (revenue+GM) · ODLN (volume of record) · OSLP.U_rsm (hierarchy) · per-RSM dsms[] (OSLP managers w/ subordinates, territory rollup)'
       }
     }
 

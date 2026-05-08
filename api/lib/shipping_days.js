@@ -19,6 +19,28 @@ function getManilaToday() {
   return new Date(nowPH.getUTCFullYear(), nowPH.getUTCMonth(), nowPH.getUTCDate())
 }
 
+/**
+ * Anchor date in Manila for dashboard/speed when ?ref_month=YYYY-MM is set.
+ * - Past month: last day of that month (full month view).
+ * - Current month: min(today, month end) in Manila.
+ * - Future month: real today (no lookahead).
+ */
+function resolveRefMonthAnchor(refMonth) {
+  const realToday = getManilaToday()
+  if (!refMonth || typeof refMonth !== 'string' || !/^\d{4}-\d{2}$/.test(refMonth.trim())) {
+    return realToday
+  }
+  const raw = refMonth.trim()
+  const y = parseInt(raw.slice(0, 4), 10)
+  const mo = parseInt(raw.slice(5, 7), 10) - 1
+  if (mo < 0 || mo > 11) return realToday
+  const monthStart = new Date(y, mo, 1)
+  const monthEnd = new Date(y, mo + 1, 0)
+  if (realToday < monthStart) return realToday
+  if (realToday > monthEnd) return monthEnd
+  return realToday
+}
+
 function isClosed(date) {
   if (date.getDay() === 0) return true  // Sunday
   return Boolean(calendar.closed_dates[fmtISO(date)])
@@ -110,6 +132,7 @@ module.exports = {
   calendar,
   fmtISO,
   getManilaToday,
+  resolveRefMonthAnchor,
   isClosed,
   countShippingDays,
   listHolidaysInPeriod,
