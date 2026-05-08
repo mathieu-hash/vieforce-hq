@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/css/evp-home.css">
 <link rel="stylesheet" href="/css/dsm-home.css">
 <link rel="stylesheet" href="/css/rsm-home.css">
+<link rel="stylesheet" href="/css/table-numbers.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -1095,6 +1096,14 @@ body{
           <button class="tb-toggle-btn active" onclick="setU(this)">MT</button>
           <button class="tb-toggle-btn" onclick="setU(this)">Bags</button>
         </div>
+        <div class="tb-divider"></div>
+        <label class="tb-month-wrap" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);white-space:nowrap">
+          <span>As of</span>
+          <select id="vf-ref-month" class="tb-month-select" style="max-width:120px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px"
+                  onchange="setRefMonth(this.value)" title="Month anchor for 7D/MTD/QTD/YTD (Live = current Manila date)">
+            <option value="">Live</option>
+          </select>
+        </label>
       </div>
 
       <div class="tb-search">
@@ -1412,15 +1421,6 @@ body{
             <div class="evp-card-cta">See full P&amp;L →</div>
           </div>
 
-          <!-- Decisions Needed -->
-          <div class="evp-card evp-decisions">
-            <div class="evp-card-hdr">
-              <div class="evp-card-title">🚨 What needs you today</div>
-              <div class="evp-badge-urgent" id="evp-decisions-count">—</div>
-            </div>
-            <div class="evp-decision-list" id="evp-decisions-list"></div>
-          </div>
-
           <!-- Regional Snapshot -->
           <div class="evp-card" onclick="navTo('pg-home')">
             <div class="evp-card-hdr">
@@ -1456,27 +1456,6 @@ body{
               <div class="evp-card-title">🏆 Top Performers MTD</div>
             </div>
             <div class="evp-performers" id="evp-performers"></div>
-          </div>
-
-          <!-- Weekly Agenda -->
-          <div class="evp-card">
-            <div class="evp-card-hdr">
-              <div class="evp-card-title">📋 This Week</div>
-            </div>
-            <div class="evp-agenda" id="evp-agenda">
-              <div class="evp-agenda-item">
-                <div class="evp-agenda-when">Thu Apr 23 · 9:00 AM</div>
-                <div class="evp-agenda-what">COMEX (3 items pending)</div>
-              </div>
-              <div class="evp-agenda-item">
-                <div class="evp-agenda-when">Fri Apr 24</div>
-                <div class="evp-agenda-what">DSM Monthly Review</div>
-              </div>
-              <div class="evp-agenda-item">
-                <div class="evp-agenda-when">Mon Apr 27</div>
-                <div class="evp-agenda-what">1:1 with Rina (RSM Luzon)</div>
-              </div>
-            </div>
           </div>
 
           <div style="height:80px"></div>
@@ -2872,7 +2851,13 @@ body{
           .ci-hero-cta{margin-top:10px;font-size:11px;font-weight:700;color:var(--blue);letter-spacing:0.2px}
           /* Section cards */
           .ci-tbl th{position:sticky;top:0;background:var(--surface-solid);z-index:1}
-          .ci-tbl td{font-size:12px}
+          .ci-tbl td{font-size:12px;vertical-align:top}
+          .ci-meta{font-size:10px;color:var(--text3);margin-top:2px;line-height:1.4;font-weight:500}
+          .ci-trend{font-family:var(--mono);font-size:11px;line-height:1.3}
+          .ci-trend-from{color:var(--text3)}
+          .ci-trend-to{color:var(--text);font-weight:700}
+          .ci-trend-delta{font-weight:700;font-family:var(--mono);font-size:10px;letter-spacing:0.2px}
+          .ci-section-sub{font-size:11px;color:var(--text2);font-weight:500;margin-top:3px;letter-spacing:0.1px}
           .ci-tbl .ci-link{color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;border-bottom:1px dotted transparent;transition:border-color 0.15s}
           .ci-tbl .ci-link:hover{border-bottom-color:var(--blue);color:var(--blue)}
           .ci-tbl .ci-action{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:0.3px;border:1px solid;background:transparent;cursor:pointer;transition:background 0.12s}
@@ -3031,11 +3016,14 @@ body{
           </a>
         </div>
 
-        <!-- LEVEL 2 — RESCUE TODAY (red) -->
+        <!-- LEVEL 2 — RESCUE (red) -->
         <div class="card" id="sec-rescue" style="border-left:3px solid var(--red);margin-bottom:18px">
           <div class="card-hdr">
-            <div class="card-title" style="color:var(--red)">🔴 RESCUE TODAY — top <span id="ci-rescue-title-cnt">—</span> customers needing immediate action</div>
-            <button class="export-btn" type="button" onclick="ciExport('rescue')" style="color:var(--red);border-color:rgba(231,76,60,0.3)">⬇ Export List</button>
+            <div>
+              <div class="card-title" style="color:var(--red)">🔴 Rescue · <span id="ci-rescue-title-cnt">—</span> customers</div>
+              <div class="ci-section-sub">Silent ≥ 30 days with open AR — call today.</div>
+            </div>
+            <button class="export-btn" type="button" onclick="ciExport('rescue')" style="color:var(--red);border-color:rgba(231,76,60,0.3)">⬇ Export</button>
           </div>
           <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
             <table class="tbl ci-tbl">
@@ -3043,26 +3031,26 @@ body{
                 <tr>
                   <th style="width:30px">#</th>
                   <th>Customer</th>
-                  <th>Region</th>
                   <th class="num">AR</th>
                   <th class="num">Silent</th>
                   <th>Last Order</th>
-                  <th>Sales Rep</th>
-                  <th class="num" title="Priority = (AR / ₱1M) × log10(days_silent + 1) × 10, clamped 0-100">Priority</th>
                   <th style="width:84px">Action</th>
                   <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-rescue-tbody"><tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-rescue-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
 
-        <!-- LEVEL 3 — GROW THIS MONTH (green) -->
+        <!-- LEVEL 3 — GROW (green) -->
         <div class="card" id="sec-growth" style="border-left:3px solid var(--green);margin-bottom:18px">
           <div class="card-hdr">
-            <div class="card-title" style="color:var(--green)">🟢 GROW THIS MONTH — top <span id="ci-growth-title-cnt">—</span> cross-sell opportunities</div>
-            <button class="export-btn" type="button" onclick="ciExport('growth')">⬇ Export List</button>
+            <div>
+              <div class="card-title" style="color:var(--green)">🟢 Grow · <span id="ci-growth-title-cnt">—</span> opportunities</div>
+              <div class="ci-section-sub">Cross-sell candidates ranked by yearly upside.</div>
+            </div>
+            <button class="export-btn" type="button" onclick="ciExport('growth')">⬇ Export</button>
           </div>
           <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
             <table class="tbl ci-tbl">
@@ -3070,16 +3058,13 @@ body{
                 <tr>
                   <th style="width:30px">#</th>
                   <th>Customer</th>
-                  <th>Currently</th>
-                  <th>Missing</th>
-                  <th class="num" title="Conservative upside: peer-group avg volume × 60% × avg PHP/kg (annualised)">Yearly Upside</th>
-                  <th>Reason</th>
-                  <th class="num" title="Priority = log10(upside / ₱100K) × 25, clamped 0-100">Priority</th>
+                  <th>Missing brands</th>
+                  <th class="num">Yearly upside</th>
                   <th style="width:84px">Action</th>
                   <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-growth-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-growth-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -3087,8 +3072,11 @@ body{
         <!-- LEVEL 4 — EARLY WARNING (gold) -->
         <div class="card" id="sec-warning" style="border-left:3px solid var(--gold);margin-bottom:18px">
           <div class="card-hdr">
-            <div class="card-title" style="color:var(--gold)">🟡 EARLY WARNING — top <span id="ci-warning-title-cnt">—</span> customers with declining trend</div>
-            <button class="export-btn" type="button" onclick="ciExport('warning')" style="color:var(--gold);border-color:rgba(241,177,29,0.3)">⬇ Export List</button>
+            <div>
+              <div class="card-title" style="color:var(--gold)">🟡 Early warning · <span id="ci-warning-title-cnt">—</span> declining</div>
+              <div class="ci-section-sub">Last-30-day volume vs 90-day average — visit before they go silent.</div>
+            </div>
+            <button class="export-btn" type="button" onclick="ciExport('warning')" style="color:var(--gold);border-color:rgba(241,177,29,0.3)">⬇ Export</button>
           </div>
           <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:540px;overflow-y:auto">
             <table class="tbl ci-tbl">
@@ -3096,18 +3084,13 @@ body{
                 <tr>
                   <th style="width:30px">#</th>
                   <th>Customer</th>
-                  <th>Region</th>
-                  <th class="num">90d Avg</th>
-                  <th class="num">Last 30d</th>
-                  <th class="num">Δ</th>
-                  <th class="num">Yearly Risk</th>
-                  <th>Sales Rep</th>
-                  <th class="num" title="Priority = (risk_millions × |Δ%|) ÷ 5, clamped 0-100">Priority</th>
+                  <th class="num">Trend (MT)</th>
+                  <th class="num">Yearly risk</th>
                   <th style="width:84px">Action</th>
                   <th style="width:28px"></th>
                 </tr>
               </thead>
-              <tbody id="ci-warning-tbody"><tr><td colspan="11" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+              <tbody id="ci-warning-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -3115,10 +3098,13 @@ body{
         <!-- LEVEL 5 — DORMANT (gray, collapsible) -->
         <div class="card" id="sec-dormant" style="border-left:3px solid var(--text3);margin-bottom:18px">
           <div class="card-hdr">
-            <div class="card-title" style="color:var(--text2)">💤 DORMANT — <span id="ci-dormant-hdr">—</span></div>
+            <div>
+              <div class="card-title" style="color:var(--text2)">💤 Dormant · <span id="ci-dormant-hdr">—</span></div>
+              <div class="ci-section-sub">No invoice in 90+ days — long-tail reactivation pool.</div>
+            </div>
             <div style="display:flex;gap:6px">
-              <button class="export-btn" type="button" onclick="ciExport('dormant')">⬇ Export CSV</button>
-              <button class="export-btn" type="button" onclick="ciWinBackModal()" style="color:var(--blue);border-color:rgba(0,174,239,0.35)">🚀 Win-Back</button>
+              <button class="export-btn" type="button" onclick="ciExport('dormant')">⬇ Export</button>
+              <button class="export-btn" type="button" onclick="ciWinBackModal()" style="color:var(--blue);border-color:rgba(0,174,239,0.35)">🚀 Win-back</button>
             </div>
           </div>
           <div class="card-body" style="padding-top:14px">
@@ -3147,12 +3133,9 @@ body{
                   <tr>
                     <th style="width:30px">#</th>
                     <th>Customer</th>
-                    <th>Region</th>
-                    <th>Sales Rep</th>
-                    <th>Last Order</th>
-                    <th class="num">Days Silent</th>
+                    <th>Last order</th>
+                    <th class="num">Days silent</th>
                     <th class="num">Historical AR</th>
-                    <th class="num">Vol (36mo)</th>
                   </tr>
                 </thead>
                 <tbody id="ci-dormant-tbody"></tbody>
@@ -3164,19 +3147,13 @@ body{
         <!-- LEVEL 5.5 — LEGACY AR (opening-balance migration, muted gray) -->
         <div class="card" id="sec-legacy-ar" style="border-left:3px solid var(--text3);margin-bottom:18px;opacity:0.96">
           <div class="card-hdr">
-            <div class="card-title" style="color:var(--text2)">📋 LEGACY AR — <span id="ci-legacy-hdr">—</span></div>
-            <div style="display:flex;gap:6px">
-              <button class="export-btn" type="button" onclick="ciExport('legacy_ar')">⬇ Export List</button>
+            <div>
+              <div class="card-title" style="color:var(--text2)">📋 Legacy AR · <span id="ci-legacy-hdr">—</span></div>
+              <div class="ci-section-sub">Pre-2024 balances from SAP go-live — Finance reconciliation, not a sales lead.</div>
             </div>
+            <button class="export-btn" type="button" onclick="ciExport('legacy_ar')">⬇ Export</button>
           </div>
           <div class="card-body" style="padding-top:10px">
-            <div style="font-size:11px;color:var(--text3);line-height:1.65;margin-bottom:12px;padding:10px 14px;background:rgba(255,255,255,0.025);border-radius:6px;border:1px dashed var(--divider)">
-              <b style="color:var(--text2)">Reconciliation task, not a sales alert.</b>
-              Customers below carry open AR but have
-              <b>no invoices since 2024-01-01</b>. Most are opening-balance
-              migration artifacts from the SAP go-live cutover. Route to
-              Finance/Collections — do not pursue as dormancy.
-            </div>
             <div style="display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;margin-bottom:10px">
               <div><span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Count:</span><span id="ci-legacy-count" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span></div>
               <div><span style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-right:6px">Total AR:</span><span id="ci-legacy-ar" style="font-family:var(--mono);font-weight:700;color:var(--text)">—</span></div>
@@ -3188,15 +3165,12 @@ body{
                   <tr>
                     <th style="width:30px">#</th>
                     <th>Customer</th>
-                    <th>Region</th>
-                    <th>Sales Rep</th>
-                    <th>Last Inv</th>
-                    <th class="num">Years Silent</th>
-                    <th class="num">AR Balance</th>
-                    <th style="width:28px"></th>
+                    <th>Last invoice</th>
+                    <th class="num">Years silent</th>
+                    <th class="num">AR balance</th>
                   </tr>
                 </thead>
-                <tbody id="ci-legacy-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
+                <tbody id="ci-legacy-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3536,6 +3510,10 @@ body{
               .team-tbl .total-row td{border-top:2px solid var(--divider);font-weight:700;background:rgba(0,174,239,0.06)}
               .ach-bar{display:inline-flex;align-items:center;gap:4px}
               .ach-fill{height:6px;border-radius:3px;min-width:2px}
+              .team-rsm-expand{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin:0 6px 0 0;padding:0;border:1px solid var(--divider);border-radius:4px;background:rgba(0,0,0,0.2);color:var(--text2);cursor:pointer;font-size:15px;line-height:1;vertical-align:middle;flex-shrink:0}
+              .team-rsm-expand:hover{background:rgba(255,255,255,0.08);color:var(--text)}
+              .team-tbl tr.team-dsm-sub td{background:rgba(0,0,0,0.12)}
+              .team-tbl tr.team-dsm-sub.is-collapsed{display:none}
             </style>
             <table class="team-tbl" id="team-tbl">
               <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>Avg Speed</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
@@ -3928,6 +3906,7 @@ body{
 <script src="js/evp-home.js"></script>
 <script src="js/dsm-home.js"></script>
 <script src="js/rsm-home.js"></script>
+<script src="js/table-numbers.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -3938,7 +3917,46 @@ else { console.error('No valid session — redirecting to login'); }
 var PD = localStorage.getItem('vf_period') || 'MTD';
 var CMP = localStorage.getItem('vf_compare') || 'vs_pp';
 var UT  = localStorage.getItem('vf_unit') || 'MT';
+var VF_REF_MONTH = localStorage.getItem('vf_ref_month') || '';
 var RG = 'ALL', PG = 'pg-home', CX = {}, CH = {}, DC = {};
+
+/** Query params for APIs that support period + optional ref_month (YYYY-MM). */
+function vfApiParams(extra) {
+  var o = { period: PD, region: RG };
+  if (VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) o.ref_month = VF_REF_MONTH;
+  if (extra && typeof extra === 'object') {
+    for (var k in extra) {
+      if (extra[k] !== undefined && extra[k] !== null) o[k] = extra[k];
+    }
+  }
+  return o;
+}
+function setRefMonth(val) {
+  VF_REF_MONTH = (val && val !== '') ? val : '';
+  try {
+    if (VF_REF_MONTH) localStorage.setItem('vf_ref_month', VF_REF_MONTH);
+    else localStorage.removeItem('vf_ref_month');
+  } catch (e) {}
+  DC = {};
+  loadPage(PG);
+}
+function populateRefMonthSelect() {
+  var el = document.getElementById('vf-ref-month');
+  if (!el) return;
+  var preserve = VF_REF_MONTH;
+  el.innerHTML = '<option value="">Live (today)</option>';
+  var now = new Date();
+  for (var i = 0; i < 24; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    var v = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    el.appendChild(opt);
+  }
+  if (preserve && /^\d{4}-\d{2}$/.test(preserve)) el.value = preserve;
+  else el.value = '';
+}
 
 /* ===== INIT ===== */
 function initApp(s) {
@@ -3950,6 +3968,7 @@ function initApp(s) {
   var saved = localStorage.getItem('vf_theme');
   if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme','light'); document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent='☀️'}); }
   syncFilterUI();
+  populateRefMonthSelect();
   // ROUTING HIDDEN: Pivoting DSM/RSM mobile experience to Patrol app.
   // Keeping HQ mobile dashboards (pg-dsm-home + pg-rsm-home) in the repo as
   // future desktop option + component reference. Users land on pg-home for
@@ -4274,6 +4293,11 @@ function syncFilterUI(){
   if(tbToggle) tbToggle.querySelectorAll('.tb-toggle-btn').forEach(function(c){
     if(c.textContent.trim()===UT) c.classList.add('active'); else c.classList.remove('active');
   });
+  var rm = document.getElementById('vf-ref-month');
+  if(rm){
+    if(VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) rm.value = VF_REF_MONTH;
+    else rm.value = '';
+  }
 }
 function setF(el){if(!el)return;addClickAnimation(el);el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
 function doSearch(){var q=document.getElementById('global-search').value.trim();if(q){navTo('pg-customers');loadCust(q)}}
@@ -4332,10 +4356,10 @@ async function loadHome(){
     if(!DC) DC={};
     if(!DC['pg-home']){
       var results = await Promise.all([
-        getDashboardData({period:PD,region:RG}).catch(function(e){console.error('dashboard:',e);return null}),
-        getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null}),
+        getDashboardData(vfApiParams()).catch(function(e){console.error('dashboard:',e);return null}),
+        getSalesData(vfApiParams()).catch(function(e){console.error('sales:',e);return null}),
         getARData().catch(function(e){console.error('ar:',e);return null}),
-        getSpeedData({period:PD}).catch(function(e){console.error('speed:',e);return null})
+        getSpeedData(vfApiParams()).catch(function(e){console.error('speed:',e);return null})
       ]);
       DC['pg-home'] = {d:results[0], sl:results[1], ar:results[2], sp:results[3]};
     }
@@ -4585,8 +4609,8 @@ async function loadSales(){
     if(!DC) DC={};
     if(!DC['pg-sales']){
       var results = await Promise.all([
-        getSalesData({period:PD,region:RG}).catch(function(e){console.error('sales:',e);return null}),
-        getSpeedData({period:PD}).catch(function(e){console.error('speed:',e);return null})
+        getSalesData(vfApiParams()).catch(function(e){console.error('sales:',e);return null}),
+        getSpeedData(vfApiParams()).catch(function(e){console.error('speed:',e);return null})
       ]);
       DC['pg-sales'] = { d: results[0], sp: results[1] };
     }
@@ -4596,12 +4620,12 @@ async function loadSales(){
     console.log('[SALES] Rendering:', Object.keys(d));
     var kp = d.kpis || d;
     // KPIs — bind to top-level (new) or legacy aliases
-    if(kp.volume_mt!=null)     animateNumber(sel('sk-vol'),     kp.volume_mt,     function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
-    if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  kp.ytd_volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
+    if(kp.volume_mt!=null)     animateNumber(sel('sk-vol'),     UT==='Bags' ? (kp.volume_bags||0) : kp.volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> '+(UT==='Bags'?'bags':'MT')+'</span>'});
+    if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  UT==='Bags' ? (kp.ytd_volume_bags!=null?kp.ytd_volume_bags:(kp.ytd_volume_mt*50)) : kp.ytd_volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> '+(UT==='Bags'?'bags':'MT')+'</span>'});
     if(kp.revenue!=null)       animateNumber(sel('sk-sales'),   kp.revenue,       fc);
     if(kp.gmt!=null)           animateNumber(sel('sk-gmt'),     kp.gmt,           function(v){return '₱'+fcn(Math.round(v))});
-    // Deltas
-    var dp = kp.delta_pct || {};
+    // Deltas — respect vs PP / vs LY (same payload as home)
+    var dp = (CMP === 'vs_ly' && kp.delta_pct_ly) ? kp.delta_pct_ly : (kp.delta_pct || {});
     function setDelta(id, pct){
       var el = sel(id); if(!el || pct==null) return;
       var arrow = pct>=0?'▲':'▼';
@@ -4712,7 +4736,7 @@ async function loadSales(){
         html+='<td><div class="rank '+rc(i)+'">'+(i+1)+'</div></td>';
         html+='<td style="font-weight:600">'+esc(c.customer_name||'')+'</td>';
         html+='<td style="color:var(--text3);font-size:11px">'+esc(c.region||c.City||'')+'</td>';
-        html+='<td class="num">'+fcn(Math.round(c.volume_mt||0))+' MT</td>';
+        html+='<td class="num">'+fv(c.volume_mt||0, c.volume_bags||0)+'</td>';
         html+='<td class="num">'+fc(c.revenue||0)+'</td>';
         html+='<td class="num">'+(c.gmt?'₱'+fcn(Math.round(c.gmt)):'--')+'</td></tr>';
       });
@@ -5133,7 +5157,7 @@ function renderInvProducts(){
 async function loadSpeed(){
   clearError('pg-speed');
   try {
-    var d = await getSpeedData({period:PD});  // period mirrors topbar selection
+    var d = await getSpeedData(vfApiParams());  // period + ref_month mirror topbar
     if(!d){showError('pg-speed','Unable to load speed data');return}
     console.log('[SPEED] Rendering:', Object.keys(d), '| daily_pullout:', d.daily_pullout, 'days:', d.days_elapsed+'/'+d.days_total);
     // Hero banner — canonical fields
@@ -5608,7 +5632,7 @@ async function loadMargin(){
   try {
     if(!DC) DC={};
     if(!DC['pg-margin']){
-      DC['pg-margin'] = await getMarginData({period:PD}).catch(function(e){console.error('margin:',e);return null});
+      DC['pg-margin'] = await getMarginData(vfApiParams()).catch(function(e){console.error('margin:',e);return null});
     }
     var d = DC['pg-margin'];
     if(!d){showError('pg-margin','Unable to load margin data');return}
@@ -6004,7 +6028,7 @@ async function loadIntelligence(){
   try {
     if(!DC) DC = {};
     if(!DC['pg-insights']){
-      DC['pg-insights'] = await getIntelligenceData({period: PD}).catch(function(e){ console.error('intelligence:', e); return null; });
+      DC['pg-insights'] = await getIntelligenceData(vfApiParams()).catch(function(e){ console.error('intelligence:', e); return null; });
     }
     var d = DC['pg-insights'];
     if(!d){ showError('pg-insights','Unable to load intelligence data'); return; }
@@ -6027,23 +6051,22 @@ async function loadIntelligence(){
     if(d.top_rescue && d.top_rescue.length){
       var rhtml = '';
       d.top_rescue.forEach(function(r, i){
-        var pcls = ciPrioCls(r.priority_score || 0);
+        var meta = [r.region, r.sales_rep].filter(Boolean).map(esc).join(' · ');
         rhtml += '<tr>'
           + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
-          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a></td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a>'
+          +   (meta ? '<div class="ci-meta">'+ meta +'</div>' : '')
+          + '</td>'
           + '<td class="num" style="color:var(--red);font-weight:700">'+ fc(r.ar_balance||0) +'</td>'
           + '<td class="num" style="color:var(--gold);font-family:var(--mono);font-weight:700">'+ (r.days_silent||0) +'d</td>'
           + '<td style="font-size:11px;color:var(--text2)">'+ ciFmtDate(r.last_order_date) + (r.last_order_amount ? ' · '+ fc(r.last_order_amount) : '') +'</td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
-          + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(r.reason||'') +'">'+ (r.priority_score||0) +'</span></td>'
           + '<td><button class="ci-action ci-action-rescue" type="button" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.suggested_action||'') +'">Call</button></td>'
           + '<td>' + ciRowMenuBtn('rescue', r.card_code, r.name, r.reason || ('Silent ' + (r.days_silent||0) + 'd')) + '</td>'
           + '</tr>';
       });
       seth('ci-rescue-tbody', rhtml);
     } else {
-      seth('ci-rescue-tbody', '<tr><td colspan="10" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No rescue candidates — all accounts on cadence.</td></tr>');
+      seth('ci-rescue-tbody', '<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No rescue candidates — all accounts on cadence.</td></tr>');
     }
 
     // ========== LEVEL 3 — GROWTH TABLE ==========
@@ -6051,25 +6074,24 @@ async function loadIntelligence(){
     if(d.top_growth && d.top_growth.length){
       var ghtml = '';
       d.top_growth.forEach(function(g, i){
-        var pcls = ciPrioCls(g.priority_score || 0);
-        var currentHtml = (g.current_brands||[]).slice(0,3).map(function(b){ return '<span class="ci-brand-pill">'+ esc(b) +'</span>'; }).join('');
-        if((g.current_brands||[]).length > 3) currentHtml += '<span class="ci-brand-pill" style="background:rgba(255,255,255,0.04);color:var(--text3)">+'+ ((g.current_brands||[]).length - 3) +'</span>';
         var missingHtml = (g.missing_brands||[]).map(function(b){ return '<span class="ci-brand-pill ci-brand-pill-miss">'+ esc(b) +'</span>'; }).join('');
+        var meta = [g.region, g.sales_rep].filter(Boolean).map(esc).join(' · ');
+        var reasonLine = g.reason ? '<div class="ci-meta" style="color:var(--text2)">'+ esc(g.reason) +'</div>' : '';
         ghtml += '<tr>'
           + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
-          + '<td><a class="ci-link" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.card_code) +'">'+ esc(g.name||g.card_code) +'</a><div style="font-size:10px;color:var(--text3);margin-top:2px">'+ esc(g.region||'') + (g.sales_rep ? ' · '+ esc(g.sales_rep) : '') +'</div></td>'
-          + '<td style="font-size:11px;line-height:1.8">'+ currentHtml + '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+ fcn(Math.round(g.current_volume_ytd_mt||0)) +' MT/yr</div></td>'
-          + '<td style="font-size:11px">'+ (missingHtml || '<span style="color:var(--text3)">—</span>') +'</td>'
-          + '<td class="num" style="color:var(--green);font-weight:700">'+ fc(g.upside_php_yearly||0) +'<div style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--mono)">'+ fcn(Math.round(g.upside_mt_yearly||0)) +' MT/yr</div></td>'
-          + '<td style="font-size:11px;color:var(--text2);line-height:1.5">'+ esc(g.reason||'') +'</td>'
-          + '<td class="num"><span class="ci-prio '+ pcls +'" title="Upside '+ fc(g.upside_php_yearly||0) +' · score = log10(upside/₱100K) × 25">'+ (g.priority_score||0) +'</span></td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.card_code) +'">'+ esc(g.name||g.card_code) +'</a>'
+          +   (meta ? '<div class="ci-meta">'+ meta +'</div>' : '')
+          +   reasonLine
+          + '</td>'
+          + '<td style="font-size:11px;line-height:1.8">'+ (missingHtml || '<span style="color:var(--text3)">—</span>') +'</td>'
+          + '<td class="num" style="color:var(--green);font-weight:700">'+ fc(g.upside_php_yearly||0) +'<div class="ci-meta" style="font-family:var(--mono)">'+ fcn(Math.round(g.upside_mt_yearly||0)) +' MT/yr</div></td>'
           + '<td><button class="ci-action ci-action-grow" type="button" onclick="openCust(\''+ esc(g.card_code) +'\')" title="'+ esc(g.suggested_action||'') +'">Pitch</button></td>'
           + '<td>' + ciRowMenuBtn('grow', g.card_code, g.name, 'Upside ' + fc(g.upside_php_yearly||0) + '/yr') + '</td>'
           + '</tr>';
       });
       seth('ci-growth-tbody', ghtml);
     } else {
-      seth('ci-growth-tbody', '<tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No cross-sell opportunities above threshold this window.</td></tr>');
+      seth('ci-growth-tbody', '<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No cross-sell opportunities above threshold this window.</td></tr>');
     }
 
     // ========== LEVEL 4 — EARLY WARNING TABLE ==========
@@ -6077,25 +6099,29 @@ async function loadIntelligence(){
     if(d.early_warning && d.early_warning.length){
       var whtml = '';
       d.early_warning.forEach(function(w, i){
-        var pcls = ciPrioCls(w.priority_score || 0);
         var chgCls = (w.change_pct||0) < -50 ? 'color:var(--red)' : 'color:var(--gold)';
+        var meta = [w.region, w.sales_rep].filter(Boolean).map(esc).join(' · ');
+        var avg90 = fcn(Math.round((w.avg_90d_mt||0)));
+        var last30 = fcn(Math.round((w.last_30d_mt||0)));
+        var trendCell =
+            '<span class="ci-trend-from">'+ avg90 +'</span>'
+          + ' <span class="ci-trend-from">→</span> '
+          + '<span class="ci-trend-to">'+ last30 +'</span>'
+          + '<div class="ci-trend-delta" style="'+ chgCls +'">'+ (w.change_pct||0) +'%</div>';
         whtml += '<tr>'
           + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
-          + '<td><a class="ci-link" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.card_code) +'">'+ esc(w.name||w.card_code) +'</a></td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(w.region||'—') +'</td>'
-          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round((w.avg_90d_mt||0))) +'</td>'
-          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round((w.last_30d_mt||0))) +'</td>'
-          + '<td class="num" style="'+ chgCls +';font-weight:700;font-family:var(--mono)">'+ (w.change_pct||0) +'%</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.card_code) +'">'+ esc(w.name||w.card_code) +'</a>'
+          +   (meta ? '<div class="ci-meta">'+ meta +'</div>' : '')
+          + '</td>'
+          + '<td class="num"><div class="ci-trend">'+ trendCell +'</div></td>'
           + '<td class="num" style="color:var(--gold);font-weight:700">'+ fc(w.revenue_impact_php_yearly||0) +'</td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(w.sales_rep||'—') +'</td>'
-          + '<td class="num"><span class="ci-prio '+ pcls +'" title="'+ esc(w.reason||'') +'">'+ (w.priority_score||0) +'</span></td>'
           + '<td><button class="ci-action ci-action-warn" type="button" onclick="openCust(\''+ esc(w.card_code) +'\')" title="'+ esc(w.suggested_action||'') +'">Visit</button></td>'
           + '<td>' + ciRowMenuBtn('warning', w.card_code, w.name, (w.change_pct||0) + '% · risk ' + fc(w.revenue_impact_php_yearly||0)) + '</td>'
           + '</tr>';
       });
       seth('ci-warning-tbody', whtml);
     } else {
-      seth('ci-warning-tbody', '<tr><td colspan="11" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No customers with meaningful declining trend.</td></tr>');
+      seth('ci-warning-tbody', '<tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No customers with meaningful declining trend.</td></tr>');
     }
 
     // ========== LEVEL 5 — DORMANT SUMMARY + LIST ==========
@@ -6123,20 +6149,20 @@ async function loadIntelligence(){
     if(d.dormant_list && d.dormant_list.length){
       var dhtml = '';
       d.dormant_list.forEach(function(r, i){
+        var meta = [r.region, r.sales_rep].filter(Boolean).map(esc).join(' · ');
         dhtml += '<tr>'
           + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
-          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a></td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
-          + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
+          + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(r.name||r.card_code) +'</a>'
+          +   (meta ? '<div class="ci-meta">'+ meta +'</div>' : '')
+          + '</td>'
           + '<td style="font-size:11px;color:var(--text2)">'+ ciFmtDate(r.last_order_date) +'</td>'
           + '<td class="num" style="font-family:var(--mono);color:var(--text2)">'+ fcn(r.days_dormant||0) +'d</td>'
           + '<td class="num" style="font-family:var(--mono);'+ (r.historical_ar>0?'color:var(--red);font-weight:700':'color:var(--text3)') +'">'+ fc(r.historical_ar||0) +'</td>'
-          + '<td class="num" style="font-family:var(--mono)">'+ fcn(Math.round(r.lifetime_volume_mt||0)) +'</td>'
           + '</tr>';
       });
       seth('ci-dormant-tbody', dhtml);
     } else {
-      seth('ci-dormant-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No dormant customers.</td></tr>');
+      seth('ci-dormant-tbody', '<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No dormant customers.</td></tr>');
     }
 
     // ========== LEVEL 5.5 — LEGACY AR ==========
@@ -6515,7 +6541,7 @@ async function loadTeam(){
   try {
     if(!DC) DC={};
     if(!DC['pg-team']){
-      DC['pg-team'] = await getTeamData({period:PD}).catch(function(e){console.error('team:',e);return null});
+      DC['pg-team'] = await getTeamData(vfApiParams()).catch(function(e){console.error('team:',e);return null});
     }
     var d = DC['pg-team'];
     if(!d){showError('pg-team','Unable to load team data');return}
@@ -6564,30 +6590,63 @@ async function loadTeam(){
         'vsLY=' + e.vs_ly_pct, 'Speed=' + e.speed, 'GM/Ton=' + e.gm_ton,
         'RSMs=' + e.rsm_count, 'Reps=' + e.reports_count, 'Customers=' + e.active_customers);
     }
-    // RSM SCORECARD — main team table
+    // RSM SCORECARD — main team table (+ expandable DSM sub-rows from /api/team)
     if(d.rsms && d.rsms.length){
+      function teamScoreRowHtml(row, cls, nameHtml, extraTrAttrs){
+        extraTrAttrs = extraTrAttrs || '';
+        var ach = row.ach_pct!=null ? row.ach_pct : 0;
+        var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
+        var dsoCol = row.dso!=null ? (row.dso<=45?'b-green' : row.dso<=60?'b-gold' : 'b-red') : 'b-gold';
+        var h = '<tr class="'+cls+'"'+extraTrAttrs+'>';
+        h += '<td>'+nameHtml+'</td>';
+        h += '<td>'+esc(row.region||'--')+'</td>';
+        h += '<td>'+esc(row.bu||'--')+'</td>';
+        h += '<td>'+fcn(Math.round(row.ytd_vol||0))+'</td>';
+        h += '<td>'+fcn(Math.round(row.ytd_target||0))+'</td>';
+        h += '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
+        h += '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>';
+        h += '<td class="'+((row.vs_ly||0)>=0?'up':'down')+'">'+(row.vs_ly!=null?(row.vs_ly>=0?'+':'')+row.vs_ly.toFixed(1)+'%':'--')+'</td>';
+        h += '<td>'+fcn(Math.round(row.speed||0))+'</td>';
+        h += '<td>₱'+fcn(Math.round(row.gm_ton||0))+'</td>';
+        h += '<td><span class="badge '+dsoCol+'">'+(row.dso!=null?Math.round(row.dso)+'d':'--')+'</span></td>';
+        h += '<td>'+fcn(row.customers||0)+'</td>';
+        h += '<td style="color:'+(row.silent>0?'var(--red)':'var(--text)')+';font-weight:'+(row.silent>0?'700':'400')+'">'+(row.silent||0)+'</td>';
+        h += '<td style="color:'+(row.neg_margin>0?'var(--red)':'var(--text)')+';font-weight:'+(row.neg_margin>0?'700':'400')+'">'+(row.neg_margin||0)+'</td>';
+        h += '</tr>';
+        return h;
+      }
       var thtml='';
       d.rsms.forEach(function(r){
-        var ach = r.ach_pct!=null ? r.ach_pct : 0;
-        var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
-        var dsoCol = r.dso!=null ? (r.dso<=45?'b-green' : r.dso<=60?'b-gold' : 'b-red') : 'b-gold';
-        thtml += '<tr class="rsm-row">';
-        thtml += '<td>'+esc((r.name||'').toUpperCase())+'</td>';
-        thtml += '<td>'+esc(r.region||'--')+'</td>';
-        thtml += '<td>'+esc(r.bu||'--')+'</td>';
-        thtml += '<td>'+fcn(Math.round(r.ytd_vol||0))+'</td>';
-        thtml += '<td>'+fcn(Math.round(r.ytd_target||0))+'</td>';
-        thtml += '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
-        thtml += '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>';
-        thtml += '<td class="'+((r.vs_ly||0)>=0?'up':'down')+'">'+(r.vs_ly!=null?(r.vs_ly>=0?'+':'')+r.vs_ly.toFixed(1)+'%':'--')+'</td>';
-        thtml += '<td>'+fcn(Math.round(r.speed||0))+'</td>';
-        thtml += '<td>₱'+fcn(Math.round(r.gm_ton||0))+'</td>';
-        thtml += '<td><span class="badge '+dsoCol+'">'+(r.dso!=null?Math.round(r.dso)+'d':'--')+'</span></td>';
-        thtml += '<td>'+fcn(r.customers||0)+'</td>';
-        thtml += '<td style="color:'+(r.silent>0?'var(--red)':'var(--text)')+';font-weight:'+(r.silent>0?'700':'400')+'">'+(r.silent||0)+'</td>';
-        thtml += '<td style="color:'+(r.neg_margin>0?'var(--red)':'var(--text)')+';font-weight:'+(r.neg_margin>0?'700':'400')+'">'+(r.neg_margin||0)+'</td>';
-        thtml += '</tr>';
+        var nm = esc((r.name||'').toUpperCase());
+        var dsms = r.dsms || [];
+        var nameCell = dsms.length
+          ? '<span style="display:inline-flex;align-items:center;width:100%"><button type="button" class="team-rsm-expand" data-rsm-slp="'+esc(String(r.slp_code))+'" aria-expanded="false" aria-label="Expand DSM rows" title="Show / hide DSMs">+</button><span>'+nm+'</span></span>'
+          : nm;
+        thtml += teamScoreRowHtml(r, 'rsm-row', nameCell, '');
+        dsms.forEach(function(dm){
+          var dnm = esc((dm.name||'').toUpperCase());
+          thtml += teamScoreRowHtml(dm, 'dsm-row team-dsm-sub is-collapsed', dnm, ' data-under-rsm="'+String(r.slp_code)+'"');
+        });
       });
+      if(!window.__teamRsmExpandBound){
+        window.__teamRsmExpandBound = true;
+        document.addEventListener('click', function(ev){
+          var btn = ev.target && ev.target.closest && ev.target.closest('.team-rsm-expand');
+          if(!btn) return;
+          var tbl = document.getElementById('team-tbl');
+          if(!tbl || !tbl.contains(btn)) return;
+          ev.preventDefault();
+          var slp = btn.getAttribute('data-rsm-slp');
+          if(slp==null) return;
+          var expanded = btn.getAttribute('aria-expanded') === 'true';
+          var show = !expanded;
+          btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+          btn.textContent = show ? '\u2212' : '+';
+          document.querySelectorAll('tr.team-dsm-sub[data-under-rsm="'+slp+'"]').forEach(function(tr){
+            tr.classList.toggle('is-collapsed', !show);
+          });
+        });
+      }
       // Totals row
       var totals = d.rsms.reduce(function(a,r){
         a.vol+=(r.ytd_vol||0); a.tgt+=(r.ytd_target||0);
@@ -7754,21 +7813,21 @@ function ciRenderLegacyAR(l){
   }).join(''));
   var top = l.top_accounts || [];
   if(!top.length){
-    seth('ci-legacy-tbody', '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No legacy AR — all open balances have post-2024 activity.</td></tr>');
+    seth('ci-legacy-tbody', '<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px;padding:24px">No legacy AR — all open balances have post-2024 activity.</td></tr>');
     return;
   }
   var html = top.map(function(r, i){
     var name = r.name || r.card_code;
     var yrs  = (r.years_silent != null) ? (r.years_silent + ' yr') : '—';
+    var meta = [r.region, r.sales_rep].filter(Boolean).map(esc).join(' · ');
     return '<tr>'
       + '<td style="color:var(--text3);font-family:var(--mono)">'+ (i+1) +'</td>'
-      + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(name) +'</a></td>'
-      + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.region||'—') +'</td>'
-      + '<td style="font-size:11px;color:var(--text2)">'+ esc(r.sales_rep||'—') +'</td>'
+      + '<td><a class="ci-link" onclick="openCust(\''+ esc(r.card_code) +'\')" title="'+ esc(r.card_code) +'">'+ esc(name) +'</a>'
+      +   (meta ? '<div class="ci-meta">'+ meta +'</div>' : '')
+      + '</td>'
       + '<td style="font-size:11px;color:var(--text2);font-family:var(--mono)">'+ ciFmtDate(r.last_inv_date) +'</td>'
       + '<td class="num" style="font-family:var(--mono);color:var(--gold);font-weight:700">'+ esc(yrs) +'</td>'
       + '<td class="num" style="font-family:var(--mono);color:var(--text2);font-weight:700">'+ fc(r.ar_balance||0) +'</td>'
-      + '<td>' + ciRowMenuBtn('legacy_ar', r.card_code, name, 'Legacy AR ' + fc(r.ar_balance||0)) + '</td>'
       + '</tr>';
   }).join('');
   seth('ci-legacy-tbody', html);
