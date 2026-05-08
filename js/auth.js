@@ -15,30 +15,58 @@ var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
  * to Patrol and you will never hit this page.
  */
 function getHqOAuthRedirectUrl() {
+  var path = '/auth/callback.html';
   var host = '';
   try {
     host = String(window.location.hostname || '').toLowerCase();
   } catch (e) {}
-  var path = '/auth/callback.html';
   if (host === 'localhost' || host === '127.0.0.1') {
     return 'https://vieforce-hq.vercel.app' + path;
-  }
-  if (host === 'vieforce-hq.vercel.app') {
-    return 'https://vieforce-hq.vercel.app' + path;
-  }
-  if (host.indexOf('vieforce-hq') !== -1) {
-    var origin = '';
-    try {
-      origin = String(window.location.origin || '').replace(/\/$/, '');
-    } catch (e2) {}
-    if (origin) return origin + path;
   }
   var o = '';
   try {
     o = String(window.location.origin || '').replace(/\/$/, '');
-  } catch (e3) {}
+  } catch (e2) {}
   if (o) return o + path;
   return 'https://vieforce-hq.vercel.app' + path;
+}
+
+/** Substring that must not appear in Supabase authorize URL redirect_to when signing in from HQ. */
+var PATROL_OAUTH_HOST_MARKER = 'vieforce-patrol';
+
+/**
+ * Inspect OAuth authorize URL before navigating (requires skipBrowserRedirect).
+ * @returns {{ ok: boolean, error?: string }}
+ */
+function verifyHqOAuthAuthorizeUrl(authorizeUrl) {
+  if (!authorizeUrl) {
+    return { ok: false, error: 'Google sign-in did not return a URL. Try again or use phone + PIN.' };
+  }
+  var redirectParam = '';
+  try {
+    redirectParam = new URL(authorizeUrl).searchParams.get('redirect_to') || '';
+  } catch (e) {
+    return { ok: false, error: 'Could not verify Google redirect. Check Supabase Redirect URLs for HQ.' };
+  }
+  if (!redirectParam) {
+    return {
+      ok: false,
+      error:
+        'Supabase omitted redirect_to. Set Site URL and Redirect URLs for HQ (see RUNBOOK_DEPLOY.md) or run npm run fix:supabase-auth-url.'
+    };
+  }
+  var decoded = redirectParam;
+  try {
+    decoded = decodeURIComponent(redirectParam);
+  } catch (e2) {}
+  if (decoded.toLowerCase().indexOf(PATROL_OAUTH_HOST_MARKER) !== -1) {
+    return {
+      ok: false,
+      error:
+        'Sign-in would return to Patrol, not HQ. In Supabase → Authentication → URL Configuration, set Site URL to the HQ origin and add this app\'s /auth/callback.html to Redirect URLs, or run npm run fix:supabase-auth-url.'
+    };
+  }
+  return { ok: true };
 }
 
 async function isGoogleProviderEnabled() {
@@ -177,12 +205,19 @@ async function loginWithGoogle() {
       queryParams: {
         hd: GOOGLE_ALLOWED_DOMAIN,
         prompt: 'select_account'
-      }
+      },
+      skipBrowserRedirect: true
     }
   });
   if (result.error) {
     return { ok: false, error: result.error.message || 'Google sign-in failed to start.' };
   }
+  var authorizeUrl = result.data && result.data.url;
+  var check = verifyHqOAuthAuthorizeUrl(authorizeUrl);
+  if (!check.ok) {
+    return { ok: false, error: check.error };
+  }
+  window.location.assign(authorizeUrl);
   return { ok: true, pendingRedirect: true };
 }
 
