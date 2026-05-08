@@ -8,6 +8,7 @@ const {
   getPeriodBounds,
   getPeriodEndBound,
   getManilaToday,
+  resolveRefMonthAnchor,
   fmtISO
 } = require('./lib/shipping_days')
 
@@ -73,8 +74,8 @@ const BUDGET_2026 = {
   ]
 }
 
-function getTarget(period) {
-  const now = new Date()
+function getTarget(period, anchorDate) {
+  const now = anchorDate || getManilaToday()
   const month = now.getMonth()      // 0-11
   const quarter = Math.floor(month / 3) // 0-3
 
@@ -144,9 +145,10 @@ module.exports = async (req, res) => {
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   const { period = 'MTD' } = req.query
+  const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
 
   // Period bounds computed early so zero-state + cache key share them.
-  const todayPH = getManilaToday()
+  const todayPH = resolveRefMonthAnchor(refMonthRaw)
   const { start: dateFrom, end: dateTo } = getPeriodBounds(period, todayPH)
   const periodEnd = getPeriodEndBound(period, todayPH)
 
@@ -176,7 +178,8 @@ module.exports = async (req, res) => {
 
   // Cache key includes scope user so user A's rows cannot serve user B.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
-  const cacheKey = `speed_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const refKey = refMonthRaw && /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
+  const cacheKey = `speed_${refKey}_${period}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -252,7 +255,7 @@ module.exports = async (req, res) => {
       ? Math.round(speed_per_day * total_days)
       : 0
 
-    const target_mt = getTarget(period)
+    const target_mt = getTarget(period, todayPH)
     const pct_of_target = target_mt > 0
       ? Math.round((projected_mt / target_mt) * 100)
       : 0

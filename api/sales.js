@@ -38,13 +38,17 @@ module.exports = async (req, res) => {
 
   // Cache check — include scope in key so user A's cached rows don't leak to user B.
   const scopeKey = scope ? `_scope:${scope.userId}:${scope.role}` : ''
-  const cacheKey = `sales_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
+  const cacheKey = `sales_${refMonthKey}_${req.query.period || 'MTD'}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const { period = 'MTD', region = 'ALL' } = req.query
-    const { dateFrom, dateTo } = getPeriodDates(period)
+    const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+    const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
 
     // Patrol-only opt-in blocks. Web dashboard never sends include= so its response
     // stays byte-identical. Patrol passes ?include=whitespace,at_risk.
@@ -336,8 +340,9 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${scopeSql}
     `, { pFrom: prevFrom, pTo: prevTo })
 
-    // YTD (Jan 1 → today)
-    const ytdFrom = new Date(new Date().getFullYear(), 0, 1)
+    // YTD (Jan 1 → anchor end) — anchor respects ref_month
+    const anchorEnd = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate())
+    const ytdFrom = new Date(anchorEnd.getFullYear(), 0, 1)
     const kpiYtd = await query(`
       SELECT
         ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
@@ -346,8 +351,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= @ytdFrom AND T0.CANCELED='N'${scopeSql}
-    `, { ytdFrom })
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @ytdEnd AND T0.CANCELED='N'${scopeSql}
+    `, { ytdFrom, ytdEnd: anchorEnd })
 
     // LY same period (current period -1y) and LY YTD — pulls from historical when pre-cutoff
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
@@ -366,8 +371,8 @@ module.exports = async (req, res) => {
       WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}
     `, {}, lyFrom, lyTo)
 
-    const ytdLyFrom = new Date(new Date().getFullYear() - 1, 0, 1)
-    const ytdLyTo   = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate())
+    const ytdLyFrom = new Date(anchorEnd.getFullYear() - 1, 0, 1)
+    const ytdLyTo   = new Date(anchorEnd.getFullYear() - 1, anchorEnd.getMonth(), anchorEnd.getDate())
     const kpiYtdLy = await queryDateRange(`
       SELECT
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
@@ -386,6 +391,7 @@ module.exports = async (req, res) => {
     const cur = kpiCurrent[0] || {}, prv = kpiPrev[0] || {}, yt = kpiYtd[0] || {}
     const ly  = sumRows(kpiLy, 'volume_bags', 'volume_mt', 'revenue')
     if (kpiLy.length === 1) ly.gmt = kpiLy[0].gmt || 0   // single-DB short-circuit
+    const lyGmtForDelta = (kpiLy.length >= 1 && kpiLy[0].gmt != null) ? kpiLy[0].gmt : (ly.gmt || 0)
     const ytdLy = sumRows(kpiYtdLy, 'volume_mt', 'revenue')
 
     const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0
@@ -416,6 +422,7 @@ module.exports = async (req, res) => {
       delta_pct_ly: {
         volume_mt: pct(cur.volume_mt, ly.volume_mt),
         revenue:   pct(cur.revenue,   ly.revenue),
+        gmt:       pct(cur.gmt, lyGmtForDelta),
         ytd_volume_mt: pct(yt.volume_mt, ytdLy.volume_mt),
         ytd_revenue:   pct(yt.revenue,   ytdLy.revenue)
       }

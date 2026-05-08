@@ -50,18 +50,26 @@ async function verifyServiceToken(req) {
   }
 }
 
-function getPeriodDates(period) {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth()
-  const d = now.getDate()
+const { resolveRefMonthAnchor } = require('./lib/shipping_days')
+
+/**
+ * @param {string} period  7D | MTD | QTD | YTD
+ * @param {{ refMonth?: string, ref_month?: string }} [opts]
+ */
+function getPeriodDates(period, opts) {
+  opts = opts || {}
+  const refRaw = opts.refMonth || opts.ref_month
+  const anchor = resolveRefMonthAnchor(typeof refRaw === 'string' ? refRaw : '')
+  const y = anchor.getFullYear()
+  const m = anchor.getMonth()
+  const d = anchor.getDate()
 
   switch (period) {
-    case '7D':  return { dateFrom: new Date(y, m, d - 7), dateTo: now }
-    case 'MTD': return { dateFrom: new Date(y, m, 1), dateTo: now }
-    case 'QTD': return { dateFrom: new Date(y, Math.floor(m / 3) * 3, 1), dateTo: now }
-    case 'YTD': return { dateFrom: new Date(y, 0, 1), dateTo: now }
-    default:    return { dateFrom: new Date(y, m, 1), dateTo: now }
+    case '7D':  return { dateFrom: new Date(y, m, d - 7), dateTo: anchor }
+    case 'MTD': return { dateFrom: new Date(y, m, 1), dateTo: anchor }
+    case 'QTD': return { dateFrom: new Date(y, Math.floor(m / 3) * 3, 1), dateTo: anchor }
+    case 'YTD': return { dateFrom: new Date(y, 0, 1), dateTo: anchor }
+    default:    return { dateFrom: new Date(y, m, 1), dateTo: anchor }
   }
 }
 
