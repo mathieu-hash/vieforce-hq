@@ -17,7 +17,38 @@
  *   SUPABASE_PROJECT_REF     (default: yolxcmeoovztuindrglk — must match js/supabase.js project)
  *   SUPABASE_AUTH_SITE_URL   auth site_url (default: https://vieforce-hq.vercel.app) — see header comment
  *   AUTH_URI_ALLOW_LIST      comma-separated patterns (default merges Patrol + HQ + localhost)
+ *
+ * If SUPABASE_ACCESS_TOKEN is unset, this script loads it from .env.local in cwd (same as local dev).
  */
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+
+function loadSupabasePatFromEnvLocal() {
+  if (process.env.SUPABASE_ACCESS_TOKEN && String(process.env.SUPABASE_ACCESS_TOKEN).trim()) return
+  const p = join(process.cwd(), '.env.local')
+  if (!existsSync(p)) return
+  try {
+    const raw = readFileSync(p, 'utf8')
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const m = trimmed.match(/^SUPABASE_ACCESS_TOKEN=(.*)$/)
+      if (!m) continue
+      let v = m[1].trim()
+      if (
+        (v.startsWith('"') && v.endsWith('"')) ||
+        (v.startsWith("'") && v.endsWith("'"))
+      ) {
+        v = v.slice(1, -1)
+      }
+      if (v) process.env.SUPABASE_ACCESS_TOKEN = v
+      break
+    }
+  } catch (_) {}
+}
+
+loadSupabasePatFromEnvLocal()
+
 const API = 'https://api.supabase.com'
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'yolxcmeoovztuindrglk'
 // MUST be vieforce-hq hostname so GoTrue accepts redirect_to from HQ without relying on glob
@@ -45,7 +76,8 @@ if (!token || !String(token).trim()) {
     'Missing SUPABASE_ACCESS_TOKEN.\n' +
       'Create a Personal Access Token: https://supabase.com/dashboard/account/tokens\n' +
       'Scopes: include project config / auth write for your org.\n' +
-      'Then: $env:SUPABASE_ACCESS_TOKEN = "sbp_..." ; node scripts/patch-supabase-auth-url.mjs'
+      'Add to .env.local: SUPABASE_ACCESS_TOKEN=sbp_...\n' +
+      'Or: $env:SUPABASE_ACCESS_TOKEN = "sbp_..." ; npm run fix:supabase-auth-url'
   )
   process.exit(1)
 }
