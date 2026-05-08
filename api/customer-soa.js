@@ -1,14 +1,15 @@
 const { query } = require('./_db')
-const { verifySession } = require('./_auth')
+const { verifySession, verifyServiceToken } = require('./_auth')
 const cache = require('../lib/cache')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
+  res.setHeader('Access-Control-Allow-Headers', 'x-session-id, authorization, content-type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const session = await verifySession(req)
+  // Auth — service-token first (cc-portal / Patrol S2S), fall back to user session.
+  const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   const { id } = req.query
