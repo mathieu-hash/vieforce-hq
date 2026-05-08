@@ -4,6 +4,8 @@
 
 Shared Supabase project: enable **Google** provider under Authentication → Providers (already on for Patrol).
 
+**Return URL rule:** Where you land after Google is **`redirect_to` from the app that started OAuth**, not “always Site URL.” Patrol’s client sends Patrol’s URL; HQ’s client sends HQ’s `/auth/callback.html`. **Repo contract:** `tests/oauth-redirect-contract.test.js` fails if HQ ever embeds Patrol’s hostname in its redirect helper (or if the patch script drops either app from the allow-list).
+
 **Redirect URLs** (Authentication → URL Configuration → **Redirect URLs**) must allow **both** apps.
 
 | Symptom | Cause |
