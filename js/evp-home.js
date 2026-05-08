@@ -52,13 +52,17 @@
 
     // Fire all 5 API calls in parallel — each is independent for graceful partial render
     var calls;
+    var _pd = (typeof PD !== 'undefined' && PD) ? PD : 'MTD';
+    var _rm = (typeof VF_REF_MONTH !== 'undefined' && VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) ? VF_REF_MONTH : undefined;
+    var _p = { period: _pd };
+    if(_rm) _p.ref_month = _rm;
     try{
       calls = await Promise.all([
-        (typeof getDashboardData==='function'  ? getDashboardData({period:'MTD'})  : Promise.resolve(null)).catch(function(e){console.error('[EVP] dash:',e);return null}),
-        (typeof getSalesData==='function'      ? getSalesData({period:'MTD'})      : Promise.resolve(null)).catch(function(e){console.error('[EVP] sales:',e);return null}),
+        (typeof getDashboardData==='function'  ? getDashboardData(_p)  : Promise.resolve(null)).catch(function(e){console.error('[EVP] dash:',e);return null}),
+        (typeof getSalesData==='function'      ? getSalesData(_p)      : Promise.resolve(null)).catch(function(e){console.error('[EVP] sales:',e);return null}),
         (typeof getARData==='function'         ? getARData()                       : Promise.resolve(null)).catch(function(e){console.error('[EVP] ar:',e);return null}),
-        (typeof getMarginData==='function'     ? getMarginData({period:'MTD'})     : Promise.resolve(null)).catch(function(e){console.error('[EVP] margin:',e);return null}),
-        (typeof getTeamData==='function'       ? getTeamData()                     : Promise.resolve(null)).catch(function(e){console.error('[EVP] team:',e);return null})
+        (typeof getMarginData==='function'     ? getMarginData(_p)     : Promise.resolve(null)).catch(function(e){console.error('[EVP] margin:',e);return null}),
+        (typeof getTeamData==='function'       ? getTeamData(_p)                     : Promise.resolve(null)).catch(function(e){console.error('[EVP] team:',e);return null})
       ]);
     } catch(err){
       console.error('[EVP] fatal load error:', err);
@@ -71,12 +75,10 @@
     // Render each section — wrapped in try so one broken card doesn't kill the rest
     try { renderEvpHero(dash); }          catch(e){ console.error('[EVP] hero:',e); }
     try { renderEvpPnl(dash, sales, margin); } catch(e){ console.error('[EVP] pnl:',e); }
-    try { renderEvpDecisions(); }         catch(e){ console.error('[EVP] decisions:',e); }
     try { renderEvpRegions(dash); }       catch(e){ console.error('[EVP] regions:',e); }
     try { renderEvpRisks(dash, ar, margin); } catch(e){ console.error('[EVP] risks:',e); }
     try { renderEvpOpps(dash, team); }    catch(e){ console.error('[EVP] opps:',e); }
     try { renderEvpPerformers(team, dash); } catch(e){ console.error('[EVP] performers:',e); }
-    // agenda is static HTML for Day 1
   }
 
   // --- Renderers --------------------------------------------------------------
@@ -147,23 +149,6 @@
     // GM / Ton
     var gmton = (dash && dash.gmt) || 0;
     var gmtEl = $('evp-gmton'); if(gmtEl) gmtEl.textContent = gmton ? '₱'+Math.round(gmton).toLocaleString() : '—';
-  }
-
-  function renderEvpDecisions(){
-    // Hardcoded for Day 1 — future: GET /api/decisions (Mat's follow-up list table)
-    var decisions = [
-      { text: 'Approve 2 new DSMs for NL expansion?',     cta: 'Decide' },
-      { text: 'Cebu plant land subdivision — sign off?',  cta: 'Review' },
-      { text: 'Vet budget FY26 — increase 20% proposal',  cta: 'Decide' }
-    ];
-    var html = decisions.map(function(d){
-      return '<div class="evp-decision-item">' +
-        '<div class="evp-decision-text">'+d.text+'</div>' +
-        '<div class="evp-decision-cta">'+d.cta+'</div>' +
-      '</div>';
-    }).join('');
-    var listEl = $('evp-decisions-list'); if(listEl) listEl.innerHTML = html;
-    var countEl = $('evp-decisions-count'); if(countEl) countEl.textContent = decisions.length;
   }
 
   function renderEvpRegions(dash){
