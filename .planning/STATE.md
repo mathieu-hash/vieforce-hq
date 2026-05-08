@@ -32,7 +32,7 @@ Last activity: 2026-05-03 — GSD resume; session continuity updated
 
 ## Session continuity
 
-- **Last session:** 2026-05-03 — resumed GSD after deploy + Patrol doc work.  
-- **Stopped at:** Milestone **v1.0 Beta** — `ready-for-uat`; no `HANDOFF.json`, no `.planning/phases/*` checkpoints.  
-- **Resume file:** none (flat `.planning/` only).  
-- **Next up:** run **`/gsd-verify-work`** (or walk `.planning/ADMIN_VALIDATION_CHECKLIST.md`), then **`/gsd-audit-milestone`** → **`/gsd-complete-milestone`** when sign-off is real.
+- **Last session:** 2026-05-03 — resumed GSD after deploy + Patrol doc work; Cursor session captured Patrol/SAP/MCP handoff.  
+- **Stopped at:** Milestone **v1.0 Beta** — `ready-for-uat`. **UAT execution:** `.planning/phases/04-beta-uat/4-UAT.md` — **A1 SAP reps list** still **`[pending]`** after staging preconditions **pass**.  
+- **Resume file:** `.planning/CURSOR_SESSION_LOG_2026-05-03.md` (Patrol Sales, Supabase mapping, MCP/VPN, GSD next steps).  
+- **Next up:** Continue **`4-UAT.md`** from A1; run **`/gsd-verify-work`** (or walk `.planning/ADMIN_VALIDATION_CHECKLIST.md`), then **`/gsd-audit-milestone`** → **`/gsd-complete-milestone`** when sign-off is real.
