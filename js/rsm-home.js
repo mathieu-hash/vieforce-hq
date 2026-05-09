@@ -251,10 +251,27 @@
     // Target
     var target = Number(rsm.ytd_target || 0);
     var achPct = Number(rsm.ach_pct || 0);
-    var vsLy   = Number(rsm.vs_ly || 0);
+    var vsTrend = 0;
+    var cmpLbl = 'vs PP';
+    if (regionRow && typeof CMP === 'string') {
+      var useLy = CMP === 'vs_ly';
+      var raw = useLy ? regionRow.vs_ly : regionRow.vs_pp;
+      if (useLy && (raw == null || raw === '')) {
+        raw = regionRow.vs_pp;
+        cmpLbl = 'vs PP';
+      } else {
+        cmpLbl = useLy ? 'vs LY' : 'vs PP';
+      }
+      vsTrend = Number(raw || 0);
+    } else {
+      vsTrend = Number(rsm.vs_ly || 0);
+      cmpLbl = 'vs LY';
+    }
 
     setTxt('rsm-revenue', fmtPhpShort(revMtd));
-    setTxt('rsm-revenue-trend', (vsLy === 0 ? '—' : (vsLy > 0 ? '↑' : '↓') + Math.abs(vsLy).toFixed(1) + '%'));
+    setTxt('rsm-revenue-trend', (vsTrend === 0 ? '—' : (vsTrend > 0 ? '↑' : '↓') + Math.abs(vsTrend).toFixed(1) + '%'));
+    var cmpEl = document.getElementById('rsm-revenue-cmp-lbl');
+    if (cmpEl) cmpEl.textContent = cmpLbl;
     setTxt('rsm-revenue-pct', (achPct ? Math.round(achPct) : 0) + '%');
 
     var fill = document.getElementById('rsm-progress-fill');
