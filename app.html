@@ -1227,7 +1227,7 @@ body{
             </div>
             <div class="card-body" style="padding-top:8px">
               <table class="tbl" id="home-region-tbl">
-                <tr><th>Region</th><th class="num">Volume (MT)</th><th class="num">Net Sales</th><th class="num">vs PP</th><th class="num">GM/Ton</th><th class="num">DSO</th></tr>
+                <tr><th>Region</th><th class="num">Volume (MT)</th><th class="num">Net Sales</th><th class="num"><span id="home-region-cmp-label">vs PP</span></th><th class="num">GM/Ton</th><th class="num">DSO</th></tr>
                 <tbody id="home-region-tbody">
                 <tr>
                   <td style="font-weight:700">LUZON</td>
@@ -4464,10 +4464,17 @@ async function loadHome(){
         var rhtml='';var totV=0,totS=0;
         d.region_performance.forEach(function(r){
           var dsoBadge=r.dso<50?'b-green':r.dso<55?'b-gold':'b-red';
+          var cmpVs = (CMP==='vs_ly' && r.vs_ly!=null) ? r.vs_ly : r.vs_pp;
+          var cmpTd;
+          if(cmpVs==null){
+            cmpTd='<td class="num">--</td>';
+          } else {
+            cmpTd='<td class="num '+(cmpVs>=0?'up':'down')+'">'+(cmpVs>=0?'+':'')+cmpVs.toFixed(1)+'%</td>';
+          }
           rhtml+='<tr><td style="font-weight:700">'+esc(r.region||r.name||'').toUpperCase()+'</td>';
           rhtml+='<td class="num">'+fcn(Math.round(r.vol||r.volume_mt||0))+'</td>';
           rhtml+='<td class="num">'+fc(r.sales||r.revenue||0)+'</td>';
-          rhtml+='<td class="num '+(r.vs_pp>=0?'up':'down')+'">'+(r.vs_pp!=null?(r.vs_pp>=0?'+':'')+r.vs_pp.toFixed(1)+'%':'--')+'</td>';
+          rhtml+=cmpTd;
           rhtml+='<td class="num">₱'+fcn(Math.round(r.gm_ton||r.gmt||0))+'</td>';
           rhtml+='<td class="num"><span class="badge '+dsoBadge+'">'+(r.dso?Math.round(r.dso)+'d':'--')+'</span></td></tr>';
           totV+=(r.vol||r.volume_mt||0);totS+=(r.sales||r.revenue||0);
@@ -4491,6 +4498,8 @@ async function loadHome(){
         });
         seth('home-topcust',tchtml);
       }
+      var _hrRegCmp = document.getElementById('home-region-cmp-label');
+      if(_hrRegCmp) _hrRegCmp.textContent = (CMP==='vs_ly' ? 'vs LY' : 'vs PP');
     }
     // DSO card — prefer dashboard's dso_active, fall back to /api/ar
     var dsoActive = (d && d.dso_active!=null) ? d.dso_active : (ar && ar.dso_active!=null ? ar.dso_active : (ar && ar.dso!=null ? ar.dso : null));
