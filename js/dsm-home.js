@@ -121,11 +121,18 @@
         val.textContent = fmtPhpShort(s.mtd_revenue || 0);
       }
     }
-    var vs = Number(s.vs_pp_pct || 0);
+    var useLy = (typeof CMP === 'string' && CMP === 'vs_ly');
+    var vsLyRaw = s.vs_ly_pct;
+    var vsPpRaw = s.vs_pp_pct;
+    var vs = useLy
+      ? (vsLyRaw != null && vsLyRaw !== '' && !isNaN(Number(vsLyRaw)) ? Number(vsLyRaw) : Number(vsPpRaw || 0))
+      : Number(vsPpRaw || 0);
+    var cmpWord = useLy ? 'LY' : 'PP';
+    if (useLy && (vsLyRaw == null || vsLyRaw === '' || isNaN(Number(vsLyRaw)))) cmpWord = 'PP';
     if (trend){
       var arrow = vs >= 0 ? '↑' : '↓';
       trend.className = 'dsm-hero-trend ' + (vs >= 0 ? 'up' : 'down');
-      trend.textContent = arrow + ' ' + Math.abs(vs).toFixed(1) + '% vs PP';
+      trend.textContent = arrow + ' ' + Math.abs(vs).toFixed(1) + '% vs ' + cmpWord;
     }
     if (ach) ach.textContent = fmtPhpShort(s.mtd_revenue || 0);
     if (tgt) tgt.textContent = s.target ? fmtPhpShort(s.target) + ' target' : 'no target set';
