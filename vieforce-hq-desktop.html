@@ -831,7 +831,8 @@ body{
       <div class="topbar-sub" id="topbar-sub">National Overview</div>
       <div class="topbar-spacer"></div>
 
-      <div class="topbar-controls" id="topbar-controls">
+      <!-- Review-only HTML mockup: period/compare/unit chips are not wired (no localStorage/loadPage). Use app.html for live filtering. -->
+      <div class="topbar-controls" id="topbar-controls" style="display:none">
         <button class="tb-chip" onclick="setPd(this)">7D</button>
         <button class="tb-chip active" onclick="setPd(this)">MTD</button>
         <button class="tb-chip" onclick="setPd(this)">QTD</button>
