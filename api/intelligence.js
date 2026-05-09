@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
   const anchorMs = anchorDate.getTime()
 
   // Cache key includes userId so silences are user-scoped.
-  const cacheKey = `intelligence_v4_${session.id}_${refMonthKey}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `intelligence_v5_${session.id}_${refMonthKey}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -82,8 +82,9 @@ module.exports = async (req, res) => {
       return out
     }
 
-    // ============== Q1: per-customer activity (36mo) + 2024+ flag =========
-    // 36-mo scan spans the 2026-01-01 cutoff. Run against BOTH DBs and merge by CardCode.
+    // ============== Q1: per-customer activity (120d) + 2024+ flag =========
+    // 120-day scan can still cross the 2026-01-01 cutoff for ref-month anchors.
+    // Run against BOTH DBs and merge by CardCode.
     // Rolling-window columns use @anchor (Manila as-of day; ref_month overrides “today”).
     // CardName / frozen_for / bp_status come from OCRD — prefer current over historical.
     const Q1_SQL = `
@@ -109,7 +110,7 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
       LEFT JOIN OCRD OC  ON T0.CardCode = OC.CardCode
-      WHERE T0.DocDate >= DATEADD(MONTH, -36, @anchor)
+      WHERE T0.DocDate >= DATEADD(DAY, -120, @anchor)
         AND T0.CANCELED = 'N'
       GROUP BY T0.CardCode
     `
@@ -174,7 +175,7 @@ module.exports = async (req, res) => {
         : 9999
     }))
 
-    // ============== Q2: last-order details ==============
+    // ============== Q2: last-order details (active universe horizon) ==============
     // Also spans cutoff. Take most-recent row across both DBs.
     const Q2_SQL = `
       WITH Ranked AS (
@@ -190,7 +191,7 @@ module.exports = async (req, res) => {
           ) AS rn
         FROM OINV T0
         LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate >= DATEADD(MONTH, -36, @anchor)
+        WHERE T0.DocDate >= DATEADD(DAY, -120, @anchor)
           AND T0.CANCELED = 'N'
       )
       SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpName AS sales_rep
@@ -407,9 +408,13 @@ module.exports = async (req, res) => {
     }
 
     const allCustomers = [...custMap.values()]
+    // Insights active universe: customers with last purchase in the last 120 days.
+    const activeCustomers = allCustomers.filter(c =>
+      c.last_order_date && Number(c.days_silent || 9999) <= 120
+    )
 
     // ============== LIST 1 — TOP RESCUE ==============
-    const rescueAll = allCustomers
+    const rescueAll = activeCustomers
       .filter(c => {
         if (c.frozen_for === 'Y') return false
         if (c.bp_status === 'Delinquent' || c.bp_status === 'InActive') return false
@@ -459,7 +464,7 @@ module.exports = async (req, res) => {
     }
 
     const peerGroups = new Map()
-    for (const c of allCustomers) {
+    for (const c of activeCustomers) {
       if (c.days_silent >= 90) continue
       if (c.frozen_for === 'Y') continue
       const key = `${c.region}|${tierOf(c)}`
@@ -496,7 +501,7 @@ module.exports = async (req, res) => {
     }
 
     const growthAll = []
-    for (const c of allCustomers) {
+    for (const c of activeCustomers) {
       if (c.days_silent >= 90) continue
       if (c.frozen_for === 'Y') continue
       const tier = tierOf(c)
@@ -547,7 +552,7 @@ module.exports = async (req, res) => {
 
     // ============== LIST 3 — EARLY WARNING ==============
     const warningAll = []
-    for (const c of allCustomers) {
+    for (const c of activeCustomers) {
       if (c.days_silent >= 30) continue
       if (c.frozen_for === 'Y') continue
       if (c.vol_90d_mt <= 5) continue
@@ -596,6 +601,7 @@ module.exports = async (req, res) => {
     //
     // Buckets are mutually exclusive. Mat can tune the thresholds in
     // intelligence.js if the split still doesn't match his mental model.
+    // Legacy AR is activity-agnostic — lost customers can still have outstanding AR.
     const legacyArAll = allCustomers.filter(c => {
       if (c.ar_balance <= 0) return false
       if (c.orders_since_2024 === 0) return true
@@ -604,7 +610,7 @@ module.exports = async (req, res) => {
       return false
     })
     const legacySet = new Set(legacyArAll.map(c => c.card_code))
-    const dormantActiveAll = allCustomers.filter(c =>
+    const dormantActiveAll = activeCustomers.filter(c =>
       c.days_silent >= 60 && c.orders_since_2024 > 0 && !legacySet.has(c.card_code)
     )
 
@@ -724,6 +730,7 @@ module.exports = async (req, res) => {
       },
       meta: {
         total_customers_analyzed: allCustomers.length,
+        active_universe_size:     activeCustomers.length,
         rescue_pool_size:         rescueAll.length,
         growth_pool_size:         growthAll.length,
         warning_pool_size:        warningAll.length,
