@@ -88,6 +88,13 @@ module.exports = async (req, res) => {
     const lyEnd = new Date(dateTo)
     lyEnd.setFullYear(lyEnd.getFullYear() - 1)
 
+    // Prior period — same length as [dateFrom, dateTo], ending day before period start
+    // (mirrors api/dashboard.js + api/sales.js window math).
+    const ppTo = new Date(dateFrom)
+    ppTo.setDate(ppTo.getDate() - 1)
+    const ppFrom = new Date(dateFrom)
+    ppFrom.setTime(ppFrom.getTime() - (dateTo.getTime() - dateFrom.getTime()))
+
     const mtdBounds = getPeriodDates('MTD', periodOpts)
     const monthStart = mtdBounds.dateFrom
     const monthEnd = mtdBounds.dateTo
@@ -142,6 +149,14 @@ module.exports = async (req, res) => {
       console.warn('[team] LY national ODLN failed:', e.message); return [{}]
     })
 
+    const nationalPpOdln = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS pp_vol
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'
+    `, { ppFrom, ppTo })
+
     // ───────────────────────────────────────────────────────────────────────
     // 2. RSM ROSTER — discover RSMs from OSLP.U_rsm self-references
     // ───────────────────────────────────────────────────────────────────────
@@ -175,6 +190,20 @@ module.exports = async (req, res) => {
       GROUP BY S.U_rsm
     `, { dateFrom, dateTo })
     const rsmYtdMap = Object.fromEntries(rsmYtd.map(r => [r.rsm_code, r]))
+
+    const rsmPp = await query(`
+      SELECT
+        S.U_rsm                                                          AS rsm_code,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)   AS pp_vol
+      FROM OSLP S
+      INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
+      INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
+      LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
+      WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
+        AND T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'
+      GROUP BY S.U_rsm
+    `, { ppFrom, ppTo })
+    const rsmPpMap = Object.fromEntries(rsmPp.map(r => [r.rsm_code, r.pp_vol]))
 
     // MTD ODLN per RSM (calendar month of anchor)
     const rsmMtdOdln = await query(`
@@ -339,6 +368,9 @@ module.exports = async (req, res) => {
     const ytdBudget = ytdBudgetMt(today)
     const achPct    = ytdBudget > 0 ? Math.round((ytdVol / ytdBudget) * 1000) / 10 : 0
     const vsLyPct   = lyVol > 0 ? Math.round(((ytdVol - lyVol) / lyVol) * 1000) / 10 : null
+    const ppVolNat  = Number(nationalPpOdln[0]?.pp_vol || 0)
+    const vsPpPctNat = ppVolNat > 0 ? Math.round(((ytdVol - ppVolNat) / ppVolNat) * 1000) / 10 : null
+    const vsPpAbsNat = ytdVol - ppVolNat
 
     const shipDays  = countShippingDays(dateFrom, today)
     const ytdSpeed  = shipDays > 0 ? Math.round(ytdVol / shipDays) : 0
@@ -377,6 +409,7 @@ module.exports = async (req, res) => {
     let dsmYtdOdlnMap = {}
     let dsmMtdOdlnMap = {}
     let dsmLyMap = {}
+    let dsmPpMap = {}
     let dsmDsoMap = {}
     let dsmSilentMap = {}
     let dsmNegMap = {}
@@ -441,6 +474,20 @@ module.exports = async (req, res) => {
       })
       dsmLyMap = Object.fromEntries(dsmLyRows.map(r => [Number(r.dsm_key), Number(r.ly_vol || 0)]))
 
+      const dsmPpRows = await query(`
+        SELECT ${caseRollup} AS dsm_key,
+          ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS pp_vol
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
+        LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+        INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
+        WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        GROUP BY ${caseRollup}
+      `, { ppFrom, ppTo }).catch(e => {
+        console.warn('[team] DSM PP failed:', e.message); return []
+      })
+      dsmPpMap = Object.fromEntries(dsmPpRows.map(r => [Number(r.dsm_key), Number(r.pp_vol || 0)]))
+
       const dsmDsoRows = await query(`
         SELECT dsm_key, dso FROM (
           SELECT ${caseRollup} AS dsm_key,
@@ -495,6 +542,7 @@ module.exports = async (req, res) => {
       const ytdGmD = Number(ytd.ytd_gm || 0)
       const ytdRevD = Number(ytd.ytd_revenue || 0)
       const lyVolD = dsmLyMap[dc] || 0
+      const ppVolD = Number(dsmPpMap[dc] || 0)
       const mtdD = Number(dsmMtdOdlnMap[dc] || 0)
       const ytdOdD = Number(dsmYtdOdlnMap[dc] || 0)
       const dsoD = Number(dsmDsoMap[dc] || 0)
@@ -502,6 +550,8 @@ module.exports = async (req, res) => {
       const negD = Number(dsmNegMap[dc] || 0)
       const gmTonD = ytdVolD > 0 ? Math.round(ytdGmD / ytdVolD) : 0
       const vsLyD = lyVolD > 0 ? Math.round(((ytdVolD - lyVolD) / lyVolD) * 1000) / 10 : null
+      const vsPpPctD = ppVolD > 0 ? Math.round(((ytdVolD - ppVolD) / ppVolD) * 1000) / 10 : null
+      const vsPpAbsD = ytdVolD - ppVolD
       const speedD = shipDays > 0 ? Math.round(ytdOdD / shipDays) : 0
       const memo = row.memo ? String(row.memo).trim() : ''
       return {
@@ -515,6 +565,9 @@ module.exports = async (req, res) => {
         ach_pct:       0,
         vs_ly:         vsLyD,
         ly_vol:        Math.round(lyVolD),
+        pp_vol:        Math.round(ppVolD),
+        vs_pp_pct:     vsPpPctD,
+        vs_pp:         Math.round(vsPpAbsD * 10) / 10,
         speed:         speedD,
         mtd_speed:     Math.round(mtdD),
         gm_ton:        gmTonD,
@@ -539,6 +592,7 @@ module.exports = async (req, res) => {
       const ytdGmR  = Number(ytd.ytd_gm || 0)
       const ytdRevR = Number(ytd.ytd_revenue || 0)
       const lyVolR  = rsmLyMap[rc] || 0
+      const ppVolR  = Number(rsmPpMap[rc] || 0)
       const mtdR    = Number(rsmMtdMap[rc] || 0)
       const ytdOdR  = Number(rsmYtdOdlnMap[rc] || 0)
       const dsoR    = Number(rsmDsoMap[rc] || 0)
@@ -546,6 +600,8 @@ module.exports = async (req, res) => {
       const negR    = Number(rsmNegMap[rc] || 0)
       const gmTonR  = ytdVolR > 0 ? Math.round(ytdGmR / ytdVolR) : 0
       const vsLyR   = lyVolR > 0 ? Math.round(((ytdVolR - lyVolR) / lyVolR) * 1000) / 10 : null
+      const vsPpPctR = ppVolR > 0 ? Math.round(((ytdVolR - ppVolR) / ppVolR) * 1000) / 10 : null
+      const vsPpAbsR = ytdVolR - ppVolR
       // Per-RSM YTD speed: OdlnVol / shipping_days_elapsed
       const speedR  = shipDays > 0 ? Math.round(ytdOdR / shipDays) : 0
       const dsmsForRsm = dsmRosterRows
@@ -561,6 +617,9 @@ module.exports = async (req, res) => {
         ach_pct:   0,
         vs_ly:     vsLyR,
         ly_vol:    Math.round(lyVolR),
+        pp_vol:    Math.round(ppVolR),
+        vs_pp_pct: vsPpPctR,
+        vs_pp:     Math.round(vsPpAbsR * 10) / 10,
         speed:     speedR,
         mtd_speed: Math.round(mtdR),
         gm_ton:    gmTonR,
@@ -607,6 +666,9 @@ module.exports = async (req, res) => {
         budget_mt:         ytdBudget,
         ach_pct:           achPct,
         vs_ly_pct:         vsLyPct,
+        pp_vol:            Math.round(ppVolNat),
+        vs_pp_pct:         vsPpPctNat,
+        vs_pp:             Math.round(vsPpAbsNat * 10) / 10,
         ly_vol:            Math.round(lyVol),       // ODLN
         ly_vol_invoiced:   Math.round(lyVolInv),    // OINV (transparency)
         active_customers:  Number(nat.active_customers || 0),
@@ -625,6 +687,7 @@ module.exports = async (req, res) => {
         period_start: dateFrom.toISOString(),
         period_end:   dateTo.toISOString(),
         ly_window:    [lyStart.toISOString(), lyEnd.toISOString()],
+        pp_window:    [ppFrom.toISOString(), ppTo.toISOString()],
         director_slpcode_excluded: DIRECTOR_SLPCODE,
         sources:      'OINV (revenue+GM) · ODLN (volume of record) · OSLP.U_rsm (hierarchy) · per-RSM dsms[] (OSLP managers w/ subordinates, territory rollup)'
       }

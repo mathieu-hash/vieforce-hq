@@ -3420,7 +3420,7 @@ body{
               <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">YTD Vol</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-ytd">—</div></div>
               <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Budget</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-budget">—</div></div>
               <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Ach %</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--gold)" id="team-evp-ach">—</div></div>
-              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">vs LY</div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)" id="team-evp-vsly">—</div></div>
+              <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase"><span id="team-evp-cmp-label">vs PP</span></div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)" id="team-evp-vsly">—</div></div>
               <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">Speed</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-speed">—</div></div>
               <div style="text-align:center;padding:0 10px"><div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase">GM/Ton</div><div style="font-family:var(--mono);font-size:22px;font-weight:700" id="team-evp-gmton">—</div></div>
             </div>
@@ -3518,7 +3518,7 @@ body{
               .team-tbl tr.team-dsm-sub.is-collapsed{display:none}
             </style>
             <table class="team-tbl" id="team-tbl">
-              <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>MTD ODLN</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
+              <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th><span id="team-score-cmp-label">vs PP</span></th><th>MTD ODLN</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
               <tbody id="team-tbody">
 
               <!-- MART ESPLIGUEZ — Visayas RSM -->
@@ -6582,21 +6582,25 @@ async function loadTeam(){
       animateNumber(sel('team-evp-speed'), e.speed || 0, function(v){return fcn(Math.round(v)) + ' MT/d'});
       animateNumber(sel('team-evp-gmton'), e.gm_ton || 0, function(v){return '₱' + fcn(Math.round(v))});
 
-      // vs LY — backend now returns real % from historical DB
+      var evpCmpLbl = sel('team-evp-cmp-label');
+      if(evpCmpLbl) evpCmpLbl.textContent = (CMP === 'vs_ly' ? 'vs LY' : 'vs PP');
+      // vs PP / vs LY — same payload; toggle picks series (no refetch)
       var vsLyEl = sel('team-evp-vsly');
       if(vsLyEl){
-        if(e.vs_ly_pct == null){
+        var vsHero = (CMP === 'vs_ly') ? e.vs_ly_pct : e.vs_pp_pct;
+        if(vsHero == null){
           vsLyEl.textContent = '—';
           vsLyEl.style.color = 'var(--text3)';
         } else {
-          var vs = e.vs_ly_pct;
-          vsLyEl.textContent = (vs >= 0 ? '+' : '') + vs.toFixed(1) + '%';
-          vsLyEl.style.color = vs >= 0 ? 'var(--green)' : 'var(--red)';
+          vsLyEl.textContent = (vsHero >= 0 ? '+' : '') + vsHero.toFixed(1) + '%';
+          vsLyEl.style.color = vsHero >= 0 ? 'var(--green)' : 'var(--red)';
         }
       }
+      var teamScoreCmp = sel('team-score-cmp-label');
+      if(teamScoreCmp) teamScoreCmp.textContent = (CMP === 'vs_ly' ? 'vs LY' : 'vs PP');
       console.log('[TEAM] EVP hero wired:',
         'YTD=' + ytdVol, 'Budget=' + budget, 'Ach=' + ach + '%',
-        'vsLY=' + e.vs_ly_pct, 'Speed=' + e.speed, 'GM/Ton=' + e.gm_ton,
+        'cmp=' + CMP, 'vsLY=' + e.vs_ly_pct, 'vsPP=' + e.vs_pp_pct, 'Speed=' + e.speed, 'GM/Ton=' + e.gm_ton,
         'RSMs=' + e.rsm_count, 'Reps=' + e.reports_count, 'Customers=' + e.active_customers);
     }
     // RSM SCORECARD — main team table (+ expandable DSM sub-rows from /api/team)
@@ -6614,7 +6618,9 @@ async function loadTeam(){
         h += '<td>'+fcn(Math.round(row.ytd_target||0))+'</td>';
         h += '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
         h += '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>';
-        h += '<td class="'+((row.vs_ly||0)>=0?'up':'down')+'">'+(row.vs_ly!=null?(row.vs_ly>=0?'+':'')+row.vs_ly.toFixed(1)+'%':'--')+'</td>';
+        var vsPct = (CMP === 'vs_ly') ? row.vs_ly : row.vs_pp_pct;
+        var vsTdCls = (vsPct == null || !isFinite(Number(vsPct))) ? '' : (((vsPct||0)>=0) ? 'up' : 'down');
+        h += '<td class="'+vsTdCls+'">'+(vsPct!=null&&isFinite(Number(vsPct))?(vsPct>=0?'+':'')+Number(vsPct).toFixed(1)+'%':'--')+'</td>';
         h += '<td>'+fcn(Math.round(row.speed||0))+'</td>';
         h += '<td>₱'+fcn(Math.round(row.gm_ton||0))+'</td>';
         h += '<td><span class="badge '+dsoCol+'">'+(row.dso!=null?Math.round(row.dso)+'d':'--')+'</span></td>';
