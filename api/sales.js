@@ -331,6 +331,7 @@ module.exports = async (req, res) => {
         ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
         ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gross_margin,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
           ELSE 0 END                                                       AS gmt
@@ -362,6 +363,7 @@ module.exports = async (req, res) => {
         ISNULL(SUM(T1.Quantity), 0)                                       AS volume_bags,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS volume_mt,
         ISNULL(SUM(T1.LineTotal), 0)                                      AS revenue,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS gross_margin,
         CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
           THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
           ELSE 0 END                                                       AS gmt
@@ -389,7 +391,7 @@ module.exports = async (req, res) => {
       return acc
     }
     const cur = kpiCurrent[0] || {}, prv = kpiPrev[0] || {}, yt = kpiYtd[0] || {}
-    const ly  = sumRows(kpiLy, 'volume_bags', 'volume_mt', 'revenue')
+    const ly  = sumRows(kpiLy, 'volume_bags', 'volume_mt', 'revenue', 'gross_margin')
     if (kpiLy.length === 1) ly.gmt = kpiLy[0].gmt || 0   // single-DB short-circuit
     const lyGmtForDelta = (kpiLy.length >= 1 && kpiLy[0].gmt != null) ? kpiLy[0].gmt : (ly.gmt || 0)
     const ytdLy = sumRows(kpiYtdLy, 'volume_mt', 'revenue')
@@ -409,6 +411,7 @@ module.exports = async (req, res) => {
       delta_pct: {
         volume_mt: pct(cur.volume_mt, prv.volume_mt),
         revenue:   pct(cur.revenue,   prv.revenue),
+        gross_margin: pct(cur.gross_margin, prv.gross_margin || 0),
         gmt:       pct(cur.gmt,       prv.gmt)
       },
       // Last-year comparators (period-matched + YTD)
@@ -422,6 +425,7 @@ module.exports = async (req, res) => {
       delta_pct_ly: {
         volume_mt: pct(cur.volume_mt, ly.volume_mt),
         revenue:   pct(cur.revenue,   ly.revenue),
+        gross_margin: pct(cur.gross_margin, ly.gross_margin || 0),
         gmt:       pct(cur.gmt, lyGmtForDelta),
         ytd_volume_mt: pct(yt.volume_mt, ytdLy.volume_mt),
         ytd_revenue:   pct(yt.revenue,   ytdLy.revenue)
