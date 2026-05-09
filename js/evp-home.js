@@ -121,10 +121,15 @@
     var revEl = $('evp-revenue'); if(revEl) revEl.textContent = fmtPHP(rev);
 
     var revDelta = (dash && dash.delta_pct && dash.delta_pct.revenue) || 0;
+    var revLbl = 'vs PP';
+    if (typeof CMP === 'string' && CMP === 'vs_ly' && dash && dash.delta_pct_ly && dash.delta_pct_ly.revenue != null && dash.delta_pct_ly.revenue !== undefined) {
+      revDelta = dash.delta_pct_ly.revenue;
+      revLbl = 'vs LY';
+    }
     var revTrendEl = $('evp-revenue-trend');
     if(revTrendEl){
       var arrow = revDelta>=0 ? '↑' : '↓';
-      revTrendEl.textContent = arrow+' '+Math.abs(revDelta).toFixed(1)+'% vs PP';
+      revTrendEl.textContent = arrow+' '+Math.abs(revDelta).toFixed(1)+'% '+revLbl;
       revTrendEl.className = 'evp-pnl-trend '+(revDelta>=0?'up':'down');
     }
 
@@ -136,6 +141,9 @@
     }
     var gmPctEl = $('evp-gm-pct'); if(gmPctEl) gmPctEl.textContent = (gmPct!=null) ? gmPct.toFixed(1)+'%' : '—';
     var gmDelta = (dash && dash.delta_pct && dash.delta_pct.gross_margin) || 0;
+    if (typeof CMP === 'string' && CMP === 'vs_ly' && dash && dash.delta_pct_ly && dash.delta_pct_ly.gross_margin != null && dash.delta_pct_ly.gross_margin !== undefined) {
+      gmDelta = dash.delta_pct_ly.gross_margin;
+    }
     var gmTrendEl = $('evp-gm-trend');
     if(gmTrendEl){
       gmTrendEl.textContent = (gmDelta>=0?'↑':'↓')+' '+Math.abs(gmDelta).toFixed(1)+'%';
