@@ -6028,7 +6028,9 @@ async function loadIntelligence(){
   try {
     if(!DC) DC = {};
     if(!DC['pg-insights']){
-      DC['pg-insights'] = await getIntelligenceData(vfApiParams()).catch(function(e){ console.error('intelligence:', e); return null; });
+      var intelParams = { region: RG };
+      if (VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) intelParams.ref_month = VF_REF_MONTH;
+      DC['pg-insights'] = await getIntelligenceData(intelParams).catch(function(e){ console.error('intelligence:', e); return null; });
     }
     var d = DC['pg-insights'];
     if(!d){ showError('pg-insights','Unable to load intelligence data'); return; }
