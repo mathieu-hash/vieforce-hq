@@ -114,3 +114,17 @@ A cross-account OAuth bug (Mat ended up logged in as Windel because `vieforce-pa
 ## How to update this log
 
 Append a dated section when closing the session, or supersede with a new `CURSOR_SESSION_LOG_<date>.md`. Move stale logs to `.planning/archive/` if `.planning/` gets noisy.
+
+---
+
+## Fix sprint addendum (2026-05-09 PM)
+
+**Period-filter honesty sprint executed:** six atomic commits on `master` ending at `474b0de` (pushed). Goal was labels + strip misleading params + RSM period wiring + chart prototype removal + desktop chip hide — **no SAP SQL changes**.
+
+- **Intelligence:** `loadIntelligence()` no longer passes `vfApiParams()` (period stripped earlier in sprint); UI subtitle added for fixed T36M / 90-day dormancy windows.
+- **AR:** No client param strip was needed (calls already parameterless); snapshot label added on `pg-ar`.
+- **Team scorecard:** Column header set to **`MTD ODLN`** per spec (not a longer card subtitle).
+- **`initCharts()`:** Removed prototype Chart.js init for sales trend, BU GM, speed sparkline, customer Sales/GM, margin region; removed now-unused inner `mkBar` helper; dropped obsolete `loadSales` console.warn block. **Canvases may stay empty** until those charts are wired to API shapes — intentional per sprint.
+- **`vieforce-hq-desktop.html`:** `#topbar-controls` hidden with `display:none` + HTML comment (review surface).
+
+Re-run **`npm test`** before push: **76/76 pass**.
