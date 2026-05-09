@@ -1766,12 +1766,13 @@ body{
       <!-- ===== SALES ===== -->
       <div class="page" id="pg-sales">
         <!-- KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger" id="sales-kpi-row">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px" class="stagger" id="sales-kpi-row">
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-vol">14.2K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-vol-d">▲ 12.1%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-ytdvol">54.4K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-ytdvol-d">▲ 92.0%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="sk-sales">₱482M</div><div class="kpi-delta up" id="sk-sales-d">▲ 8.3%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed <span id="sk-speed-cmp-label" style="font-size:9px;color:var(--text3);font-weight:600">vs PP</span></div><div class="kpi-val" style="font-size:18px" id="sk-speed">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up" id="sk-speed-d">▲ 4.8%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg GM/Ton</div><div class="kpi-val" style="font-size:18px" id="sk-gmt">₱6,953</div><div class="kpi-delta up" id="sk-gmt-d">▲ 3.2%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">GM %</div><div class="kpi-val" style="font-size:18px" id="sk-gm">28.4%</div><div class="kpi-delta up" id="sk-gm-d">▲ 1.1%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed <span id="sk-speed-cmp-label" style="font-size:9px;color:var(--text3);font-weight:600">vs PP</span></div><div class="kpi-val" style="font-size:18px" id="sk-speed">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up" id="sk-speed-d">▲ 4.8%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:18px;color:var(--gold)" id="sk-pending">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src" id="sk-pending-sub">42 orders</div></div>
         </div>
 
@@ -4636,6 +4637,7 @@ async function loadSales(){
     if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  UT==='Bags' ? (kp.ytd_volume_bags!=null?kp.ytd_volume_bags:(kp.ytd_volume_mt*50)) : kp.ytd_volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> '+(UT==='Bags'?'bags':'MT')+'</span>'});
     if(kp.revenue!=null)       animateNumber(sel('sk-sales'),   kp.revenue,       fc);
     if(kp.gmt!=null)           animateNumber(sel('sk-gmt'),     kp.gmt,           function(v){return '₱'+fcn(Math.round(v))});
+    if(kp.gross_margin!=null)  animateNumber(sel('sk-gm'),      kp.gross_margin,  function(v){return Number(v).toFixed(1)+'%'});
     // Deltas — respect vs PP / vs LY (same payload as home)
     var dp = (CMP === 'vs_ly' && kp.delta_pct_ly) ? kp.delta_pct_ly : (kp.delta_pct || {});
     function setDelta(id, pct){
@@ -4647,6 +4649,7 @@ async function loadSales(){
     setDelta('sk-vol-d', dp.volume_mt);
     setDelta('sk-sales-d', dp.revenue);
     setDelta('sk-gmt-d', dp.gmt);
+    setDelta('sk-gm-d', dp.gross_margin);
     // YTD Volume delta — vs LY not computed here, skip arrow
     // Avg Speed — pull from /api/speed
     if(sp){
