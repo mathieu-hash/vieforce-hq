@@ -1794,7 +1794,7 @@ body{
             </div>
           </div>
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Monthly Volume Trend</div></div>
+            <div class="card-hdr"><div><div class="card-title">Monthly Volume Trend</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Trailing 12 months <span style="color:var(--text4)">· Independent of period chip</span></div></div></div>
             <div class="card-body"><div class="chart-wrap chart-wrap-sm"><canvas id="salesTrendChart"></canvas></div></div>
           </div>
           <div class="card">
@@ -2029,6 +2029,7 @@ body{
 
       <!-- ===== AR ===== -->
       <div class="page" id="pg-ar">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Current AR snapshot — as of today <span style="color:var(--text4)">· Period chip does not apply</span></div>
         <div class="grid-sidebar">
           <div>
             <!-- Delinquent filter toggle -->
@@ -2402,7 +2403,7 @@ body{
           <div class="card-body" style="padding-top:8px">
             <table class="tbl" id="cust-tbl">
               <thead>
-              <tr><th>#</th><th>Customer</th><th>Code</th><th>Region</th><th>BU</th><th class="num">Volume</th><th class="num">Net Sales</th><th class="num">GM/Ton</th></tr>
+              <tr><th>#</th><th>Customer</th><th>Code</th><th>Region</th><th>BU</th><th class="num">Volume</th><th class="num">T12M Revenue</th><th class="num">GM/Ton</th></tr>
               </thead>
               <tbody id="cust-tbody">
               <tr style="cursor:pointer" onclick="navTo('pg-custdetail')"><td><div class="rank rank-1">1</div></td><td style="font-weight:700">Metro Feeds Corp.</td><td style="color:var(--text3)">CA-001</td><td>Luzon</td><td style="font-size:11px;color:var(--text3)">Distribution</td><td class="num">420 MT</td><td class="num">₱18.2M</td><td class="num">₱6,240</td></tr>
@@ -2989,6 +2990,8 @@ body{
           [data-theme="light"] .ci-modal-back{background:rgba(0,30,50,0.45)}
         </style>
 
+        <div style="font-size:11px;color:var(--text3);margin:0 0 14px 0;line-height:1.45">Trailing 36 months · 90-day dormancy <span style="color:var(--text4)">· Period chip does not apply</span></div>
+
         <div class="ci-hero-grid">
           <a href="#sec-rescue" class="ci-hero-card" data-tone="rescue" onclick="ciScrollTo(event,'sec-rescue')">
             <div class="ci-hero-top"><span class="ci-hero-icon">🔴</span><span class="ci-hero-tag">Rescue</span></div>
@@ -3308,7 +3311,7 @@ body{
           <div class="card-hdr">
             <div>
               <div class="card-title">📊 SKU PENETRATION HEATMAP</div>
-              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Which customers buy which brands — and where are the whitespace gaps?</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Which customers buy which brands — and where are the whitespace gaps? · Trailing 12 months</div>
             </div>
             <button class="export-btn" onclick="daExportSkuMatrix()">📊 Export</button>
           </div>
@@ -3339,7 +3342,7 @@ body{
           <div class="card-hdr">
             <div>
               <div class="card-title">🎯 BRAND COVERAGE GAPS</div>
-              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Where is our product portfolio under-sold by region and segment?</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">Where is our product portfolio under-sold by region and segment? · Trailing 12 months</div>
             </div>
             <button class="export-btn" onclick="daExportBrandCoverage()">📊 Export</button>
           </div>
@@ -3361,7 +3364,7 @@ body{
           <div class="card-hdr">
             <div>
               <div class="card-title">⏱ BUYING PATTERN CLASSIFIER</div>
-              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">What's each customer's ordering rhythm, and is it changing?</div>
+              <div style="font-size:10px;color:var(--text3);letter-spacing:0.3px;margin-top:2px">What's each customer's ordering rhythm, and is it changing? · Trailing 12 months</div>
             </div>
             <button class="export-btn" onclick="daExportBuyingPatterns()">📊 Export</button>
           </div>
@@ -3516,7 +3519,7 @@ body{
               .team-tbl tr.team-dsm-sub.is-collapsed{display:none}
             </style>
             <table class="team-tbl" id="team-tbl">
-              <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>Avg Speed</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
+              <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th>vs LY</th><th>MTD ODLN</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
               <tbody id="team-tbody">
 
               <!-- MART ESPLIGUEZ — Visayas RSM -->
@@ -3630,6 +3633,7 @@ body{
           <div style="display:flex;align-items:flex-start;gap:32px;position:relative">
             <div style="flex:1">
               <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">Sales Volume Budget 2026</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px">Calendar YTD vs FY budget <span style="color:var(--text4)">· Period chip does not apply</span></div>
               <div style="font-size:12px;color:var(--text2);margin-top:4px">FY Target: <b style="color:var(--text)">188,266 MT</b> · ₱5.97B Net Sales · +37.4% vs FY2025</div>
             </div>
             <div style="display:flex;gap:20px;flex-shrink:0">
