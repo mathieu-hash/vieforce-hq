@@ -39,7 +39,9 @@ function emptySpeedPayload(period, todayPH, dateFrom, periodEnd, scope) {
     period_volume_mt: 0,
     shipping_days_elapsed: 0, shipping_days_total: 0, shipping_days_remaining: 0,
     daily_pullout: 0, projected_period_volume: 0, vs_prior_period_pct: 0,
+    vs_last_year_pct: 0,
     prior_period_volume_mt: 0, prior_period_daily_pullout: 0,
+    last_year_volume_mt: 0, last_year_daily_pullout: 0,
     mtd_actual: 0, days_elapsed: 0, days_total: 0, days_remaining: 0, projected_mtd: 0,
     last_month_full_mt: 0, last_month_same_day_mt: 0,
     vs_last_month_volume: 0, vs_last_month_pct: 0,
@@ -131,6 +133,15 @@ function getPriorPeriodWindow(period, currentFrom, today) {
     default:
       return { from: currentFrom, to: today }
   }
+}
+
+/** Same calendar window as current period, shifted −1 year (OINV/dashboard LY rule). */
+function getLastYearSpeedWindow(dateFrom, today) {
+  const lyFrom = new Date(dateFrom)
+  lyFrom.setFullYear(lyFrom.getFullYear() - 1)
+  const lyTo = new Date(today)
+  lyTo.setFullYear(lyTo.getFullYear() - 1)
+  return { from: lyFrom, to: lyTo }
 }
 
 module.exports = async (req, res) => {
@@ -361,6 +372,22 @@ module.exports = async (req, res) => {
       ? Math.round(((speed_per_day - prior_daily_pullout) / prior_daily_pullout) * 1000) / 10
       : 0
 
+    const lyWin = getLastYearSpeedWindow(dateFrom, today)
+    const lyRow = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS ly_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED='N'${speedFilter.sql}
+    `, { lyFrom: lyWin.from, lyTo: lyWin.to })
+
+    const last_year_volume = lyRow[0]?.ly_mt || 0
+    const ly_elapsed_days = countShippingDays(lyWin.from, lyWin.to)
+    const last_year_daily_pullout = ly_elapsed_days > 0 ? last_year_volume / ly_elapsed_days : 0
+    const vs_last_year_pct = last_year_daily_pullout > 0
+      ? Math.round(((speed_per_day - last_year_daily_pullout) / last_year_daily_pullout) * 1000) / 10
+      : 0
+
     const result = {
       period,
       // ---- Calendar debug (PH shipping calendar — Sundays + holidays excluded) ----
@@ -376,8 +403,11 @@ module.exports = async (req, res) => {
       daily_pullout:             Math.round(speed_per_day * 10) / 10,
       projected_period_volume:   projected_mt,
       vs_prior_period_pct:       vs_prior_period_pct,
+      vs_last_year_pct:          vs_last_year_pct,
       prior_period_volume_mt:    Math.round(prior_period_volume * 10) / 10,
       prior_period_daily_pullout:Math.round(prior_daily_pullout * 10) / 10,
+      last_year_volume_mt:       Math.round(last_year_volume * 10) / 10,
+      last_year_daily_pullout:   Math.round(last_year_daily_pullout * 10) / 10,
       // ---- Back-compat aliases (retain for older code paths) ----
       mtd_actual:     Math.round(actual_mt * 10) / 10,
       days_elapsed:   elapsed_days,
