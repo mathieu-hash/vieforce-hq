@@ -3635,13 +3635,13 @@ body{
           <div style="display:flex;align-items:flex-start;gap:32px;position:relative">
             <div style="flex:1">
               <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">Sales Volume Budget 2026</div>
-              <div style="font-size:11px;color:var(--text3);margin-top:6px">Calendar YTD vs FY budget <span style="color:var(--text4)">· Period chip does not apply</span></div>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px">Actual vs period-paced budget <span style="color:var(--text4)">· Budget figure is annual</span></div>
               <div style="font-size:12px;color:var(--text2);margin-top:4px">FY Target: <b style="color:var(--text)">188,266 MT</b> · ₱5.97B Net Sales · +37.4% vs FY2025</div>
             </div>
             <div style="display:flex;gap:20px;flex-shrink:0">
-              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Actual</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)" id="bud-ytd-actual">—</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">Period Actual</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)" id="bud-ytd-actual">—</div></div>
               <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
-              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">YTD Budget</div><div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bud-ytd-budget">—</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">Pacing Budget</div><div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bud-ytd-budget">—</div></div>
               <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
               <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase">Achievement</div><div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green)" id="bud-ytd-ach">—</div></div>
             </div>
@@ -6730,11 +6730,13 @@ async function loadTeam(){
 async function loadBudget(){
   clearError('pg-budget');
   try {
+    var budgetParams = vfApiParams();
+    var budgetKey = 'pg-budget|' + JSON.stringify(budgetParams);
     if(!DC) DC={};
-    if(!DC['pg-budget']){
-      DC['pg-budget'] = await getBudgetData().catch(function(e){console.error('budget:',e);return null});
+    if(!DC[budgetKey]){
+      DC[budgetKey] = await getBudgetData(budgetParams).catch(function(e){console.error('budget:',e);return null});
     }
-    var d = DC['pg-budget'];
+    var d = DC[budgetKey];
     if(!d){showError('pg-budget','Unable to load budget data');return}
     console.log('[BUDGET] Rendering:', d.hero);
     var pg=sel('pg-budget');

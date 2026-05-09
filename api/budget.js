@@ -1,6 +1,7 @@
 const { query, queryH } = require('./_db')
-const { verifySession, applyRoleFilter } = require('./_auth')
+const { verifySession, applyRoleFilter, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
+const { countShippingDays, getPeriodEndBound, resolveRefMonthAnchor } = require('./lib/shipping_days')
 
 // FY2026 Budget — from Sales Volume Budget 2026 Excel
 const BUDGET = {
@@ -64,16 +65,6 @@ const BUDGET = {
   ]
 }
 
-function getYTDBudget() {
-  const now = new Date()
-  const currentMonth = now.getMonth() // 0-11
-  let ytd = 0
-  for (let i = 0; i <= currentMonth; i++) {
-    ytd += BUDGET.monthly[i]
-  }
-  return ytd
-}
-
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -85,33 +76,54 @@ module.exports = async (req, res) => {
   const session = await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
+  const period = (req.query.period || 'MTD').toUpperCase()
+  const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
+  const refMonthKey = /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
+
   // Cache check
-  const cacheKey = `budget_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `budget_v2_${session.role}_${session.region || 'ALL'}_${period}_${refMonthKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const ytdStart = new Date(new Date().getFullYear(), 0, 1)
-    const baseWhere = `WHERE T0.DocDate >= @ytdStart AND T0.CANCELED = 'N'`
+    const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+    const periodDates = getPeriodDates(period, periodOpts)
+    const dateFrom = periodDates.dateFrom
+    const dateTo = periodDates.dateTo
+    const anchorDate = resolveRefMonthAnchor(refMonthKey === 'live' ? '' : refMonthKey)
+    const periodEnd = getPeriodEndBound(period, anchorDate)
+    const yearStart = new Date(dateTo.getFullYear(), 0, 1)
+    const yearEnd = new Date(dateTo.getFullYear(), 11, 31)
+
+    const elapsedBusinessDays = countShippingDays(dateFrom, dateTo)
+    const totalBusinessDaysInYear = countShippingDays(yearStart, yearEnd)
+    const pacingRatio = totalBusinessDaysInYear > 0 ? (elapsedBusinessDays / totalBusinessDaysInYear) : 0
+
+    const budgetPacingMt = BUDGET.fy_target_mt * pacingRatio
+    const budgetPacingSales = BUDGET.fy_target_sales * pacingRatio
+    const budgetPacingGm = BUDGET.fy_target_gm * pacingRatio
+
+    const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
     const filteredWhere = applyRoleFilter(session, baseWhere)
 
-    // --- YTD Actual from SAP ---
-    const ytdActual = await query(`
+    // --- Period Actual from SAP ---
+    const periodActual = await query(`
       SELECT
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS ytd_vol,
-        ISNULL(SUM(T1.LineTotal), 0)                                      AS ytd_sales,
-        ISNULL(SUM(T1.GrssProfit), 0)                                     AS ytd_gm
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS actual_vol,
+        ISNULL(SUM(T1.LineTotal), 0)                                      AS actual_sales,
+        ISNULL(SUM(T1.GrssProfit), 0)                                     AS actual_gm
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-    `, { ytdStart })
+    `, { dateFrom, dateTo })
 
-    // --- LY YTD Actual (from historical DB: Jan 1 of prior year → same (M,D)) ---
-    const now = new Date()
-    const lyYtdStart = new Date(now.getFullYear() - 1, 0, 1)
-    const lyYtdEnd   = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-    const lyYtdActual = await queryH(`
+    // --- LY same-period actual ---
+    const lyFrom = new Date(dateFrom)
+    lyFrom.setFullYear(lyFrom.getFullYear() - 1)
+    const lyTo = new Date(dateTo)
+    lyTo.setFullYear(lyTo.getFullYear() - 1)
+    const lyPeriodActual = await queryH(`
       SELECT
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS ly_vol,
         ISNULL(SUM(T1.LineTotal), 0)                                      AS ly_sales,
@@ -120,8 +132,8 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
-    `, { lyStart: lyYtdStart, lyEnd: lyYtdEnd }).catch(e => {
-      console.warn('[budget] LY YTD query failed:', e.message); return [{}]
+    `, { lyStart: lyFrom, lyEnd: lyTo }).catch(e => {
+      console.warn('[budget] LY period query failed:', e.message); return [{}]
     })
 
     // --- LY full-year actual (for FY vs FY26 budget comparison) ---
@@ -134,7 +146,7 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE YEAR(T0.DocDate) = @ly AND T0.CANCELED = 'N'
-    `, { ly: now.getFullYear() - 1 }).catch(e => {
+    `, { ly: dateTo.getFullYear() - 1 }).catch(e => {
       console.warn('[budget] LY FY query failed:', e.message); return [{}]
     })
 
@@ -152,7 +164,7 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY MONTH(T0.DocDate), FORMAT(T0.DocDate, 'MMM')
       ORDER BY month_num ASC
-    `, { ytdStart })
+    `, { dateFrom, dateTo })
 
     // --- Actual by region (YTD, approximate via warehouse) ---
     const regionActual = await query(`
@@ -177,18 +189,20 @@ module.exports = async (req, res) => {
           WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
           ELSE 'Other'
         END
-    `, { ytdStart })
+    `, { dateFrom, dateTo })
 
     // Build results
-    const ytd = ytdActual[0] || { ytd_vol: 0, ytd_sales: 0, ytd_gm: 0 }
-    const ytdBudget = getYTDBudget()
-    const achievement_pct = ytdBudget > 0 ? Math.round((ytd.ytd_vol / ytdBudget) * 100) : 0
+    const actual = periodActual[0] || { actual_vol: 0, actual_sales: 0, actual_gm: 0 }
+    const actualMt = Number(actual.actual_vol || 0)
+    const actualSales = Number(actual.actual_sales || 0)
+    const actualGm = Number(actual.actual_gm || 0)
+    const achievement_pct = budgetPacingMt > 0 ? Math.round((actualMt / budgetPacingMt) * 100) : 0
 
     // P&L summary rows
-    const currentMonth = new Date().getMonth()
+    const currentMonth = dateTo.getMonth()
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const pl_months = []
-    for (let i = 0; i <= Math.min(currentMonth, 11); i++) {
+    for (let i = dateFrom.getMonth(); i <= Math.min(currentMonth, 11); i++) {
       const actual = monthlyActual.find(m => m.month_num === i + 1)
       pl_months.push({
         month: monthNames[i],
@@ -202,24 +216,16 @@ module.exports = async (req, res) => {
     }
 
     // Achievement by region
-    const quarter = Math.floor(now.getMonth() / 3)
     const achievement_by_region = ['Visayas', 'Mindanao', 'Luzon'].map(region => {
       const budgetData = BUDGET.regions[region]
       const actual = regionActual.find(r => r.region === region) || { vol: 0, sales: 0, gm: 0 }
-      // YTD budget = sum of quarterly budgets up to current quarter + prorated current quarter
-      let ytdRegionBudget = 0
-      for (let q = 0; q < quarter; q++) {
-        ytdRegionBudget += budgetData.quarterly[q]
-      }
-      // Add prorated current quarter
-      const monthInQuarter = now.getMonth() % 3
-      ytdRegionBudget += Math.round(budgetData.quarterly[quarter] * ((monthInQuarter + 1) / 3))
+      const pacedRegionBudget = budgetData.fy26 * pacingRatio
 
       return {
         region,
         ytd_actual: Math.round(actual.vol),
-        ytd_budget: ytdRegionBudget,
-        ach_pct: ytdRegionBudget > 0 ? Math.round((actual.vol / ytdRegionBudget) * 100) : 0,
+        ytd_budget: Math.round(pacedRegionBudget),
+        ach_pct: pacedRegionBudget > 0 ? Math.round((actual.vol / pacedRegionBudget) * 100) : 0,
         fy_budget: budgetData.fy26
       }
     })
@@ -286,53 +292,72 @@ module.exports = async (req, res) => {
         {
           label: 'Volume (MT)',
           values: pl_months.map(m => m.vol_actual),
-          ytd_actual: Math.round(ytd.ytd_vol),
-          ytd_budget: ytdBudget,
+          ytd_actual: Math.round(actualMt),
+          ytd_budget: Math.round(budgetPacingMt),
           ach_pct: achievement_pct,
           fy_budget: BUDGET.fy_target_mt
         },
         {
           label: 'Net Sales',
           values: pl_months.map(m => m.sales_actual),
-          ytd_actual: Math.round(ytd.ytd_sales),
-          ytd_budget: Math.round(ytdBudget * BUDGET.net_sales_per_ton),
-          ach_pct: ytdBudget > 0 ? Math.round((ytd.ytd_sales / (ytdBudget * BUDGET.net_sales_per_ton)) * 100) : 0,
+          ytd_actual: Math.round(actualSales),
+          ytd_budget: Math.round(budgetPacingSales),
+          ach_pct: budgetPacingSales > 0 ? Math.round((actualSales / budgetPacingSales) * 100) : 0,
           fy_budget: BUDGET.fy_target_sales
         },
         {
           label: 'COGS',
           values: pl_months.map(m => -Math.round(m.sales_actual - m.gm_actual)),
-          ytd_actual: -Math.round(ytd.ytd_sales - ytd.ytd_gm),
-          ytd_budget: -Math.round(ytdBudget * BUDGET.cogs_per_ton),
-          ach_pct: ytdBudget > 0 ? Math.round(((ytd.ytd_sales - ytd.ytd_gm) / (ytdBudget * BUDGET.cogs_per_ton)) * 100) : 0,
+          ytd_actual: -Math.round(actualSales - actualGm),
+          ytd_budget: -Math.round(budgetPacingSales - budgetPacingGm),
+          ach_pct: (budgetPacingSales - budgetPacingGm) > 0
+            ? Math.round(((actualSales - actualGm) / (budgetPacingSales - budgetPacingGm)) * 100)
+            : 0,
           fy_budget: -Math.round(BUDGET.fy_target_mt * BUDGET.cogs_per_ton)
         },
         {
           label: 'Gross Margin',
           values: pl_months.map(m => m.gm_actual),
-          ytd_actual: Math.round(ytd.ytd_gm),
-          ytd_budget: Math.round(ytdBudget * BUDGET.gm_per_ton),
-          ach_pct: ytdBudget > 0 ? Math.round((ytd.ytd_gm / (ytdBudget * BUDGET.gm_per_ton)) * 100) : 0,
+          ytd_actual: Math.round(actualGm),
+          ytd_budget: Math.round(budgetPacingGm),
+          ach_pct: budgetPacingGm > 0 ? Math.round((actualGm / budgetPacingGm) * 100) : 0,
           fy_budget: BUDGET.fy_target_gm
         }
       ]
     }
 
-    const lyYtd = lyYtdActual[0] || {}
+    const lyPeriod = lyPeriodActual[0] || {}
     const lyFy  = lyFullYearActual[0] || {}
     const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0
 
     const result = {
       hero: {
+        period,
+        period_start: dateFrom.toISOString(),
+        period_end: dateTo.toISOString(),
+        annual_budget_mt: BUDGET.fy_target_mt,
+        annual_budget_sales: BUDGET.fy_target_sales,
+        annual_budget_gm: BUDGET.fy_target_gm,
+        actual_mt: Math.round(actualMt),
+        actual_sales: Math.round(actualSales),
+        actual_gm: Math.round(actualGm),
+        budget_pacing_mt: Math.round(budgetPacingMt),
+        budget_pacing_sales: Math.round(budgetPacingSales),
+        budget_pacing_gm: Math.round(budgetPacingGm),
+        actual_vs_pacing_pct: achievement_pct,
+        actual_vs_annual_pct: BUDGET.fy_target_mt > 0 ? Math.round((actualMt / BUDGET.fy_target_mt) * 100) : 0,
+        elapsed_business_days_in_period: elapsedBusinessDays,
+        total_business_days_in_year: totalBusinessDaysInYear,
         fy_target_mt: BUDGET.fy_target_mt,
         fy_target_sales: BUDGET.fy_target_sales,
         fy_target_gm: BUDGET.fy_target_gm,
-        ytd_actual: Math.round(ytd.ytd_vol),
-        ytd_budget: ytdBudget,
+        // Back-compat aliases for existing UI ids.
+        ytd_actual: Math.round(actualMt),
+        ytd_budget: Math.round(budgetPacingMt),
         achievement_pct,
         // LY comparisons
-        ytd_ly_actual:  Math.round(lyYtd.ly_vol || 0),
-        ytd_vs_ly_pct:  pct(ytd.ytd_vol, lyYtd.ly_vol || 0),
+        ytd_ly_actual:  Math.round(lyPeriod.ly_vol || 0),
+        ytd_vs_ly_pct:  pct(actualMt, lyPeriod.ly_vol || 0),
         ly_fy_vol:      Math.round(lyFy.fy_vol || 0),
         ly_fy_sales:    Math.round(lyFy.fy_sales || 0),
         ly_fy_gm:       Math.round(lyFy.fy_gm || 0)
