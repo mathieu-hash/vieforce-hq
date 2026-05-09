@@ -1,5 +1,5 @@
 const { query, queryH } = require('./_db')
-const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
+const { verifySession, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 
 // FY2026 Budget — from Sales Volume Budget 2026 Excel
