@@ -155,6 +155,22 @@ module.exports = async (req, res) => {
         AND T0.DocDate BETWEEN @prev AND @prevEnd
     `, { prev, prevEnd, dsmName: nameTrim })
 
+    // ---------- 2b. Last year — same calendar window as MTD, shifted −1y (dashboard LY rule)
+    const lyStart = new Date(mtdStart)
+    lyStart.setFullYear(lyStart.getFullYear() - 1)
+    const lyEnd = new Date(today)
+    lyEnd.setFullYear(lyEnd.getFullYear() - 1)
+    const lyRows = await query(`
+      SELECT
+        ISNULL(SUM(T1.LineTotal), 0)                                    AS revenue,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0)    AS volume_mt
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
+      ${dsmFilter}
+        AND T0.DocDate BETWEEN @lyStart AND @lyEnd
+    `, { lyStart, lyEnd, dsmName: nameTrim })
+
     // ---------- 3. YTD sales ----------
     const ytdRows = await query(`
       SELECT
@@ -287,8 +303,11 @@ module.exports = async (req, res) => {
     // ---------- 8. Sales KPI + target ----------
     const sales_mtd     = Math.round(Number(mtdRows[0]?.revenue || 0))
     const sales_prev    = Math.round(Number(prevRows[0]?.revenue || 0))
+    const sales_ly_rev  = Math.round(Number(lyRows[0]?.revenue || 0))
     const sales_vs_pp   = sales_prev > 0
       ? Math.round(((sales_mtd - sales_prev) / sales_prev) * 1000) / 10 : 0
+    const sales_vs_ly   = sales_ly_rev > 0
+      ? Math.round(((sales_mtd - sales_ly_rev) / sales_ly_rev) * 1000) / 10 : 0
     const volume_mtd_mt = Math.round(Number(mtdRows[0]?.volume_mt || 0) * 10) / 10
     const volume_prev_mt= Math.round(Number(prevRows[0]?.volume_mt || 0) * 10) / 10
     const ytd_revenue   = Math.round(Number(ytdRows[0]?.revenue || 0))
@@ -313,6 +332,9 @@ module.exports = async (req, res) => {
         prev_period_revenue: sales_prev,
         prev_period_volume_mt: volume_prev_mt,
         vs_pp_pct:           sales_vs_pp,
+        ly_period_revenue:   sales_ly_rev,
+        ly_period_volume_mt: Math.round(Number(lyRows[0]?.volume_mt || 0) * 10) / 10,
+        vs_ly_pct:           sales_vs_ly,
         target,
         target_pct,
         ytd_revenue,
