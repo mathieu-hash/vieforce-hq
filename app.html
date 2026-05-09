@@ -4746,11 +4746,6 @@ async function loadSales(){
       });
       seth('sales-rankings-tbody',html);
     }
-    // Monthly trend chart update
-    if(d.monthly_trend && d.monthly_trend.length && charts.salesTrendChart){
-      // Not available directly — chart uses hardcoded region split. Log for Agent 4.
-      console.warn('[SALES] monthly_trend available but chart expects region-split data. Keeping prototype chart.');
-    }
     pulseRefresh('pg-sales');
   } catch(e) { console.error('Sales:', e); showError('pg-sales','Unable to load sales data'); }
 }
@@ -7372,117 +7367,13 @@ function renderHomeCombos(apiData){
 }
 function initCharts(pageId){
   setTimeout(()=>{
-    const mkBar = (id,labels,datasets,opts)=>{
-      if(charts[id]) return;
-      const ctx = document.getElementById(id);
-      if(!ctx) return;
-      charts[id] = new Chart(ctx,{type:'bar',data:{labels,datasets},options:{
-        responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{position:'bottom',labels:{color:'rgba(240,244,250,0.35)',font:{size:10,weight:600},padding:14,usePointStyle:true,pointStyleWidth:8}}},
-        scales:{
-          y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:10}}},
-          x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.25)',font:{size:10}}}
-        },...opts
-      }});
-    };
     if(pageId==='pg-home'){
       renderHomeCombos();
     }
-    if(pageId==='pg-sales'){
-      mkBar('salesTrendChart',['Oct','Nov','Dec','Jan','Feb','Mar','Apr'],[
-        {label:'Luzon',data:[5200,5800,6100,5900,6400,7200,8420],backgroundColor:'rgba(0,174,239,0.55)',borderRadius:4,borderSkipped:false},
-        {label:'Visayas',data:[2100,2400,2200,2500,2800,2900,3180],backgroundColor:'rgba(151,215,0,0.5)',borderRadius:4,borderSkipped:false},
-        {label:'Mindanao',data:[1800,1900,2100,2000,2200,2400,2600],backgroundColor:'rgba(255,199,44,0.5)',borderRadius:4,borderSkipped:false}
-      ]);
-      if(!charts.gmGroup){
-        const ctx2 = document.getElementById('gmGroupChart');
-        if(ctx2){
-          charts.gmGroup = new Chart(ctx2,{type:'bar',data:{
-            labels:['Gamefowl','Poultry','Specialties','Layer','Broiler','Hogs'],
-            datasets:[{data:[8200,6400,5900,5200,4800,3100],
-              backgroundColor:['rgba(151,215,0,0.6)','rgba(0,174,239,0.5)','rgba(0,174,239,0.4)','rgba(255,199,44,0.5)','rgba(255,199,44,0.4)','rgba(239,68,68,0.5)'],
-              borderRadius:4,borderSkipped:false}]
-          },options:{
-            indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false}},
-            scales:{
-              x:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:v=>'₱'+v.toLocaleString()}},
-              y:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.4)',font:{size:10,weight:600}}}
-            }
-          }});
-        }
-      }
-    }
-    if(pageId==='pg-speed'){
-      // Main speed bar chart is created by loadSpeed() using real API data — no prototype init here
-      // Speed sparkline
-      if(!charts.speedSparkline){
-        const ctx2 = document.getElementById('speedSparkline');
-        if(ctx2){
-          charts.speedSparkline = new Chart(ctx2,{type:'line',data:{
-            labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr'],
-            datasets:[{
-              data:[18200,16400,12800,22400,19600,18800,15649],
-              borderColor:'rgba(240,244,250,0.6)',backgroundColor:'rgba(240,244,250,0.04)',
-              fill:true,tension:0.4,pointRadius:3,pointBackgroundColor:'rgba(240,244,250,0.8)',
-              pointBorderColor:'rgba(240,244,250,0.8)',borderWidth:2,pointHoverRadius:5
-            }]
-          },options:{
-            responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1000).toFixed(1)+'K'}}},
-            scales:{y:{display:false,beginAtZero:true},x:{display:false}}
-          }});
-        }
-      }
-    }
-    if(pageId==='pg-custdetail'){
-      // custVolBar chart is created inside openCust() → loadCustDetail() from real API data (cy_vs_ly).
-      // No prototype init here — prevents categorical axis caching when switching customers.
-      // Sales & GM/Ton trend line
-      if(!charts.custSalesGm){
-        const ctx2 = document.getElementById('custSalesGmChart');
-        if(!ctx2) return;
-        const g2 = ctx2.getContext('2d').createLinearGradient(0,0,0,180);
-        g2.addColorStop(0,'rgba(0,174,239,0.1)');g2.addColorStop(1,'rgba(0,174,239,0)');
-        charts.custSalesGm = new Chart(ctx2,{type:'line',data:{
-          labels:['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'],
-          datasets:[
-            {label:'Sales (₱M)',data:[12,13,14.5,13.8,15.2,14.8,16.1,17.2,15.8,16.8,17.6,18.2],borderColor:'#00AEEF',backgroundColor:g2,fill:true,tension:0.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#00AEEF',borderWidth:2},
-            {label:'GM/Ton (₱K)',data:[5.48,5.51,5.58,5.62,5.68,5.75,5.82,5.88,5.94,6.09,6.18,6.24],borderColor:'#97D700',backgroundColor:'transparent',tension:0.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#97D700',borderWidth:2,yAxisID:'y1'}
-          ]
-        },options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{position:'bottom',labels:{color:'rgba(240,244,250,0.35)',font:{size:10,weight:600},padding:14,usePointStyle:true,pointStyleWidth:8}}},
-          scales:{
-            y:{beginAtZero:false,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:v=>'₱'+v+'M'}},
-            y1:{position:'right',beginAtZero:false,grid:{display:false},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:v=>'₱'+v.toFixed(1)+'K'}},
-            x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.2)',font:{size:9}}}
-          }
-        }});
-      }
-    }
-    if(pageId==='pg-margin'){
-      if(!charts.marginRegion){
-        const ctx = document.getElementById('marginRegionChart');
-        if(ctx){
-          charts.marginRegion = new Chart(ctx,{type:'line',data:{
-            labels:['Nov','Dec','Jan','Feb','Mar','Apr'],
-            datasets:[
-              {label:'Luzon',data:[5980,6050,6120,6180,6280,6210],borderColor:'#00AEEF',backgroundColor:'transparent',tension:0.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#00AEEF',borderWidth:2},
-              {label:'Visayas',data:[5350,5280,5180,5150,5240,5210],borderColor:'#97D700',backgroundColor:'transparent',tension:0.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#97D700',borderWidth:2},
-              {label:'Mindanao',data:[4200,3980,3780,3650,3580,3500],borderColor:'#EF4444',backgroundColor:'transparent',tension:0.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#EF4444',borderWidth:2,borderDash:[5,3]}
-            ]
-          },options:{
-            responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom',labels:{color:'rgba(240,244,250,0.35)',font:{size:10,weight:600},padding:14,usePointStyle:true,pointStyleWidth:8}}},
-            scales:{
-              y:{beginAtZero:false,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(240,244,250,0.25)',font:{size:9},callback:v=>'₱'+v.toLocaleString()}},
-              x:{grid:{display:false},ticks:{color:'rgba(240,244,250,0.3)',font:{size:10}}}
-            }
-          }});
-        }
-      }
-    }
+    /* pg-sales: Monthly trend + BU GM charts — real data from loadSales()/API only; prototype mkBar removed (period-honesty sprint). */
+    /* pg-speed: Main chart from loadSpeed(); sparkline prototype removed. */
+    /* pg-custdetail: Volume from loadCustDetail(); Sales/GM prototype removed. */
+    /* pg-margin: GM/Ton trend — real chart path only; prototype removed. */
     if(pageId==='pg-budget'){
       // Historical volume growth
       if(!charts.budgetHistory){
