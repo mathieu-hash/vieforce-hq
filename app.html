@@ -1770,7 +1770,7 @@ body{
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-vol">14.2K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-vol-d">▲ 12.1%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-ytdvol">54.4K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-ytdvol-d">▲ 92.0%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="sk-sales">₱482M</div><div class="kpi-delta up" id="sk-sales-d">▲ 8.3%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed</div><div class="kpi-val" style="font-size:18px" id="sk-speed">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up" id="sk-speed-d">▲ 4.8%</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Speed <span id="sk-speed-cmp-label" style="font-size:9px;color:var(--text3);font-weight:600">vs PP</span></div><div class="kpi-val" style="font-size:18px" id="sk-speed">682<span style="font-size:10px;color:var(--text3)"> MT/d</span></div><div class="kpi-delta up" id="sk-speed-d">▲ 4.8%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg GM/Ton</div><div class="kpi-val" style="font-size:18px" id="sk-gmt">₱6,953</div><div class="kpi-delta up" id="sk-gmt-d">▲ 3.2%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:18px;color:var(--gold)" id="sk-pending">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src" id="sk-pending-sub">42 orders</div></div>
         </div>
@@ -2278,7 +2278,7 @@ body{
           </div>
           <!-- Avg Pullout -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
-            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Pullout</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Average Pullout <span id="sp-pullout-cmp-label" style="font-size:8px">vs PP</span></div>
             <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-pullout">—</div>
             <div style="font-size:11px;font-weight:700;color:var(--text3)" id="sp-pullout-delta">—</div>
           </div>
@@ -4652,7 +4652,12 @@ async function loadSales(){
     if(sp){
       var dpv = sp.daily_pullout != null ? sp.daily_pullout : sp.speed_per_day;
       if(dpv!=null) animateNumber(sel('sk-speed'), dpv, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT/d</span>'});
-      if(sp.vs_prior_period_pct!=null) setDelta('sk-speed-d', sp.vs_prior_period_pct);
+      var spCmpPct = (CMP === 'vs_ly' && sp.vs_last_year_pct != null && !isNaN(Number(sp.vs_last_year_pct)))
+        ? Number(sp.vs_last_year_pct)
+        : (sp.vs_prior_period_pct != null ? Number(sp.vs_prior_period_pct) : null);
+      if(spCmpPct != null && !isNaN(spCmpPct)) setDelta('sk-speed-d', spCmpPct);
+      var skSpLbl = sel('sk-speed-cmp-label');
+      if(skSpLbl) skSpLbl.textContent = (CMP === 'vs_ly' && sp.vs_last_year_pct != null && !isNaN(Number(sp.vs_last_year_pct))) ? 'vs LY' : 'vs PP';
     }
     // Pending PO — hero KPI + full section tables
     if(d.pending_po){
@@ -5200,12 +5205,16 @@ async function loadSpeed(){
     var asOf = (d.daily && d.daily.length) ? d.daily[d.daily.length-1].ship_date : null;
     var asOfDate = asOf ? new Date(asOf) : new Date();
     sett('sp-asof', asOfDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
-    // Pullout delta (vs prior period)
-    if(d.vs_prior_period_pct!=null){
-      var vp = d.vs_prior_period_pct;
+    // Pullout delta — vs PP or vs LY (same response)
+    var spPullCmp = (CMP === 'vs_ly' && d.vs_last_year_pct != null && !isNaN(Number(d.vs_last_year_pct)))
+      ? Number(d.vs_last_year_pct)
+      : (d.vs_prior_period_pct != null ? Number(d.vs_prior_period_pct) : null);
+    if(spPullCmp != null && !isNaN(spPullCmp)){
       var pdel = sel('sp-pullout-delta');
-      if(pdel){ pdel.textContent=(vp>=0?'↑ +':'↓ ')+vp.toFixed(1)+'%'; pdel.style.color = vp>=0?'var(--green)':'var(--red)'; }
+      if(pdel){ pdel.textContent=(spPullCmp>=0?'↑ +':'↓ ')+spPullCmp.toFixed(1)+'%'; pdel.style.color = spPullCmp>=0?'var(--green)':'var(--red)'; }
     }
+    var spPlLbl = sel('sp-pullout-cmp-label');
+    if(spPlLbl) spPlLbl.textContent = (CMP === 'vs_ly' && d.vs_last_year_pct != null && !isNaN(Number(d.vs_last_year_pct))) ? 'vs LY' : 'vs PP';
     // Speed vs LM — derived ratio daily_pullout / prior_period_daily_pullout - 1
     if(dailyPull!=null && d.prior_period_daily_pullout > 0){
       var slm = ((dailyPull - d.prior_period_daily_pullout) / d.prior_period_daily_pullout) * 100;

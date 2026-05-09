@@ -79,7 +79,9 @@ function standardResponses() {
     // lastMonthRow
     ['AS mt_full',              [{ mt_full: 400, mt_to_same_day: 300 }]],
     // priorRow — 'AS mt' with trailing space (won't match mt_full/mt_to_same_day)
-    ['AS mt ',                  [{ mt: 350 }]]
+    ['AS mt ',                  [{ mt: 350 }]],
+    // last-year pullout window (alias ly_mt — unique vs prior AS mt)
+    ['AS ly_mt',                [{ ly_mt: 280 }]]
   ]
 }
 
@@ -183,9 +185,9 @@ test('speed_dsm_scope_filters_odln_slpcode_in_all_queries', async () => {
   assert.equal(res.body.scope?.slpCodes_count, 2)
   assert.equal(res.body.scope?.attribution, 'ODLN.SlpCode')
 
-  // EVERY ODLN query must carry the scope filter — 10 sites total (totalRow,
+  // EVERY ODLN query must carry the scope filter — 11 queries (totalRow,
   // daily-else, plant_breakdown, rsm_speed, feed_type_speed, weekly_raw,
-  // lastMonthRow, priorRow) — MTD period runs only one daily branch.
+  // lastMonthRow, priorRow, ly pullout) — MTD period runs only one daily branch.
   const sqls = queryStub.calls.map(c => c.sql)
   const needles = [
     'AS actual_mt',                     // totalRow
@@ -195,7 +197,8 @@ test('speed_dsm_scope_filters_odln_slpcode_in_all_queries', async () => {
     'AS brand',                         // feed_type_speed
     'AS week',                          // weekly_raw
     'AS mt_full',                       // lastMonthRow
-    'AS mt '                            // priorRow
+    'AS mt ',                           // priorRow
+    'AS ly_mt'                          // last-year pullout window
   ]
   for (const needle of needles) {
     const q = sqls.find(s => s.includes(needle))
@@ -225,6 +228,7 @@ test('speed_empty_scope_returns_zero_payload_no_sql', async () => {
   assert.equal(res.body.daily_pullout, 0)
   assert.equal(res.body.projected_period_volume, 0)
   assert.equal(res.body.vs_prior_period_pct, 0)
+  assert.equal(res.body.vs_last_year_pct, 0)
   assert.equal(res.body.vs_last_month_pct, 0)
   assert.deepEqual(res.body.daily, [])
   assert.deepEqual(res.body.plant_breakdown, [])
@@ -271,7 +275,8 @@ test('speed_division_by_zero_returns_zero_not_nan', async () => {
     ['AS brand',                []],
     ['AS vol',                  []],
     ['AS mt_full',              [{ mt_full: 0, mt_to_same_day: 0 }]],
-    ['AS mt ',                  [{ mt: 0 }]]
+    ['AS mt ',                  [{ mt: 0 }]],
+    ['AS ly_mt',                [{ ly_mt: 0 }]]
   ]
   const queryStub = makeQueryStub(zeroResponses)
   const handler = buildEnv(
@@ -292,6 +297,7 @@ test('speed_division_by_zero_returns_zero_not_nan', async () => {
   assert.equal(res.body.projected_period_volume, 0)
   assert.equal(res.body.pct_of_target, 0)
   assert.equal(res.body.vs_prior_period_pct, 0)
+  assert.equal(res.body.vs_last_year_pct, 0)
   assert.equal(res.body.vs_last_month_pct, 0)
   // Scope still reports correctly even with zero data
   assert.equal(res.body.scope?.is_empty, false, 'is_empty is false — scope has SlpCodes')
