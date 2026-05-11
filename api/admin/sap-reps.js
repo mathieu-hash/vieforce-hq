@@ -3,6 +3,11 @@
 // (SlpCode > 3 to skip placeholder/VPI/Mat/Joel), each left-joined to its
 // existing public.users row when sap_slpcode matches.
 //
+// Response shape (relevant bits):
+//   reps[].linked_supabase_user — null if no linked row; otherwise:
+//     { id, name, role, phone, manager_id, region, district, territory }
+//   (Never includes pin / pin_hash.)
+//
 // Also returns:
 //   - supabase_managers: the set of already-mapped users eligible to be
 //     selected as a manager in the portal UI (role ∈ rsm/director/exec/ceo).
@@ -40,7 +45,7 @@ module.exports = async (req, res) => {
     // ── 2. Supabase users — SELECT via service-role client ──────────────
     const { data: users, error: usersErr } = await supabase
       .from('users')
-      .select('id, name, role, phone, sap_slpcode, manager_id, is_active')
+      .select('id, name, role, phone, sap_slpcode, manager_id, is_active, region, district, territory')
       .order('name', { ascending: true })
 
     if (usersErr) {
@@ -78,7 +83,10 @@ module.exports = async (req, res) => {
           name: linked.name,
           role: linked.role,
           phone: linked.phone,
-          manager_id: linked.manager_id
+          manager_id: linked.manager_id,
+          region: linked.region != null ? linked.region : null,
+          district: linked.district != null ? linked.district : null,
+          territory: linked.territory != null ? linked.territory : null
         } : null
       }
     })
