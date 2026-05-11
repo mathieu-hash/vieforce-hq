@@ -136,9 +136,11 @@ test('admin_sap_reps_links_existing_supabase_user_when_slpcode_matches', async (
   const handler = buildEnv({
     supabaseUsers: [
       { id: 'jefrey-uuid', name: 'Jefrey Gatchalian', role: 'dsm', phone: '09180000017',
-        sap_slpcode: 17, manager_id: 'edfrey-uuid', is_active: true },
+        sap_slpcode: 17, manager_id: 'edfrey-uuid', is_active: true,
+        region: 'North Luzon', district: 'Ilocos', territory: 'T1' },
       { id: 'edfrey-uuid', name: 'Edfrey Buenaventura', role: 'rsm', phone: '09180000010',
-        sap_slpcode: 10, manager_id: null, is_active: true }
+        sap_slpcode: 10, manager_id: null, is_active: true,
+        region: 'North Luzon', district: null, territory: null }
     ]
   })
   const req = { method: 'GET', headers: {}, query: {} }
@@ -150,9 +152,22 @@ test('admin_sap_reps_links_existing_supabase_user_when_slpcode_matches', async (
   assert.ok(jefrey.linked_supabase_user, 'jefrey should be linked')
   assert.equal(jefrey.linked_supabase_user.id, 'jefrey-uuid')
   assert.equal(jefrey.linked_supabase_user.role, 'dsm')
+  assert.equal(jefrey.linked_supabase_user.region, 'North Luzon')
+  assert.equal(jefrey.linked_supabase_user.district, 'Ilocos')
+  assert.equal(jefrey.linked_supabase_user.territory, 'T1')
+
+  const edfreyAsRep = res.body.reps.find(r => r.slp_code === 10)
+  assert.equal(edfreyAsRep.linked_supabase_user.region, 'North Luzon')
+  assert.equal(edfreyAsRep.linked_supabase_user.district, null)
+  assert.equal(edfreyAsRep.linked_supabase_user.territory, null)
 
   const abegail = res.body.reps.find(r => r.slp_code === 4)
   assert.equal(abegail.linked_supabase_user, null, 'abegail not yet onboarded')
+
+  // Contract: linked user object must not expose auth secrets
+  const leaked = JSON.stringify(res.body)
+  assert.ok(!leaked.includes('"pin"'), 'response must not contain pin')
+  assert.ok(!leaked.includes('pin_hash'), 'response must not contain pin_hash')
 
   // Eligible managers dropdown must include edfrey (rsm) but NOT jefrey (dsm)
   const mgrIds = res.body.supabase_managers.map(m => m.id)
