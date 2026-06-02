@@ -215,7 +215,7 @@ module.exports = async (req, res) => {
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${lineFilters}
-    `)
+    `, { region })
 
     // --- Region performance (current period + previous period for vs_pp delta)
     //     Volume (.vol) = ODLN · Sales (.sales) = OINV · gm_ton = OINV/OINV. Mat's rule 2026-04-18.
