@@ -17,6 +17,7 @@ const { verifySession, verifyServiceToken } = require('./_auth')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 const { classify, FAMILIES } = require('./lib/brand-family')
+const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
 
 const REGIONS = ['Luzon', 'Visayas', 'Mindanao', 'Other']
 const REGION_CASE = `
@@ -47,7 +48,9 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `analytics_brand_coverage_${session.role}`
+  const regionFilter = normalizeRegion(req.query.region)
+  const buFilter = normalizeSegment(req.query.bu || req.query.segment)
+  const cacheKey = `analytics_brand_coverage_${regionFilter}_${buFilter}_${session.role}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -77,7 +80,13 @@ module.exports = async (req, res) => {
       queryH(SQL).catch(() => [])
     ])
     const histKeyed = await rekeyHistoricalRows(histRows, 'CardCode').catch(() => [])
-    const merged = [...curRows, ...histKeyed]
+    const merged = [...curRows, ...histKeyed].filter(r => {
+      const reg = REGIONS.includes(r.region) ? r.region : 'Other'
+      const bu = buClassifier(r.CardName, r.slp_code)
+      if (regionFilter !== 'ALL' && reg !== regionFilter) return false
+      if (buFilter !== 'ALL' && bu !== buFilter) return false
+      return true
+    })
 
     // Aggregations
     const national = new Map()                                 // family → vol
@@ -218,9 +227,17 @@ module.exports = async (req, res) => {
     const result = {
       meta: {
         period: 'Trailing 12 months',
+        filters: { region: regionFilter, bu: buFilter },
+        applied_filters: filterMeta(regionFilter, buFilter),
         national_volume_mt: Math.round(nationalTotal * 10) / 10,
         brands_analyzed: TOP_BRANDS,
-        generated_at: new Date().toISOString()
+        generated_at: new Date().toISOString(),
+        source: { volume: 'OINV trailing 12 months', region: 'invoice warehouse' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['bu'],
+          notes: ['BU/segment is inferred from SlpCode/customer-name classifier until official customer master segmentation is confirmed.']
+        }
       },
       national_mix,
       by_region: region_mix,

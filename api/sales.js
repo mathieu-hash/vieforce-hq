@@ -2,6 +2,7 @@ const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const { scopeForUser, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = require('./_scope')
 const cache = require('../lib/cache')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 module.exports = async (req, res) => {
   // CORS
@@ -41,12 +42,16 @@ module.exports = async (req, res) => {
   const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
     ? req.query.ref_month.trim()
     : 'live'
-  const cacheKey = `sales_${refMonthKey}_${req.query.period || 'MTD'}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const reqRegion = normalizeRegion(req.query.region)
+  const reqSegment = normalizeSegment(req.query.segment)
+  const cacheKey = `sales_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const { period = 'MTD', region = 'ALL' } = req.query
+    const { period = 'MTD' } = req.query
+    const region = reqRegion
+    const segment = reqSegment
     const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
     const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
 
@@ -58,9 +63,10 @@ module.exports = async (req, res) => {
     const wantAtRisk     = include.has('at_risk')
 
     const scopeSql = scopeFilter.sql    // '' when ALL or no scope
+    const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'` + scopeSql
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    const filteredWhere = applyRoleFilter(session, baseWhere) + lineFilters
 
     // --- By Brand ---
     const by_brand = await query(`
@@ -81,7 +87,7 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY T1.Dscription
       ORDER BY volume_mt DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Top 20 Customers ---
     const top_customers = await query(`
@@ -97,12 +103,12 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY T0.CardCode, T0.CardName
       ORDER BY volume_mt DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Monthly Trend (last 12 months, ignores period filter) ---
     const trendWhere = `WHERE T0.DocDate >= DATEADD(MONTH, -12, GETDATE()) AND T0.CANCELED = 'N'` + scopeSql
     // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
-    const trendFiltered = applyRoleFilter(session, trendWhere)
+    const trendFiltered = applyRoleFilter(session, trendWhere) + lineFilters
 
     // 12-month trend crosses 2026-01-01 cutoff → union historical + current.
     // After concat, sum by month-key (in case of overlap) and re-sort.
@@ -118,7 +124,7 @@ module.exports = async (req, res) => {
       ${trendFiltered}
       GROUP BY FORMAT(T0.DocDate, 'yyyy-MM')
       ORDER BY month ASC
-    `)
+    `, { region })
     const trendByMonth = {}
     for (const r of monthlyRaw) {
       const k = r.month
@@ -146,24 +152,14 @@ module.exports = async (req, res) => {
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${scopeSql}
+      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${scopeSql}${lineFilters}
       ORDER BY T0.DocDate ASC
-    `)
+    `, { region })
 
-    // Also get PO headers (for amount + status count — DocStatus='O' then per-line detail above)
-    const pendingPOHeaders = await query(`
-      SELECT TOP 500
-        T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName,
-        ISNULL(T0.DocTotal, 0) AS amount,
-        T0.Confirmed,
-        ISNULL(T0.SlpCode, 0) AS slp
-      FROM ORDR T0
-      WHERE T0.DocStatus='O' AND T0.CANCELED='N'${scopeSql}
-      ORDER BY T0.DocDate DESC
-    `)
-
+    const poOrderCount = new Set(pendingPO.map(p => p.DocNum)).size
     const po_total_mt = pendingPO.reduce((s, p) => s + p.qty_mt, 0)
-    const po_total_value = pendingPOHeaders.reduce((s, p) => s + (p.amount || 0), 0)
+    // Use line value so region/segment filters stay consistent with the detail rows.
+    const po_total_value = pendingPO.reduce((s, p) => s + (p.amount || 0), 0)
     const po_by_brand = {}
     const po_by_region = {}
     const po_by_sku = {}
@@ -196,9 +192,9 @@ module.exports = async (req, res) => {
       summary: {
         total_mt: Math.round(po_total_mt * 10) / 10,
         total_value: Math.round(po_total_value),
-        total_orders: new Set(pendingPO.map(p => p.DocNum)).size,
+        total_orders: poOrderCount,
         customers_count: new Set(pendingPO.map(p => p.customer_code)).size,
-        avg_order_mt: pendingPOHeaders.length > 0 ? Math.round(po_total_mt / pendingPOHeaders.length) : 0,
+        avg_order_mt: poOrderCount > 0 ? Math.round(po_total_mt / poOrderCount) : 0,
         oldest_days: pendingPO.length > 0 ? Math.max(...pendingPO.map(p => p.age_days)) : 0
       },
       by_brand: Object.entries(po_by_brand).map(([brand, mt]) => ({ brand, mt: Math.round(mt * 10) / 10 })).sort((a, b) => b.mt - a.mt),
@@ -321,7 +317,7 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // Previous-period (one period back, same length) for delta
     const prevFrom = new Date(dateFrom); prevFrom.setTime(prevFrom.getTime() - (dateTo - dateFrom))
@@ -338,8 +334,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${scopeSql}
-    `, { pFrom: prevFrom, pTo: prevTo })
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${scopeSql}${lineFilters}
+    `, { pFrom: prevFrom, pTo: prevTo, region })
 
     // YTD (Jan 1 → anchor end) — anchor respects ref_month
     const anchorEnd = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate())
@@ -352,8 +348,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @ytdFrom AND @ytdEnd AND T0.CANCELED='N'${scopeSql}
-    `, { ytdFrom, ytdEnd: anchorEnd })
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @ytdEnd AND T0.CANCELED='N'${scopeSql}${lineFilters}
+    `, { ytdFrom, ytdEnd: anchorEnd, region })
 
     // LY same period (current period -1y) and LY YTD — pulls from historical when pre-cutoff
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
@@ -370,8 +366,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}
-    `, {}, lyFrom, lyTo)
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}${lineFilters}
+    `, { region }, lyFrom, lyTo)
 
     const ytdLyFrom = new Date(anchorEnd.getFullYear() - 1, 0, 1)
     const ytdLyTo   = new Date(anchorEnd.getFullYear() - 1, anchorEnd.getMonth(), anchorEnd.getDate())
@@ -382,8 +378,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}
-    `, {}, ytdLyFrom, ytdLyTo)
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${scopeSql}${lineFilters}
+    `, { region }, ytdLyFrom, ytdLyTo)
 
     const sumRows = (rows, ...cols) => {
       const acc = Object.fromEntries(cols.map(c => [c, 0]))
@@ -432,7 +428,25 @@ module.exports = async (req, res) => {
       }
     }
 
-    const result = { kpis, by_brand, top_customers, monthly_trend, pending_po,
+    const result = { meta: {
+                       applied_filters: {
+                         period: String(period || 'MTD').toUpperCase(),
+                         ...filterMeta(region, segment),
+                         ref_month: refMonthKey
+                       },
+                       source: {
+                         volume: 'OINV',
+                         sales: 'OINV',
+                         gross_margin: 'OINV',
+                         pending_po: 'ORDR/RDR1'
+                       },
+                       data_quality: {
+                         contains_proxy: true,
+                         proxy_fields: ['pending_po.by_region_detail.value'],
+                         notes: ['Sales page invoice volume uses OINV; shipped-speed cards come from /api/speed.']
+                       }
+                     },
+                     kpis, by_brand, top_customers, monthly_trend, pending_po,
                      volume_mt: kpis.volume_mt, volume_bags: kpis.volume_bags,
                      revenue: kpis.revenue, gmt: kpis.gmt,
                      ytd_volume_mt: kpis.ytd_volume_mt, ytd_revenue: kpis.ytd_revenue }

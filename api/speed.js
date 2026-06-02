@@ -11,6 +11,8 @@ const {
   resolveRefMonthAnchor,
   fmtISO
 } = require('./lib/shipping_days')
+const { getPeriodTargetMt, budgetMeta } = require('./lib/budget_2026')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 // Speed scope filter = ODLN.SlpCode IN (...) direct.
 // Design decision locked: attribution follows the delivery's own SlpCode, not
@@ -63,31 +65,8 @@ function emptySpeedPayload(period, todayPH, dateFrom, periodEnd, scope) {
   }
 }
 
-// 2026 Budget targets (from Sales Volume Budget 2026)
-// Annual: 188,266 MT | Q1: 41,800 | Q2: 45,184 | Q3: 49,389 | Q4: 51,893
-const BUDGET_2026 = {
-  annual: 188266,
-  quarterly: [41800, 45184, 49389, 51893],  // Q1, Q2, Q3, Q4
-  monthly: [
-    13933, 13933, 13934,   // Q1: Jan, Feb, Mar (41,800 / 3)
-    15061, 15061, 15062,   // Q2: Apr, May, Jun (45,184 / 3)
-    16463, 16463, 16463,   // Q3: Jul, Aug, Sep (49,389 / 3)
-    17298, 17298, 17297    // Q4: Oct, Nov, Dec (51,893 / 3)
-  ]
-}
-
 function getTarget(period, anchorDate) {
-  const now = anchorDate || getManilaToday()
-  const month = now.getMonth()      // 0-11
-  const quarter = Math.floor(month / 3) // 0-3
-
-  switch (period) {
-    case '7D':  return Math.round(BUDGET_2026.monthly[month] * 7 / 30)
-    case 'MTD': return BUDGET_2026.monthly[month]
-    case 'QTD': return BUDGET_2026.quarterly[quarter]
-    case 'YTD': return BUDGET_2026.annual
-    default:    return BUDGET_2026.monthly[month]
-  }
+  return getPeriodTargetMt(period, anchorDate || getManilaToday())
 }
 
 // countShippingDays / getPeriodBounds / getPeriodEndBound / getManilaToday
@@ -157,6 +136,8 @@ module.exports = async (req, res) => {
 
   const { period = 'MTD' } = req.query
   const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
+  const region = normalizeRegion(req.query.region)
+  const segment = normalizeSegment(req.query.segment)
 
   // Period bounds computed early so zero-state + cache key share them.
   const todayPH = resolveRefMonthAnchor(refMonthRaw)
@@ -190,7 +171,7 @@ module.exports = async (req, res) => {
   // Cache key includes scope user so user A's rows cannot serve user B.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
   const refKey = refMonthRaw && /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
-  const cacheKey = `speed_${refKey}_${period}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const cacheKey = `speed_${refKey}_${period}_${region}_${segment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -198,8 +179,9 @@ module.exports = async (req, res) => {
     // Actual MT shipped (from ODLN delivery notes, NOT OINV invoices).
     // applyRoleFilter kept as a no-op pass-through for symmetry; the scope
     // filter (speedFilter.sql) is where real scoping happens now.
+    const lineFilters = speedFilter.sql + regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    const filteredWhere = baseWhere + speedFilter.sql
+    const filteredWhere = baseWhere + lineFilters
 
     const totalRow = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS actual_mt
@@ -207,7 +189,7 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // Breakdown — daily for 7D/MTD, weekly for QTD, monthly for YTD
     let daily
@@ -220,10 +202,10 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
         GROUP BY FORMAT(T0.DocDate, 'yyyy-MM')
         ORDER BY ship_date ASC
-      `, { dateFrom, dateTo })
+      `, { dateFrom, dateTo, region })
     } else if (period === 'QTD') {
       daily = await query(`
         SELECT
@@ -233,10 +215,10 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
         GROUP BY DATEPART(ISO_WEEK, T0.DocDate)
         ORDER BY MIN(T0.DocDate) ASC
-      `, { dateFrom, dateTo })
+      `, { dateFrom, dateTo, region })
     } else {
       daily = await query(`
         SELECT
@@ -246,10 +228,10 @@ module.exports = async (req, res) => {
         FROM ODLN T0
         INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
         GROUP BY CONVERT(VARCHAR(10), T0.DocDate, 120), DATENAME(WEEKDAY, T0.DocDate)
         ORDER BY ship_date ASC
-      `, { dateFrom, dateTo })
+      `, { dateFrom, dateTo, region })
     }
 
     const actual_mt = totalRow[0]?.actual_mt || 0
@@ -279,10 +261,10 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY T1.WhsCode
       ORDER BY mtd DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- RSM speed (by SlpCode) ---
     const rsm_speed = await query(`
@@ -293,10 +275,10 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       LEFT JOIN OSLP S ON T0.SlpCode = S.SlpCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.SlpName
       ORDER BY current_vol DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Feed type speed (by brand/description) ---
     const feed_type_speed = await query(`
@@ -306,10 +288,10 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${speedFilter.sql}
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY T1.Dscription
       ORDER BY current_vol DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Weekly matrix (last 6 weeks by plant) ---
     const weekly_raw = await query(`
@@ -320,10 +302,10 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate >= DATEADD(WEEK, -6, GETDATE()) AND T0.CANCELED = 'N'${speedFilter.sql}
+      WHERE T0.DocDate >= DATEADD(WEEK, -6, GETDATE()) AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY DATEPART(ISO_WEEK, T0.DocDate), T1.WhsCode
       ORDER BY MIN(T0.DocDate) ASC
-    `)
+    `, { region })
 
     const weeks = [...new Set(weekly_raw.map(r => r.week))].sort()
     const plants = [...new Set(weekly_raw.map(r => r.plant))].sort()
@@ -347,8 +329,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lmStart AND @lmEnd AND T0.CANCELED='N'${speedFilter.sql}
-    `, { lmStart: lastMonthStart, lmEnd: lastMonthEnd, lmSameDay: lastMonthSameDay })
+      WHERE T0.DocDate BETWEEN @lmStart AND @lmEnd AND T0.CANCELED='N'${lineFilters}
+    `, { lmStart: lastMonthStart, lmEnd: lastMonthEnd, lmSameDay: lastMonthSameDay, region })
 
     const lm_full = lastMonthRow[0]?.mt_full || 0
     const lm_same = lastMonthRow[0]?.mt_to_same_day || 0
@@ -362,8 +344,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${speedFilter.sql}
-    `, { pFrom: prior.from, pTo: prior.to })
+      WHERE T0.DocDate BETWEEN @pFrom AND @pTo AND T0.CANCELED='N'${lineFilters}
+    `, { pFrom: prior.from, pTo: prior.to, region })
 
     const prior_period_volume = priorRow[0]?.mt || 0
     const prior_elapsed_days = countShippingDays(prior.from, prior.to)
@@ -378,8 +360,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED='N'${speedFilter.sql}
-    `, { lyFrom: lyWin.from, lyTo: lyWin.to })
+      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED='N'${lineFilters}
+    `, { lyFrom: lyWin.from, lyTo: lyWin.to, region })
 
     const last_year_volume = lyRow[0]?.ly_mt || 0
     const ly_elapsed_days = countShippingDays(lyWin.from, lyWin.to)
@@ -389,6 +371,22 @@ module.exports = async (req, res) => {
       : 0
 
     const result = {
+      meta: {
+        applied_filters: {
+          period,
+          ...filterMeta(region, segment),
+          ref_month: refKey
+        },
+        source: {
+          volume: 'ODLN',
+          speed: 'ODLN',
+          budget: budgetMeta().id
+        },
+        data_quality: {
+          contains_proxy: false,
+          notes: ['Speed projection = shipped MT per elapsed shipping day times shipping days in selected period.']
+        }
+      },
       period,
       // ---- Calendar debug (PH shipping calendar — Sundays + holidays excluded) ----
       current_date_ph:     fmtISO(today),

@@ -134,7 +134,14 @@ module.exports = async (req, res) => {
     supa = getSupabase()
   } catch (e) {
     console.error('[auth/login] supabase init:', e.message)
-    return res.status(500).json({ ok: false, error: 'Login service unavailable' })
+    const devHint =
+      e.message && e.message.includes('SUPABASE_SERVICE_ROLE_KEY')
+        ? 'Local dev: add SUPABASE_SERVICE_ROLE_KEY to .env.local, then restart node server.js.'
+        : null
+    return res.status(500).json({
+      ok: false,
+      error: devHint || 'Login service unavailable'
+    })
   }
 
   const { data, error } = await supa

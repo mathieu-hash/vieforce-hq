@@ -295,14 +295,6 @@
     });
 
     document.getElementById('googleLoginBtn').addEventListener('click', async function() {
-      var hostLc = '';
-      try {
-        hostLc = String(window.location.hostname || '').toLowerCase();
-      } catch (e) {}
-      if (hostLc === 'localhost' || hostLc === '127.0.0.1') {
-        window.location.href = 'https://vieforce-hq.vercel.app/index.html#hq_google=1';
-        return;
-      }
       errorEl.classList.remove('visible');
       errorEl.textContent = '';
       var gbtn = this;

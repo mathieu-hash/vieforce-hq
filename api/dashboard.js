@@ -2,19 +2,9 @@ const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
+const { BUDGET_2026, budgetMeta } = require('./lib/budget_2026')
+const { normalizeRegion, normalizeSegment, regionCaseSql, regionFilterSql, segmentCaseSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
-// 2026 Budget targets (mirrors api/speed.js + api/budget.js)
-const BUDGET_2026 = {
-  annual_mt:      188266,
-  annual_sales:   5975000000,
-  annual_gm:      1233000000,
-  monthly_mt: [
-    13933, 13933, 13934,   // Q1 Jan, Feb, Mar
-    15061, 15061, 15062,   // Q2 Apr, May, Jun
-    16463, 16463, 16463,   // Q3 Jul, Aug, Sep
-    17298, 17298, 17297    // Q4 Oct, Nov, Dec
-  ]
-}
 const ACTIVE_PREDICATE = `(ISNULL(C.frozenFor,'N') <> 'Y' AND C.U_BpStatus = 'Active')`
 
 function monthRange(year, monthIdx) {
@@ -33,13 +23,17 @@ module.exports = async (req, res) => {
   const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
     ? req.query.ref_month.trim()
     : 'live'
+  const reqRegion = normalizeRegion(req.query.region)
+  const reqSegment = normalizeSegment(req.query.segment)
 
-  const cacheKey = `dashboard_v2_${refMonthKey}_${req.query.period || 'MTD'}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `dashboard_v2_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const { period = 'MTD', region = 'ALL' } = req.query
+    const { period = 'MTD' } = req.query
+    const region = reqRegion
+    const segment = reqSegment
     const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
     const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
 
@@ -56,8 +50,9 @@ module.exports = async (req, res) => {
     const ytd_budget_gm = Math.round((ytd_budget_mt / BUDGET_2026.annual_mt) * BUDGET_2026.annual_gm)
     const mtd_budget_mt = BUDGET_2026.monthly_mt[monthIdx]
 
+    const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    const filteredWhere = applyRoleFilter(session, baseWhere) + lineFilters
 
     // --- Current period KPIs — OINV is REVENUE/MARGIN basis only.
     //     Volume reporting uses ODLN (see below). Unit margin (gmt) uses OINV/OINV per Mat's rule 2026-04-18.
@@ -77,7 +72,7 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Current period VOLUME from ODLN (delivery notes — physical MT shipped) ---
     const odlnCur = await query(`
@@ -87,8 +82,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
-    `, { dateFrom, dateTo })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { dateFrom, dateTo, region })
 
     // --- Pending billing: ODLN docs in period that are not yet fully invoiced (DocStatus='O') ---
     const pendingBilling = await query(`
@@ -99,9 +94,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo
-        AND T0.CANCELED = 'N'
+        AND T0.CANCELED = 'N'${lineFilters}
         AND T0.DocStatus = 'O'
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Previous period KPIs (for MoM delta) ---
     // Revenue + GM from OINV; volume from ODLN (compared apples-to-apples with current ODLN volume)
@@ -116,16 +111,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
-    `, { prevFrom: prev.from, prevTo: prev.to })
+      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { prevFrom: prev.from, prevTo: prev.to, region })
 
     const prevOdln = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'
-    `, { prevFrom: prev.from, prevTo: prev.to })
+      WHERE T0.DocDate BETWEEN @prevFrom AND @prevTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { prevFrom: prev.from, prevTo: prev.to, region })
 
     // --- Same period last year (for vs LY compare) — reads historical DB when LY < cutoff ---
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
@@ -141,16 +136,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
-    `, {}, lyFrom, lyTo)
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { region }, lyFrom, lyTo)
 
     const lyOdln = await queryDateRange(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
-    `, {}, lyFrom, lyTo)
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { region }, lyFrom, lyTo)
 
     // --- YTD actuals ---
     const ytdKpis = await query(`
@@ -164,16 +159,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'
-    `, { ytdFrom, today: now })
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'${lineFilters}
+    `, { ytdFrom, today: now, region })
 
     const ytdOdln = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'
-    `, { ytdFrom, today: now })
+      WHERE T0.DocDate BETWEEN @ytdFrom AND @today AND T0.CANCELED = 'N'${lineFilters}
+    `, { ytdFrom, today: now, region })
 
     // --- AR Balance (total + active) ---
     const arWhere = `WHERE T0.CANCELED = 'N' AND T0.DocTotal > T0.PaidToDate`
@@ -186,7 +181,7 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN OCRD C ON T0.CardCode = C.CardCode
       ${arFilteredWhere}
-    `)
+    `, { region })
 
     // --- DSO (active + total) — trailing 90-day formula calibrated to Finance Dashboard ---
     const dsoRow = await query(`
@@ -219,19 +214,13 @@ module.exports = async (req, res) => {
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
+      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${lineFilters}
     `)
 
     // --- Region performance (current period + previous period for vs_pp delta)
     //     Volume (.vol) = ODLN · Sales (.sales) = OINV · gm_ton = OINV/OINV. Mat's rule 2026-04-18.
-    const REGION_CASE_OINV = `CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END`
-    // Same mapping, different join path (DLN1.WhsCode instead of INV1.WhsCode)
-    const REGION_CASE_ODLN = REGION_CASE_OINV
+    const REGION_CASE_OINV = regionCaseSql('T1')
+    const REGION_CASE_ODLN = regionCaseSql('T1')
 
     const regionInvCur = await query(`
       SELECT ${REGION_CASE_OINV} AS region,
@@ -243,7 +232,7 @@ module.exports = async (req, res) => {
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
       GROUP BY ${REGION_CASE_OINV}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     const regionOdlnCur = await query(`
       SELECT ${REGION_CASE_ODLN} AS region,
@@ -251,9 +240,9 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${lineFilters}
       GROUP BY ${REGION_CASE_ODLN}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     const regionOdlnPrev = await query(`
       SELECT ${REGION_CASE_ODLN} AS region,
@@ -261,9 +250,9 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED='N'${lineFilters}
       GROUP BY ${REGION_CASE_ODLN}
-    `, { ppFrom: prev.from, ppTo: prev.to })
+    `, { ppFrom: prev.from, ppTo: prev.to, region })
 
     // Region — same period last year (historical DB when LY is pre-cutoff)
     const regionOdlnLy = await queryDateRange(`
@@ -272,9 +261,9 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${lineFilters}
       GROUP BY ${REGION_CASE_ODLN}
-    `, {}, lyFrom, lyTo)
+    `, { region }, lyFrom, lyTo)
 
     // Merge: ODLN vol is the headline; OINV provides sales + gm_ton.
     const invByRegion = Object.fromEntries(regionInvCur.map(r => [r.region, r]))
@@ -314,10 +303,10 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${lineFilters}
       GROUP BY T0.CardCode, T0.CardName
       ORDER BY vol DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
     const topCustInvRaw = await query(`
       SELECT T0.CardCode AS code,
         ISNULL(SUM(T1.LineTotal), 0) AS revenue
@@ -325,12 +314,23 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       ${filteredWhere}
       GROUP BY T0.CardCode
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
     const revByCust = Object.fromEntries(topCustInvRaw.map(r => [r.code, r.revenue]))
     const topCust = topCustDLN
       .filter(c => !isNonCustomerRow(c.code, c.name))
       .slice(0, 5)
       .map(c => ({ code: c.code, name: c.name, vol: c.vol, revenue: revByCust[c.code] || 0 }))
+
+    const SEGMENT_CASE = segmentCaseSql('T0')
+    const segmentMix = await query(`
+      SELECT ${SEGMENT_CASE} AS segment,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS volume_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${regionFilterSql(region, 'T1')}
+      GROUP BY ${SEGMENT_CASE}
+    `, { dateFrom, dateTo, region })
 
     // --- Monthly performance (last 7 months, CY + LY volume + GM) — OINV only ---
     // 19-month scan crosses the 2026-01-01 migration cutoff → union historical + current.
@@ -344,9 +344,9 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate >= DATEADD(MONTH, -19, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
-        AND T0.CANCELED = 'N'
+        AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY YEAR(T0.DocDate), MONTH(T0.DocDate)
-    `)
+    `, { region })
 
     // Volume for monthly chart comes from ODLN (DR); gross margin stays OINV.
     const monthlyOdln = await queryBoth(`
@@ -358,9 +358,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate >= DATEADD(MONTH, -19, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
-        AND T0.CANCELED = 'N'
+        AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY YEAR(T0.DocDate), MONTH(T0.DocDate)
-    `)
+    `, { region })
 
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     const monthlyMap = {}  // 'YYYY-MM' -> { volume_mt (ODLN), gm (OINV) }
@@ -406,9 +406,9 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate >= DATEFROMPARTS(YEAR(GETDATE()) - 1, 1, 1)
-        AND T0.CANCELED = 'N'
+        AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY YEAR(T0.DocDate), DATEPART(QUARTER, T0.DocDate)
-    `)
+    `, { region })
 
     // Volume for quarterly chart comes from ODLN; gm stays OINV.
     const quarterlyOdln = await queryBoth(`
@@ -420,9 +420,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate >= DATEFROMPARTS(YEAR(GETDATE()) - 1, 1, 1)
-        AND T0.CANCELED = 'N'
+        AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY YEAR(T0.DocDate), DATEPART(QUARTER, T0.DocDate)
-    `)
+    `, { region })
 
     const qMap = {}
     // Sum across both DBs (defensive — Vienovo_Live should have only 2026+, Vienovo_Old only 2017–2025)
@@ -466,7 +466,7 @@ module.exports = async (req, res) => {
         ${filteredWhere}
         GROUP BY T0.CardCode
       ) sub
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // Defensive aggregation: queryDateRange may return 2 rows (one per DB) when range
     // spans cutoff. Sum the SUM-aggregate columns; recompute gmt from totals.
@@ -502,6 +502,23 @@ module.exports = async (req, res) => {
     const pending_docs = Number(pb.pending_docs || 0)
 
     const result = {
+      meta: {
+        applied_filters: {
+          period: String(period || 'MTD').toUpperCase(),
+          ...filterMeta(region, segment),
+          ref_month: refMonthKey
+        },
+        source: {
+          volume: 'ODLN',
+          sales: 'OINV',
+          gross_margin: 'OINV',
+          budget: budgetMeta().id
+        },
+        data_quality: {
+          contains_proxy: false,
+          notes: ['Region filter uses shipping warehouse region.']
+        }
+      },
       revenue:               d.revenue || 0,
       volume_bags:           cur_vol_bags,                           // ODLN (DR)
       volume_mt:             cur_vol_mt,                             // ODLN (DR)
@@ -571,6 +588,7 @@ module.exports = async (req, res) => {
       },
       region_performance: regionPerf,
       top_customers: topCust,
+      segment_mix: segmentMix.map(r => ({ segment: r.segment, volume_mt: Math.round(Number(r.volume_mt || 0) * 10) / 10 })),
       monthly_perf,
       quarterly_perf,
       margin_alerts: {

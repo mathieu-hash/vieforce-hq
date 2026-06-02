@@ -20,19 +20,12 @@
 const { query, queryH, queryBoth } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
+const { getProratedYtdBudgetMt } = require('./lib/budget_2026')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 // FY2026 monthly volume budget (mirrors api/dashboard.js + api/budget.js).
 // Single source of truth would ideally be a shared module — duplicated here
 // to keep the rewrite self-contained for the demo.
-const BUDGET_2026 = {
-  annual_mt: 188266,
-  monthly_mt: [
-    13933, 13933, 13934,   // Q1 Jan, Feb, Mar
-    15061, 15061, 15062,   // Q2 Apr, May, Jun
-    16463, 16463, 16463,   // Q3 Jul, Aug, Sep
-    17298, 17298, 17297    // Q4 Oct, Nov, Dec
-  ]
-}
 
 // Director SlpCode (Joel Durano). Excluded from RSM list — he IS the EVP.
 const DIRECTOR_SLPCODE = 3
@@ -50,14 +43,7 @@ function countShippingDays(from, to) {
 }
 
 function ytdBudgetMt(today) {
-  // Sum completed months + day-prorated current month. Matches Joel's natural
-  // "where should we be by today?" mental model better than month-end sums.
-  const m = today.getMonth()           // 0-indexed
-  const d = today.getDate()
-  const completed = BUDGET_2026.monthly_mt.slice(0, m).reduce((s, x) => s + x, 0)
-  const daysInMonth = new Date(today.getFullYear(), m + 1, 0).getDate()
-  const proRated = BUDGET_2026.monthly_mt[m] * (d / daysInMonth)
-  return Math.round(completed + proRated)
+  return getProratedYtdBudgetMt(today)
 }
 
 module.exports = async (req, res) => {
@@ -74,8 +60,10 @@ module.exports = async (req, res) => {
     : 'live'
   const period = String(req.query.period || 'YTD').toUpperCase()
   const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+  const region = normalizeRegion(req.query.region)
+  const segment = normalizeSegment(req.query.segment)
 
-  const cacheKey = `team_v3_${refMonthKey}_${period}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `team_v3_${refMonthKey}_${period}_${region}_${segment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -98,6 +86,7 @@ module.exports = async (req, res) => {
     const mtdBounds = getPeriodDates('MTD', periodOpts)
     const monthStart = mtdBounds.dateFrom
     const monthEnd = mtdBounds.dateTo
+    const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
 
     // ───────────────────────────────────────────────────────────────────────
     // 1. NATIONAL TOTALS — single query, no rep filter, no customer exclusions
@@ -112,16 +101,16 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
-    `, { dateFrom, dateTo })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { dateFrom, dateTo, region })
 
     const nationalOdln = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale,1)) / 1000.0, 0) AS ytd_vol
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
-    `, { dateFrom, dateTo })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { dateFrom, dateTo, region })
 
     // YTD-LY (entire prior year through same M-D) — historical DB.
     // Pull both OINV (revenue/GM) and ODLN (volume of record) so vs-LY
@@ -134,8 +123,8 @@ module.exports = async (req, res) => {
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
-    `, { lyStart, lyEnd }).catch(e => {
+      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'${lineFilters}
+    `, { lyStart, lyEnd, region }).catch(e => {
       console.warn('[team] LY national OINV failed:', e.message); return [{}]
     })
 
@@ -144,8 +133,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
-    `, { lyStart, lyEnd }).catch(e => {
+      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'${lineFilters}
+    `, { lyStart, lyEnd, region }).catch(e => {
       console.warn('[team] LY national ODLN failed:', e.message); return [{}]
     })
 
@@ -154,8 +143,8 @@ module.exports = async (req, res) => {
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'
-    `, { ppFrom, ppTo })
+      WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'${lineFilters}
+    `, { ppFrom, ppTo, region })
 
     // ───────────────────────────────────────────────────────────────────────
     // 2. RSM ROSTER — discover RSMs from OSLP.U_rsm self-references
@@ -186,9 +175,9 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.U_rsm
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
     const rsmYtdMap = Object.fromEntries(rsmYtd.map(r => [r.rsm_code, r]))
 
     const rsmPp = await query(`
@@ -200,9 +189,9 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.U_rsm
-    `, { ppFrom, ppTo })
+    `, { ppFrom, ppTo, region })
     const rsmPpMap = Object.fromEntries(rsmPp.map(r => [r.rsm_code, r.pp_vol]))
 
     // MTD ODLN per RSM (calendar month of anchor)
@@ -215,9 +204,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.U_rsm
-    `, { monthStart, monthEnd })
+    `, { monthStart, monthEnd, region })
     const rsmMtdMap = Object.fromEntries(rsmMtdOdln.map(r => [r.rsm_code, r.mtd_vol_odln]))
 
     // Period ODLN per RSM (speed denominator)
@@ -230,9 +219,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.Active = 'Y' AND S.U_rsm IS NOT NULL
-        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.U_rsm
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
     const rsmYtdOdlnMap = Object.fromEntries(rsmYtdOdln.map(r => [r.rsm_code, r.ytd_vol_odln]))
 
     // LY rollup per RSM — historical DB, JOIN on SlpName because SlpCodes can
@@ -249,9 +238,9 @@ module.exports = async (req, res) => {
       INNER JOIN OINV T0 ON T0.SlpCode = S.SlpCode
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
-      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'
+      WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'${lineFilters}
       GROUP BY S.SlpName
-    `, { lyStart, lyEnd }).catch(e => {
+    `, { lyStart, lyEnd, region }).catch(e => {
       console.warn('[team] LY per-rep failed:', e.message); return []
     })
 
@@ -288,10 +277,10 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
       LEFT JOIN OITM I ON I.ItemCode = T1.ItemCode
       WHERE S.U_rsm IS NOT NULL
-        AND T0.DocDate >= DATEADD(MONTH, -6, @anchor) AND T0.CANCELED = 'N'
+        AND T0.DocDate >= DATEADD(MONTH, -6, @anchor) AND T0.CANCELED = 'N'${lineFilters}
         AND T0.DocDate <= @anchor
       GROUP BY S.U_rsm, FORMAT(T0.DocDate, 'yyyy-MM')
-    `, { anchor: today }).catch(e => { console.warn('[team] monthly grid failed:', e.message); return [] })
+    `, { anchor: today, region }).catch(e => { console.warn('[team] monthly grid failed:', e.message); return [] })
     // Note: queryBoth concatenates current + historical rows. Historical rep's
     // U_rsm is from OLD OSLP — could be different from current. Best-effort:
     // sum by (rsm_code, month). Where the same rep moved across RSMs at
@@ -431,9 +420,9 @@ module.exports = async (req, res) => {
         INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters} AND ${territoryWhere}
         GROUP BY ${caseRollup}
-      `, { dateFrom, dateTo })
+      `, { dateFrom, dateTo, region })
       dsmYtdMap = Object.fromEntries(dsmYtdRows.map(r => [Number(r.dsm_key), r]))
 
       const dsmOdlnYtd = await query(`
@@ -443,9 +432,9 @@ module.exports = async (req, res) => {
         INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'${lineFilters} AND ${territoryWhere}
         GROUP BY ${caseRollup}
-      `, { dateFrom, dateTo })
+      `, { dateFrom, dateTo, region })
       dsmYtdOdlnMap = Object.fromEntries(dsmOdlnYtd.map(r => [Number(r.dsm_key), r.ytd_vol_odln]))
 
       const dsmOdlnMtd = await query(`
@@ -455,9 +444,9 @@ module.exports = async (req, res) => {
         INNER JOIN DLN1 T1 ON T1.DocEntry = T0.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N' AND ${territoryWhere}
+        WHERE T0.DocDate BETWEEN @monthStart AND @monthEnd AND T0.CANCELED = 'N'${lineFilters} AND ${territoryWhere}
         GROUP BY ${caseRollup}
-      `, { monthStart, monthEnd })
+      `, { monthStart, monthEnd, region })
       dsmMtdOdlnMap = Object.fromEntries(dsmOdlnMtd.map(r => [Number(r.dsm_key), r.mtd_vol_odln]))
 
       const dsmLyRows = await queryH(`
@@ -467,9 +456,9 @@ module.exports = async (req, res) => {
         INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N' AND ${territoryWhere}
+        WHERE T0.DocDate BETWEEN @lyStart AND @lyEnd AND T0.CANCELED = 'N'${lineFilters} AND ${territoryWhere}
         GROUP BY ${caseRollup}
-      `, { lyStart, lyEnd }).catch(e => {
+      `, { lyStart, lyEnd, region }).catch(e => {
         console.warn('[team] DSM LY failed:', e.message); return []
       })
       dsmLyMap = Object.fromEntries(dsmLyRows.map(r => [Number(r.dsm_key), Number(r.ly_vol || 0)]))
@@ -481,9 +470,9 @@ module.exports = async (req, res) => {
         INNER JOIN INV1 T1 ON T1.DocEntry = T0.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         INNER JOIN OSLP S ON T0.SlpCode = S.SlpCode
-        WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N' AND ${territoryWhere}
+        WHERE T0.DocDate BETWEEN @ppFrom AND @ppTo AND T0.CANCELED = 'N'${lineFilters} AND ${territoryWhere}
         GROUP BY ${caseRollup}
-      `, { ppFrom, ppTo }).catch(e => {
+      `, { ppFrom, ppTo, region }).catch(e => {
         console.warn('[team] DSM PP failed:', e.message); return []
       })
       dsmPpMap = Object.fromEntries(dsmPpRows.map(r => [Number(r.dsm_key), Number(r.pp_vol || 0)]))
@@ -682,6 +671,7 @@ module.exports = async (req, res) => {
       account_health,
       meta: {
         generated_at: today.toISOString(),
+        applied_filters: filterMeta(region, segment),
         period,
         ref_month:    refMonthKey === 'live' ? null : refMonthKey,
         period_start: dateFrom.toISOString(),
@@ -689,7 +679,15 @@ module.exports = async (req, res) => {
         ly_window:    [lyStart.toISOString(), lyEnd.toISOString()],
         pp_window:    [ppFrom.toISOString(), ppTo.toISOString()],
         director_slpcode_excluded: DIRECTOR_SLPCODE,
-        sources:      'OINV (revenue+GM) · ODLN (volume of record) · OSLP.U_rsm (hierarchy) · per-RSM dsms[] (OSLP managers w/ subordinates, territory rollup)'
+        sources:      'OINV (revenue+GM) · ODLN (volume of record) · OSLP.U_rsm (hierarchy) · per-RSM dsms[] (OSLP managers w/ subordinates, territory rollup)',
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['segment', 'region'],
+          notes: [
+            'Region filter applies to OINV/ODLN line warehouse where line-level data is present.',
+            'DSO and silent-account health remain hierarchy-based because those calculations do not carry a line warehouse dimension.'
+          ]
+        }
       }
     }
 

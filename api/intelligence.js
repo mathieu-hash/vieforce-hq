@@ -5,6 +5,7 @@ const cache = require('../lib/cache')
 const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 const { getCustomerMap } = require('./lib/customer-map')
+const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
 
 // --- Scoring helpers (deterministic, explainable) ---
 function scoreRescue(ar_balance, days_silent) {
@@ -42,6 +43,15 @@ function tierOf(c) {
   return 'Large'
 }
 
+const KA_SLPCODES = new Set([2, 7, 24])
+function buOf(c) {
+  const n = String(c && c.name || '').toUpperCase()
+  if (n.includes('PET') || n.includes('KEOS') || n.includes('NOVOPET') || n.includes('PLAISIR')) return 'PET'
+  if (c && c.slp_code != null && KA_SLPCODES.has(Number(c.slp_code))) return 'KA'
+  if (n.includes(' KA ') || n.startsWith('KA ') || n.endsWith(' KA') || n.includes(' KEY ACCOUNT')) return 'KA'
+  return 'DIST'
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'x-session-id, content-type')
@@ -54,11 +64,13 @@ module.exports = async (req, res) => {
   const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
     ? req.query.ref_month.trim()
     : 'live'
+  const regionFilter = normalizeRegion(req.query.region)
+  const segmentFilter = normalizeSegment(req.query.segment || req.query.bu)
   const anchorDate = resolveRefMonthAnchor(refMonthKey === 'live' ? '' : refMonthKey)
   const anchorMs = anchorDate.getTime()
 
   // Cache key includes userId so silences are user-scoped.
-  const cacheKey = `intelligence_v5_${session.id}_${refMonthKey}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `intelligence_v5_${session.id}_${refMonthKey}_${regionFilter}_${segmentFilter}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -184,6 +196,7 @@ module.exports = async (req, res) => {
           T0.DocDate,
           T0.DocEntry,
           T0.DocTotal,
+          T0.SlpCode,
           S.SlpName,
           ROW_NUMBER() OVER (
             PARTITION BY T0.CardCode
@@ -194,7 +207,7 @@ module.exports = async (req, res) => {
         WHERE T0.DocDate >= DATEADD(DAY, -120, @anchor)
           AND T0.CANCELED = 'N'
       )
-      SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpName AS sales_rep
+      SELECT CardCode, DocDate AS last_order_date, DocTotal AS last_order_amount, SlpCode AS slp_code, SlpName AS sales_rep
       FROM Ranked
       WHERE rn = 1
     `
@@ -351,6 +364,7 @@ module.exports = async (req, res) => {
         bp_status:         row.bp_status || '',
         region:            regionMap.get(cc) || 'Other',
         sales_rep:         last.sales_rep || '',
+        slp_code:          last.slp_code || null,
         ar_balance:        arMap.get(cc) || 0,
         last_order_date:   last.last_order_date || row.last_order_date,
         last_order_amount: Number(last.last_order_amount || 0),
@@ -373,7 +387,7 @@ module.exports = async (req, res) => {
       const arLast = arLastInvMap.get(cc) || {}
       custMap.set(cc, {
         card_code: cc, name: '(unknown)', frozen_for: 'N', bp_status: '',
-        region: 'Other', sales_rep: '', ar_balance: arbal,
+        region: 'Other', sales_rep: '', slp_code: null, ar_balance: arbal,
         last_order_date: arLast.last_inv_date || null, last_order_amount: 0,
         days_silent: 9999, order_count: 0,
         orders_since_2024: arLast.orders_since_2024_full || 0,
@@ -407,7 +421,11 @@ module.exports = async (req, res) => {
       if (isNonCustomerRow(cc, c.name)) custMap.delete(cc)
     }
 
-    const allCustomers = [...custMap.values()]
+    const allCustomers = [...custMap.values()].filter(c => {
+      if (regionFilter !== 'ALL' && c.region !== regionFilter) return false
+      if (segmentFilter !== 'ALL' && buOf(c) !== segmentFilter) return false
+      return true
+    })
     // Insights active universe: customers with last purchase in the last 120 days.
     const activeCustomers = allCustomers.filter(c =>
       c.last_order_date && Number(c.days_silent || 9999) <= 120
@@ -736,10 +754,18 @@ module.exports = async (req, res) => {
         warning_pool_size:        warningAll.length,
         dormant_active_pool_size: dormantActiveAll.length,
         legacy_ar_pool_size:      legacyArAll.length,
+        filters:                  { region: regionFilter, segment: segmentFilter },
+        applied_filters:          filterMeta(regionFilter, segmentFilter),
         non_customer_filter_applied: true,
         ref_month:                refMonthKey === 'live' ? null : refMonthKey,
         anchor_as_of:             anchorDate.toISOString(),
-        generated_at:             new Date().toISOString()
+        generated_at:             new Date().toISOString(),
+        source: { revenue: 'OINV', ar: 'OINV open balances', region: 'invoice warehouse/customer activity' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['segment'],
+          notes: ['Segment is inferred from SlpCode/customer-name classifier until official customer master segmentation is confirmed.']
+        }
       }
     }
 

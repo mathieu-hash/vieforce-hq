@@ -3,6 +3,7 @@ const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 module.exports = async (req, res) => {
   // CORS
@@ -18,8 +19,10 @@ module.exports = async (req, res) => {
   const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
     ? req.query.ref_month.trim()
     : 'live'
+  const region = normalizeRegion(req.query.region)
+  const segment = normalizeSegment(req.query.segment)
   // Cache key includes userId so silence filter is user-scoped.
-  const cacheKey = `margin_v3_${session.id}_${refMonthKey}_${req.query.period || 'YTD'}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `margin_v3_${session.id}_${refMonthKey}_${req.query.period || 'YTD'}_${region}_${segment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -32,8 +35,9 @@ module.exports = async (req, res) => {
     const silences   = await getActiveSilences(session.id)
     const silenceIdx = buildSilenceIndex(silences)
 
+    const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    const filteredWhere = applyRoleFilter(session, baseWhere) + lineFilters
 
     // --- Customer-level GP aggregation ---
     const custMargin = await query(`
@@ -58,7 +62,7 @@ module.exports = async (req, res) => {
       GROUP BY T0.CardCode, T0.CardName, S.SlpName
       HAVING SUM(T1.LineTotal) > 0
       ORDER BY gp_pct ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // Drop warehouse/internal-transfer codes/names before classifying
     const custMarginClean = custMargin.filter(c => !isNonCustomerRow(c.code, c.customer))
@@ -147,7 +151,7 @@ module.exports = async (req, res) => {
           ELSE 'Other'
         END
       ORDER BY gp_pct ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- By Brand ---
     const by_brand = await query(`
@@ -167,7 +171,7 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY T1.Dscription
       ORDER BY gm_ton ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- By Plant ---
     const by_plant = await query(`
@@ -186,7 +190,7 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY T1.WhsCode
       ORDER BY gm_ton ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- By Sales Group (feed classifier from ItemName keywords) ---
     const by_sales_group = await query(`
@@ -222,7 +226,7 @@ module.exports = async (req, res) => {
         END
       HAVING SUM(T1.LineTotal) > 0
       ORDER BY sales DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- By BU (customer-level classifier) ---
     const by_bu = await query(`
@@ -250,7 +254,7 @@ module.exports = async (req, res) => {
         END
       HAVING SUM(T1.LineTotal) > 0
       ORDER BY sales DESC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- Worst SKUs (bottom 10) ---
     const worst_skus = await query(`
@@ -271,7 +275,7 @@ module.exports = async (req, res) => {
       GROUP BY T1.ItemCode, T1.Dscription
       HAVING SUM(T1.Quantity) > 0
       ORDER BY gp_pct ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, region })
 
     // --- National KPIs ---
     const natl_gm_ton = totalVol > 0 ? totalGP / totalVol : 0
@@ -280,6 +284,19 @@ module.exports = async (req, res) => {
     const worstRegion = by_region.length > 0 ? by_region[0] : null
 
     const result = {
+      meta: {
+        applied_filters: {
+          period: String(period || 'YTD').toUpperCase(),
+          ...filterMeta(region, segment),
+          ref_month: refMonthKey
+        },
+        source: { sales: 'OINV', gross_margin: 'OINV', volume: 'OINV' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['by_bu'],
+          notes: ['BU is inferred from customer names and SlpCode classifier until official segment master is confirmed.']
+        }
+      },
       hero: {
         negative_gp_total: Math.round(negative_gp_total),
         revenue_at_risk: Math.round(revenue_at_risk),

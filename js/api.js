@@ -1,6 +1,16 @@
 // VieForce HQ — Frontend API Client
 
-var API_BASE = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api';
+var API_BASE = (function(){
+  var remote = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api';
+  try {
+    var override = localStorage.getItem('vf_api_base');
+    if (override) return override.replace(/\/+$/, '');
+    if (location.protocol.indexOf('http') === 0 && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      return location.origin + '/api';
+    }
+  } catch(e) {}
+  return remote;
+})();
 
 function getApiHeaders() {
   var session = getSession();

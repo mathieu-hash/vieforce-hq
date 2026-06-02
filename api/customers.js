@@ -4,6 +4,7 @@ const { scopeForUser, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
+const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -16,7 +17,9 @@ module.exports = async (req, res) => {
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   // Parse pagination / filter params up front so zero-state can echo them back.
-  const { search = '', region = 'ALL', page = '1', limit = '50', sort = 'revenue' } = req.query
+  const { search = '', region = 'ALL', page = '1', limit = '50', sort = 'revenue', segment = 'ALL' } = req.query
+  const reqRegion = normalizeRegion(region)
+  const reqSegment = normalizeSegment(segment)
   const pageNum  = Math.max(1, parseInt(page) || 1)
   const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50))
   const offset   = (pageNum - 1) * limitNum
@@ -77,7 +80,13 @@ module.exports = async (req, res) => {
     const filteredWhere = baseWhere + (scopeFilter.sql || '')
 
     // Region filter applied on derived region column
-    const regionFilter = region && region !== 'ALL' ? ` AND dom_region = @region` : ''
+    const buExpr = `CASE
+          WHEN UPPER(CardName) LIKE '%PET%' OR UPPER(CardName) LIKE '%KEOS%' OR UPPER(CardName) LIKE '%PLAISIR%' OR UPPER(CardName) LIKE '%NOVOPET%' THEN 'PET'
+          WHEN slp_code IN (2,7,24) OR UPPER(CardName) LIKE 'KA %' OR UPPER(CardName) LIKE '% KA %' OR UPPER(CardName) LIKE '% KEY ACCOUNT%' THEN 'KA'
+          ELSE 'DIST'
+        END`
+    const regionFilter = reqRegion !== 'ALL' ? ` AND dom_region = @region` : ''
+    const segmentFilter = reqSegment !== 'ALL' ? ` AND ${buExpr} = @segment` : ''
 
     // Main query — one row per customer, with derived region (dominant WhsCode across YTD invoices),
     // BU classification (inferred from OCRD.GroupCode UDF or CardName prefix), and YTD gm_ton.
@@ -88,6 +97,7 @@ module.exports = async (req, res) => {
           T0.CardName,
           T0.Phone1,
           T0.City,
+          MAX(T0.SlpCode)                                                    AS slp_code,
           MAX(C.U_BpStatus)                                                   AS bp_status,
           MAX(C.frozenFor)                                                    AS frozen_for,
           MAX(S.SlpName)                                                      AS rsm,
@@ -134,11 +144,7 @@ module.exports = async (req, res) => {
         CASE WHEN ytd_volume > 0 THEN ytd_gm / ytd_volume ELSE 0 END AS ytd_gm_ton,
         last_order_date,
         ISNULL(dom_region, 'Other') AS region,
-        -- BU classifier: PET if name contains pet brand; else DIST (default)
-        CASE
-          WHEN UPPER(CardName) LIKE '%PET%' OR UPPER(CardName) LIKE '%KEOS%' THEN 'PET'
-          ELSE 'DIST'
-        END AS bu,
+        ${buExpr} AS bu,
         -- Status classifier
         CASE
           WHEN frozen_for = 'Y' OR bp_status IN ('Delinquent','InActive') THEN 'Delinquent'
@@ -146,22 +152,50 @@ module.exports = async (req, res) => {
           ELSE 'Active'
         END AS status
       FROM CustomerYTD
-      WHERE 1=1 ${regionFilter}
+      WHERE 1=1 ${regionFilter}${segmentFilter}
       ORDER BY
         CASE WHEN @sort = 'revenue' THEN ytd_revenue END DESC,
         CASE WHEN @sort = 'volume'  THEN ytd_volume  END DESC,
         CASE WHEN @sort = 'name'    THEN CardName    END ASC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
-    `, { search, region, sort, offset, limit: limitNum })
+    `, { search, region: reqRegion, segment: reqSegment, sort, offset, limit: limitNum })
 
     const countRows = await query(`
+      WITH CustomerYTD AS (
+        SELECT
+          T0.CardCode,
+          T0.CardName,
+          MAX(T0.SlpCode) AS slp_code,
+          (SELECT TOP 1
+            CASE
+              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
+              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
+              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+              ELSE 'Other'
+            END
+           FROM OINV TI2
+           INNER JOIN INV1 T2 ON T2.DocEntry = TI2.DocEntry
+           WHERE TI2.CardCode = T0.CardCode AND TI2.CANCELED = 'N'
+             AND TI2.DocDate >= DATEADD(YEAR, -1, GETDATE())
+           GROUP BY
+             CASE
+              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
+              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
+              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+              ELSE 'Other'
+             END
+           ORDER BY SUM(T2.LineTotal) DESC
+          ) AS dom_region
+        FROM OCRD T0
+        LEFT JOIN OCRD C ON T0.CardCode = C.CardCode
+        ${filteredWhere}
+        GROUP BY T0.CardCode, T0.CardName
+      )
       SELECT COUNT(*) AS total
-      FROM OCRD T0
-      LEFT JOIN OCRD C ON T0.CardCode = C.CardCode
-      ${filteredWhere}
-    `, { search })
+      FROM CustomerYTD
+      WHERE 1=1 ${regionFilter}${segmentFilter}
+    `, { search, region: reqRegion, segment: reqSegment })
     const total = countRows[0]?.total || 0
-    const pages = Math.ceil(total / limitNum)
 
     // --- LY per-customer volume + YTD-rank (from historical DB) ---
     // LY YTD = 2025-01-01 → same (month, day) of 2025.
@@ -237,11 +271,22 @@ module.exports = async (req, res) => {
     }
 
     const excluded = customers.length - customersClean.length
+    const visibleTotal = Math.max(0, total - excluded)
+    const pages = Math.ceil(visibleTotal / limitNum)
     const result = {
       customers: customersClean,
-      total: Math.max(0, total - excluded),
+      total: visibleTotal,
       page: pageNum, pages, limit: limitNum,
-      non_customer_excluded: excluded
+      non_customer_excluded: excluded,
+      meta: {
+        applied_filters: filterMeta(reqRegion, reqSegment),
+        source: { customers: 'OCRD', volume: 'OINV trailing 12 months', region: 'dominant invoice warehouse' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['segment', 'region'],
+          notes: ['Segment is inferred from SlpCode/customer-name classifier until official customer master segmentation is confirmed.']
+        }
+      }
     }
     // Scope meta — only when caller passed ?scope=user:<uuid>. Web dashboard
     // (session auth, no scope) sees a byte-identical response.
