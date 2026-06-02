@@ -2,7 +2,7 @@ const { query, queryBoth, queryDateRange } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const { scopeForUser, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = require('./_scope')
 const cache = require('../lib/cache')
-const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
+const { normalizeRegion, normalizeSegment, regionFilterSql, regionCaseSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 module.exports = async (req, res) => {
   // CORS
@@ -96,7 +96,13 @@ module.exports = async (req, res) => {
         T0.CardName                                                     AS customer_name,
         ISNULL(SUM(T1.Quantity), 0)                                     AS volume_bags,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS volume_mt,
-        ISNULL(SUM(T1.LineTotal), 0)                                    AS revenue
+        ISNULL(SUM(T1.LineTotal), 0)                                    AS revenue,
+        (SELECT TOP 1 ${regionCaseSql('L')}
+           FROM INV1 L
+           INNER JOIN OINV H ON L.DocEntry = H.DocEntry
+           WHERE H.CardCode = T0.CardCode AND H.DocDate BETWEEN @dateFrom AND @dateTo AND H.CANCELED = 'N'
+           GROUP BY ${regionCaseSql('L')}
+           ORDER BY SUM(L.Quantity) DESC)                               AS region
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
@@ -399,6 +405,7 @@ module.exports = async (req, res) => {
       volume_bags:   Math.round(cur.volume_bags || 0),
       revenue:       Math.round(cur.revenue || 0),
       gross_margin:  Math.round(cur.gross_margin || 0),
+      gross_margin_pct: cur.revenue > 0 ? Math.round((cur.gross_margin / cur.revenue) * 1000) / 10 : 0,
       gmt:           Math.round(cur.gmt || 0),
       ytd_volume_mt: Math.round((yt.volume_mt || 0) * 10) / 10,
       ytd_volume_bags: Math.round(yt.volume_bags || 0),
