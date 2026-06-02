@@ -98,15 +98,23 @@ function applyRoleFilter(session, baseWhere) {
       return baseWhere
     case 'admin':
     case 'ceo':
+    case 'exec':
     case 'evp':
+    case 'director':
+    case 'marketing':
     case 'rsm':
     case 'dsm':
     case 'tsr':
       // TODO: Implement region/district filtering via SlpCode JOIN to OSLP
       // For now, all authenticated users see all data (admin-level access)
       // Phase 3 will add: RSM filters by OSLP region, DSM by SlpCode
+      // NOTE: this list MUST cover every role in public.users — an unlisted role
+      // falls through to `AND 1=0` and silently zeroes all OINV revenue/GM/margin
+      // (volume via ODLN bypasses this filter, so the symptom is "money = 0 but
+      // volume works"). Roles present 2026-06: admin/exec/evp/director/rsm/dsm/tsr.
       return baseWhere
     default:
+      console.warn('[applyRoleFilter] unlisted role -> zeroed scope:', session.role)
       return baseWhere + ' AND 1=0'
   }
 }
