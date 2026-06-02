@@ -2495,8 +2495,8 @@ body{
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-mtdsales">—</div><div class="kpi-src">revenue</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">GM/Ton</div><div class="kpi-val" style="font-size:18px;color:var(--green)" id="cd-kpi-gmt">—</div><div class="kpi-src">₱/MT</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">DSO</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-dso">—</div><div class="kpi-src">days</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-avg">—</div><div class="kpi-src">per delivery</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Frequency</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-freq">—</div><div class="kpi-src">orders/week</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Avg Order</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-avg">—</div><div class="kpi-src">₱ per order</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Orders</div><div class="kpi-val" style="font-size:18px" id="cd-kpi-freq">—</div><div class="kpi-src">YTD count</div></div>
         </div>
 
         <!-- Insights row -->
@@ -2584,24 +2584,13 @@ body{
                 </div>
               </div>
               <div class="card-body">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                  <div><span style="font-size:10px;color:var(--text3)">Total AR</span><br><span style="font-family:var(--mono);font-size:20px;font-weight:700">₱28.4M</span></div>
-                  <div style="text-align:right"><span style="font-size:10px;color:var(--text3)">Credit Line</span><br><span style="font-family:var(--mono);font-size:20px;font-weight:700">₱30.0M</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <div><span style="font-size:10px;color:var(--text3)">Total AR</span><br><span style="font-family:var(--mono);font-size:20px;font-weight:700" id="cd-arcard-total">—</span></div>
+                  <div style="text-align:right"><span style="font-size:10px;color:var(--text3)">Open Invoices</span><br><span style="font-family:var(--mono);font-size:20px;font-weight:700" id="cd-arcard-count">—</span></div>
                 </div>
-                <div class="prog" style="height:6px;margin-bottom:6px"><div class="prog-fill" style="width:95%;background:linear-gradient(90deg,var(--green),var(--gold))"></div></div>
-                <div style="font-size:9px;color:var(--gold);font-weight:600;text-align:right;margin-bottom:12px">95% utilized</div>
-                <div class="aging-bar" style="margin-bottom:10px">
-                  <div style="width:65%;background:linear-gradient(135deg,var(--green),var(--green2))">65%</div>
-                  <div style="width:20%;background:linear-gradient(135deg,var(--blue),var(--blue2))">20%</div>
-                  <div style="width:10%;background:linear-gradient(135deg,var(--gold),#E0A800);color:#000">10%</div>
-                  <div style="width:5%;background:linear-gradient(135deg,var(--red),#CC3333)">5%</div>
-                </div>
-                <table class="tbl">
+                <div class="aging-bar" style="margin-bottom:10px" id="cd-arcard-bar"></div>
+                <table class="tbl" id="cd-arcard-table">
                   <tr><th>Bucket</th><th class="num">Amount</th><th class="num">%</th></tr>
-                  <tr><td>Current</td><td class="num">₱18.5M</td><td class="num">65%</td></tr>
-                  <tr><td>1-30d</td><td class="num">₱5.7M</td><td class="num">20%</td></tr>
-                  <tr><td>31-60d</td><td class="num">₱2.8M</td><td class="num">10%</td></tr>
-                  <tr><td>&gt;60d</td><td class="num" style="color:var(--red)">₱1.4M</td><td class="num" style="color:var(--red)">5%</td></tr>
                 </table>
               </div>
             </div>
@@ -2627,13 +2616,12 @@ body{
               <div class="card-hdr"><div class="card-title">Account Info</div></div>
               <div class="card-body" style="font-size:12px;line-height:2">
                 <div style="display:grid;grid-template-columns:100px 1fr;gap:2px 12px;color:var(--text2)">
-                  <span style="color:var(--text3);font-weight:600">Owner</span><span>Roberto Tan</span>
-                  <span style="color:var(--text3);font-weight:600">Contact</span><span>+63 917 812 4490</span>
-                  <span style="color:var(--text3);font-weight:600">Email</span><span>r.tan@metrofeeds.ph</span>
-                  <span style="color:var(--text3);font-weight:600">Address</span><span>Lot 5B Eastgate Ind'l, Pasig City</span>
-                  <span style="color:var(--text3);font-weight:600">Sales Rep</span><span>J. Santos (RSM Metro Manila)</span>
-                  <span style="color:var(--text3);font-weight:600">BU</span><span>Distribution</span>
-                  <span style="color:var(--text3);font-weight:600">Tax ID</span><span>000-123-456-001</span>
+                  <span style="color:var(--text3);font-weight:600">Contact</span><span id="cd-acct-contact">—</span>
+                  <span style="color:var(--text3);font-weight:600">Email</span><span id="cd-acct-email">—</span>
+                  <span style="color:var(--text3);font-weight:600">Address</span><span id="cd-acct-address">—</span>
+                  <span style="color:var(--text3);font-weight:600">City</span><span id="cd-acct-city">—</span>
+                  <span style="color:var(--text3);font-weight:600">Sales Rep</span><span id="cd-acct-rep">—</span>
+                  <span style="color:var(--text3);font-weight:600">Code</span><span id="cd-acct-code">—</span>
                 </div>
               </div>
             </div>
@@ -5640,6 +5628,46 @@ async function openCust(code){
     sett('cd-ar-total', fc(arTotal));
     sett('cd-ar-sub', arInvoices.length + ' open invoice' + (arInvoices.length===1?'':'s'));
 
+    // AR Aging card — live from ar_invoices (was hardcoded ₱28.4M for every customer)
+    (function(){
+      var buckets = [
+        {label:'Current', test:function(d){return d<=0}, amt:0, css:'linear-gradient(135deg,var(--green),var(--green2))'},
+        {label:'1-30d',   test:function(d){return d>=1 && d<=30}, amt:0, css:'linear-gradient(135deg,var(--blue),var(--blue2))'},
+        {label:'31-60d',  test:function(d){return d>=31 && d<=60}, amt:0, css:'linear-gradient(135deg,var(--gold),#E0A800)'},
+        {label:'>60d',    test:function(d){return d>60}, amt:0, css:'linear-gradient(135deg,var(--red),#CC3333)', red:true}
+      ];
+      arInvoices.forEach(function(inv){
+        var od = +inv.days_overdue || 0, bal = +inv.balance || 0;
+        for(var i=0;i<buckets.length;i++){ if(buckets[i].test(od)){ buckets[i].amt += bal; break; } }
+      });
+      sett('cd-arcard-total', fc(arTotal));
+      sett('cd-arcard-count', String(arInvoices.length));
+      var barEl = sel('cd-arcard-bar'), tblEl = sel('cd-arcard-table');
+      if(barEl){
+        barEl.innerHTML = arTotal>0 ? buckets.map(function(b){
+          var p = Math.round(b.amt/arTotal*100);
+          return p>0 ? '<div style="width:'+p+'%;background:'+b.css+(b.label==='31-60d'?';color:#000':'')+'">'+p+'%</div>' : '';
+        }).join('') : '<div style="width:100%;background:var(--surface2);color:var(--text3)">No open AR</div>';
+      }
+      if(tblEl){
+        var rows = '<tr><th>Bucket</th><th class="num">Amount</th><th class="num">%</th></tr>';
+        buckets.forEach(function(b){
+          var p = arTotal>0 ? Math.round(b.amt/arTotal*100) : 0;
+          var st = b.red ? ' style="color:var(--red)"' : '';
+          rows += '<tr><td>'+b.label+'</td><td class="num"'+st+'>'+fc(b.amt)+'</td><td class="num"'+st+'>'+p+'%</td></tr>';
+        });
+        tblEl.innerHTML = rows;
+      }
+    })();
+
+    // Account Info card — live from info (was hardcoded "Roberto Tan" for every customer)
+    sett('cd-acct-contact', info.Phone1 || info.Cellular || info.Phone2 || '—');
+    sett('cd-acct-email',   info.email || '—');
+    sett('cd-acct-address', info.Address || '—');
+    sett('cd-acct-city',    info.City || '—');
+    sett('cd-acct-rep',     info.rsm || '—');
+    sett('cd-acct-code',    info.CardCode || code || '—');
+
     // KPI row — bind by ID
     var k = d.kpis || {};
     var ytdSales = d.ytd_sales || {};
@@ -5649,8 +5677,8 @@ async function openCust(code){
     animateNumber(sel('cd-kpi-mtdsales'), k.mtd_sales  || 0, fc);
     if(k.gm_ton    != null) sett('cd-kpi-gmt',  '₱'+fcn(Math.round(k.gm_ton)));
     if(k.dso       != null) seth('cd-kpi-dso',  Math.round(k.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>');
-    if(k.avg_order != null) seth('cd-kpi-avg',  fcn(Math.round(k.avg_order))+'<span style="font-size:10px;color:var(--text3)"> MT</span>');
-    if(k.frequency != null) seth('cd-kpi-freq', k.frequency.toFixed(1)+'<span style="font-size:10px;color:var(--text3)"> /wk</span>');
+    if(k.avg_order != null) seth('cd-kpi-avg',  fc(Math.round(k.avg_order)));  // peso per order, not MT
+    if(k.frequency != null) seth('cd-kpi-freq', fcn(Math.round(k.frequency))+'<span style="font-size:10px;color:var(--text3)"> orders</span>');
     // YTD vs LY delta — from monthly_table
     if(d.monthly_table && d.monthly_table.length){
       var ytdCy = d.monthly_table.reduce(function(s,m){return s+(+m.vol_cy||0)},0);
@@ -5670,10 +5698,12 @@ async function openCust(code){
     // 1. Growth Signal — from cy_vs_ly trend (last 3 months vs prior 3)
     var insightGrowth = sel('cd-insight-growth');
     var growthCard = sel('cd-insight-growth-card');
-    if(d.cy_vs_ly && d.cy_vs_ly.length >= 6){
-      var cy = d.cy_vs_ly.map(function(m){return m.cy_volume||0});
-      var last3 = cy.slice(-3).reduce(function(s,v){return s+v},0) / 3;
-      var prior3 = cy.slice(-6,-3).reduce(function(s,v){return s+v},0) / 3;
+    // cy_vs_ly is an OBJECT {months, cy_vol, ly_vol} — not an array of {cy_volume}
+    var cvObj = d.cy_vs_ly || {};
+    var cy = Array.isArray(cvObj) ? cvObj.map(function(m){return m.cy_volume||0}) : (cvObj.cy_vol || []);
+    if(cy.length >= 6){
+      var last3 = cy.slice(-3).reduce(function(s,v){return s+(+v||0)},0) / 3;
+      var prior3 = cy.slice(-6,-3).reduce(function(s,v){return s+(+v||0)},0) / 3;
       var trendPct = prior3 > 0 ? ((last3 - prior3) / prior3 * 100) : 0;
       if(trendPct >= 10){
         if(insightGrowth) insightGrowth.innerHTML = '3-month avg vol <b style="color:var(--text)">+' + trendPct.toFixed(0) + '%</b> vs prior 3 months. Uptrend.';
@@ -5803,13 +5833,14 @@ async function openCust(code){
 
     // Product breakdown
     if(d.product_breakdown && d.product_breakdown.length){
-      var maxVol = Math.max.apply(null, d.product_breakdown.map(function(p){return +p.vol||0}));
+      var pvol = function(p){return +p.volume||+p.vol||0};  // API field is 'volume'
+      var maxVol = Math.max.apply(null, d.product_breakdown.map(pvol));
       var phtml='';
       d.product_breakdown.slice(0,6).forEach(function(p){
-        var widthPct = maxVol>0 ? (+p.vol||0)/maxVol*100 : 0;
-        phtml+='<div class="list-row"><div style="flex:1;font-size:12px"><b>'+esc(p.name||p.item_name||'')+'</b>';
+        var widthPct = maxVol>0 ? pvol(p)/maxVol*100 : 0;
+        phtml+='<div class="list-row"><div style="flex:1;font-size:12px"><b>'+esc(p.item_name||p.name||'')+'</b>';
         phtml+='<div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-top:3px">';
-        phtml+='<span>'+fcn(Math.round(p.vol||0))+' MT</span>';
+        phtml+='<span>'+fcn(Math.round(pvol(p)))+' MT</span>';
         phtml+='<span>'+fc(p.revenue||0)+'</span></div></div>';
         phtml+='<div class="prog" style="width:100px"><div class="prog-fill" style="width:'+widthPct+'%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div></div>';
       });
@@ -5822,11 +5853,12 @@ async function openCust(code){
     if(d.recent_orders && d.recent_orders.length){
       var ohtml='';
       d.recent_orders.slice(0,10).forEach(function(o){
+        var od = o.doc_date || o.DocDate;  // API field is 'DocDate'
         ohtml+='<div class="list-row"><div style="flex:1;font-size:11px"><b>'+esc(o.doc_num||o.DocNum||'')+'</b>';
-        if(o.doc_date) ohtml+=' · '+esc(o.doc_date);
-        ohtml+='<div style="color:var(--text3);font-size:10px;margin-top:2px">'+esc(o.items||o.description||'')+'</div></div>';
-        ohtml+='<div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">'+fc(o.revenue||o.total||0)+'</div>';
-        ohtml+='<div style="font-size:9px;color:var(--text3)">'+fcn(Math.round(o.volume||0))+' MT</div></div></div>';
+        if(od) ohtml+=' · '+esc(new Date(od).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+        ohtml+='<div style="color:var(--text3);font-size:10px;margin-top:2px">'+esc(o.items||o.description||(o.DocStatus==='O'?'Open':''))+'</div></div>';
+        ohtml+='<div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:700">'+fc(o.revenue||o.total||o.DocTotal||0)+'</div>';
+        ohtml+='<div style="font-size:9px;color:var(--text3)">'+fcn(Math.round(o.volume||o.total_qty||0))+' bags</div></div></div>';
       });
       seth('cust-orders-list',ohtml);
     } else {
