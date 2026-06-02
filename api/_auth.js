@@ -1,14 +1,25 @@
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-)
+let _sessionSupabase = null
+function getSessionSupabase() {
+  if (_sessionSupabase) return _sessionSupabase
+  const url = process.env.SUPABASE_URL
+  // Prefer service role: public.users RLS blocks anon after lock-users-rls.sql.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  _sessionSupabase = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  })
+  return _sessionSupabase
+}
 
 async function verifySession(req) {
   const token = req.headers['x-session-id']
   if (!token) return null
+
+  const supabase = getSessionSupabase()
+  if (!supabase) return null
 
   const { data: user } = await supabase
     .from('users')
@@ -65,7 +76,8 @@ function getPeriodDates(period, opts) {
   const d = anchor.getDate()
 
   switch (period) {
-    case '7D':  return { dateFrom: new Date(y, m, d - 7), dateTo: anchor }
+    // Inclusive SQL BETWEEN means anchor-6 through anchor is the true 7-day window.
+    case '7D':  return { dateFrom: new Date(y, m, d - 6), dateTo: anchor }
     case 'MTD': return { dateFrom: new Date(y, m, 1), dateTo: anchor }
     case 'QTD': return { dateFrom: new Date(y, Math.floor(m / 3) * 3, 1), dateTo: anchor }
     case 'YTD': return { dateFrom: new Date(y, 0, 1), dateTo: anchor }

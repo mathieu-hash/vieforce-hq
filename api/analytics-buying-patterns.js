@@ -22,6 +22,7 @@ const { query, queryH } = require('./_db')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
+const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
 
 const REGION_CASE = `
   CASE
@@ -30,6 +31,15 @@ const REGION_CASE = `
     WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
     ELSE 'Other'
   END`
+
+const KA_SLPCODES = new Set([2, 7, 24])
+function buClassifier(name, slpCode) {
+  const n = String(name || '').toUpperCase()
+  if (n.includes('PET') || n.includes('KEOS') || n.includes('NOVOPET') || n.includes('PLAISIR')) return 'PET'
+  if (slpCode != null && KA_SLPCODES.has(Number(slpCode))) return 'KA'
+  if (n.includes(' KA ') || n.startsWith('KA ') || n.endsWith(' KA') || n.includes(' KEY ACCOUNT')) return 'KA'
+  return 'DIST'
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -40,7 +50,9 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const cacheKey = `analytics_buying_patterns_${session.role}`
+  const regionFilter = normalizeRegion(req.query.region)
+  const buFilter = normalizeSegment(req.query.bu || req.query.segment)
+  const cacheKey = `analytics_buying_patterns_${regionFilter}_${buFilter}_${session.role}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -50,6 +62,7 @@ module.exports = async (req, res) => {
       SELECT
         T0.CardCode,
         MAX(T0.CardName)                                   AS CardName,
+        MAX(T0.SlpCode)                                    AS slp_code,
         T0.DocDate                                         AS doc_date,
         ISNULL(SUM(T1.LineTotal), 0)                       AS day_revenue,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS day_vol,
@@ -70,7 +83,13 @@ module.exports = async (req, res) => {
       queryH(SQL_DATES).catch(e => { console.warn('[patterns] historical failed:', e.message); return [] })
     ])
     const histKeyed = await rekeyHistoricalRows(histRows, 'CardCode').catch(() => [])
-    const merged = [...curRows, ...histKeyed]
+    const merged = [...curRows, ...histKeyed].filter(r => {
+      const reg = r.region || 'Other'
+      const bu = buClassifier(r.CardName, r.slp_code)
+      if (regionFilter !== 'ALL' && reg !== regionFilter) return false
+      if (buFilter !== 'ALL' && bu !== buFilter) return false
+      return true
+    })
 
     // Group rows by CardCode
     const byCust = new Map()
@@ -81,6 +100,7 @@ module.exports = async (req, res) => {
         card_code: cc,
         name: r.CardName || cc,
         region: r.region || 'Other',
+        bu: buClassifier(r.CardName, r.slp_code),
         sales_rep: r.sales_rep || '',
         orders: [],
         revenue: 0,
@@ -190,6 +210,7 @@ module.exports = async (req, res) => {
         card_code: c.card_code,
         name: c.name,
         region: c.region,
+        bu: c.bu,
         sales_rep: c.sales_rep,
         pattern: cls.pattern,
         order_count: c.orders.length,
@@ -243,9 +264,17 @@ module.exports = async (req, res) => {
     const result = {
       meta: {
         period: 'Trailing 12 months',
+        filters: { region: regionFilter, bu: buFilter },
+        applied_filters: filterMeta(regionFilter, buFilter),
         cutoff_for_declining: '90-day vs prior 9 months, +50% slowdown threshold',
         generated_at: new Date().toISOString(),
-        total_customers_analyzed: customers.length
+        total_customers_analyzed: customers.length,
+        source: { cadence: 'OINV distinct customer order dates', region: 'invoice warehouse' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['bu'],
+          notes: ['BU/segment is inferred from SlpCode/customer-name classifier until official customer master segmentation is confirmed.']
+        }
       },
       summary,
       customers

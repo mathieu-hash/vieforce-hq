@@ -64,10 +64,12 @@ const URI_ALLOW_LIST =
     'https://vieforce-patrol.vercel.app/**',
     'https://vieforce-hq.vercel.app/**',
     'https://vieforce-hq.vercel.app/index.html',
-    // HQ Google OAuth return (must match getHqOAuthRedirectUrl() in js/auth.js).
+    // HQ Google OAuth returns to the current origin via getHqOAuthRedirectUrl().
     'https://vieforce-hq.vercel.app/auth/callback.html**',
     'http://localhost:3000/**',
     'http://127.0.0.1:3000/**',
+    'http://localhost:8080/**',
+    'http://127.0.0.1:8080/**',
   ].join(',')
 
 const token = process.env.SUPABASE_ACCESS_TOKEN

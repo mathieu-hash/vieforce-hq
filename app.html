@@ -506,6 +506,15 @@ body{
   padding:0 2px;line-height:1;opacity:0.7;transition:opacity 0.15s;
 }
 .inv-filter-pill button:hover{opacity:1}
+.hq-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 14px 0;min-height:28px}
+.hq-filter-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.035);color:var(--text2);font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}
+.hq-filter-chip b{color:var(--text);font-family:var(--mono);font-weight:800;text-transform:none}
+.hq-filter-chip button{border:none;background:transparent;color:inherit;font-weight:900;cursor:pointer;padding:0;margin-left:2px;opacity:.8}
+.hq-filter-chip button:hover{opacity:1;color:var(--blue)}
+.hq-source-note{font-size:10px;color:var(--text3);letter-spacing:.2px;margin-left:auto}
+.tb-select{max-width:132px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;font-weight:700}
+[data-theme="light"] .tb-select{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.18);color:#fff}
+[data-theme="light"] .tb-select option{color:#111;background:#fff}
 .inv-clear{
   padding:4px 10px;background:transparent;border:1px solid var(--divider);
   border-radius:20px;font-size:10px;font-weight:700;color:var(--text3);
@@ -1104,6 +1113,19 @@ body{
             <option value="">Live</option>
           </select>
         </label>
+        <select id="vf-region" class="tb-select" onchange="setRegion(this.value)" title="Global shipping-region filter">
+          <option value="ALL">All Regions</option>
+          <option value="Luzon">Luzon</option>
+          <option value="Visayas">Visayas</option>
+          <option value="Mindanao">Mindanao</option>
+          <option value="Other">Other</option>
+        </select>
+        <select id="vf-segment" class="tb-select" onchange="setSegment(this.value)" title="Global business segment filter">
+          <option value="ALL">All Segments</option>
+          <option value="DIST">Distribution</option>
+          <option value="KA">Key Accounts</option>
+          <option value="PET">Pet Care</option>
+        </select>
       </div>
 
       <div class="tb-search">
@@ -1121,6 +1143,7 @@ body{
     </header>
 
     <div class="content">
+      <div class="hq-filter-bar" id="hq-filter-bar"></div>
 
       <!-- ===== HOME ===== -->
       <div class="page active" id="pg-home">
@@ -1136,7 +1159,7 @@ body{
 
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px" class="stagger" id="home-kpi-row">
           <!-- 1. Net Sales -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-sales')" title="Open Sales details">
             <div class="kpi-label">Net Sales</div>
             <div class="kpi-val" style="font-size:20px" id="hk-sales">₱482M</div>
             <div class="kpi-delta up" id="hk-sales-d">▲ 8.3%</div>
@@ -1146,7 +1169,7 @@ body{
             <div class="kpi-enr-status ok" id="hk-sales-pct">93% YTD</div>
           </div>
           <!-- 2. Volume — DR (ODLN) primary · Invoiced (OINV) shown in sub-line · pending-bill count -->
-          <div class="kpi kpi-sm kpi-enr" title="Volume reports physical MT shipped (ODLN/DR), including deliveries not yet invoiced. Gross Margin and GM/Ton use invoiced volume (OINV).">
+          <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-speed')" title="Open Speed Monitor. Volume reports physical MT shipped (ODLN/DR), including deliveries not yet invoiced. Gross Margin and GM/Ton use invoiced volume (OINV).">
             <div class="kpi-label">Volume <span style="font-size:9px;color:var(--text4);font-weight:500;letter-spacing:0.3px">(DR)</span></div>
             <div class="kpi-val" style="font-size:20px" id="hk-vol">14.2K<span style="font-size:11px;color:var(--text3)"> MT</span></div>
             <div class="kpi-delta up" id="hk-vol-d">▲ 12.1%</div>
@@ -1157,7 +1180,7 @@ body{
             <div class="kpi-enr-status ok" id="hk-vol-pct">93% YTD</div>
           </div>
           <!-- 3. Gross Margin -->
-          <div class="kpi kpi-sm kpi-enr" id="kpi-gm">
+          <div class="kpi kpi-sm kpi-enr" id="kpi-gm" style="cursor:pointer" onclick="navTo('pg-margin')" title="Open Margin Alerts">
             <div class="kpi-label">Gross Margin</div>
             <div class="kpi-val" style="font-size:20px" id="hk-gm">₱78M</div>
             <div class="kpi-delta up" id="hk-gm-d">▲ 5.6%</div>
@@ -1167,7 +1190,7 @@ body{
             <div class="kpi-enr-status ok" id="hk-gm-pct">98% YTD</div>
           </div>
           <!-- 4. GM/Ton -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-margin')" title="Open Margin Alerts">
             <div class="kpi-label">GM/Ton</div>
             <div class="kpi-val" style="font-size:20px" id="hk-gmt">₱5,493</div>
             <div class="kpi-delta down" id="hk-gmt-d">▼ 1.2%</div>
@@ -1177,7 +1200,7 @@ body{
             <div class="kpi-enr-status ok" id="hk-gmt-pct">100% YTD</div>
           </div>
           <!-- 5. DSO (active) -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-ar')" title="Open Accounts Receivable">
             <div class="kpi-label">DSO</div>
             <div class="kpi-val" style="font-size:20px" id="hk-dso">47<span style="font-size:13px;color:var(--text3)">d</span></div>
             <div class="kpi-delta" style="color:var(--text2)" id="hk-dso-d">Active accounts</div>
@@ -1188,7 +1211,7 @@ body{
             <div class="kpi-enr-badge" id="hk-dso-badge" style="display:none">+0d from delinquent</div>
           </div>
           <!-- 6. SPEED (period-aware — projected volume vs budget) -->
-          <div class="kpi kpi-sm kpi-enr">
+          <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-speed')" title="Open Speed Monitor">
             <div class="kpi-label" id="hk-speed-label">Speed · MTD</div>
             <div class="kpi-val" style="font-size:20px" id="hk-speed">—<span style="font-size:11px;color:var(--text3)"> MT</span></div>
             <div class="kpi-delta" id="hk-speed-d">projected (vs target)</div>
@@ -1267,7 +1290,7 @@ body{
           <!-- BU Split (moved to top) -->
           <div class="card">
             <div class="card-hdr"><div class="card-title" id="home-bu-title">BU Split · MTD</div></div>
-            <div class="card-body">
+            <div class="card-body" id="home-bu-body">
               <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:14px">
                 <div style="display:flex;align-items:center;gap:8px">
                   <div style="height:22px;flex:55;background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800">DIST</div>
@@ -2399,7 +2422,7 @@ body{
           <div style="flex:1"></div>
           <span style="font-size:10px;color:var(--text4);display:flex;align-items:center">Sort: Sales ▼</span>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin:0 0 12px 0;line-height:1.45">Trailing 12 months revenue <span style="color:var(--text4)">· Period chip does not apply</span></div>
+        <div style="font-size:11px;color:var(--text3);margin:0 0 12px 0;line-height:1.45">Trailing 12 months revenue <span style="color:var(--text4)">· Period chip does not apply</span> <span id="cust-count" style="float:right;color:var(--text4);font-family:var(--mono)">—</span></div>
         <div class="card">
           <div class="card-body" style="padding-top:8px">
             <table class="tbl" id="cust-tbl">
@@ -3297,6 +3320,9 @@ body{
 
           /* Spinner */
           .da-loading { padding:30px; text-align:center; color:var(--text3); font-size:12px }
+          .da-loadbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 14px;padding:10px 12px;border:1px solid var(--glass-border);border-radius:8px;background:rgba(255,255,255,0.025)}
+          .da-loadbar-note{font-size:11px;color:var(--text3);line-height:1.4}
+          .da-loadbar .export-btn{white-space:nowrap}
           .da-loading::after { content:" ⏳" }
 
           /* Mobile responsive */
@@ -3310,6 +3336,11 @@ body{
         <div style="font-size:11px;color:var(--text3);margin:0 0 14px 0;line-height:1.45">Trailing 12 months <span style="color:var(--text4)">· Period chip does not apply</span></div>
 
         <!-- ===== SECTION 1 — SKU PENETRATION HEATMAP ===== -->
+        <div class="da-loadbar">
+          <div class="da-loadbar-note">Deeper analytics are streamed on demand so this page opens faster. They honor the global region/segment filters plus the controls below.</div>
+          <button class="export-btn" type="button" onclick="loadDeeperAnalytics(true)">Load deeper analytics</button>
+        </div>
+
         <div class="card da-section" id="sec-sku-matrix">
           <div class="card-hdr">
             <div>
@@ -3326,11 +3357,11 @@ body{
                 <button data-unit="revenue" onclick="daSetUnit('revenue')">By Revenue (PHP)</button>
               </div>
               <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-left:10px">Region</span>
-              <select class="da-select" id="da-region-sel" onchange="daRefreshSku()">
+              <select class="da-select" id="da-region-sel" onchange="daRefreshAll()">
                 <option value="ALL">All</option><option>Luzon</option><option>Visayas</option><option>Mindanao</option><option>Other</option>
               </select>
               <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:0.4px;text-transform:uppercase">BU</span>
-              <select class="da-select" id="da-bu-sel" onchange="daRefreshSku()">
+              <select class="da-select" id="da-bu-sel" onchange="daRefreshAll()">
                 <option value="ALL">All</option><option>DIST</option><option>KA</option><option>PET</option>
               </select>
             </div>
@@ -3925,11 +3956,19 @@ var PD = localStorage.getItem('vf_period') || 'MTD';
 var CMP = localStorage.getItem('vf_compare') || 'vs_pp';
 var UT  = localStorage.getItem('vf_unit') || 'MT';
 var VF_REF_MONTH = localStorage.getItem('vf_ref_month') || '';
-var RG = 'ALL', PG = 'pg-home', CX = {}, CH = {}, DC = {};
+var RG = localStorage.getItem('vf_region') || 'ALL';
+var SEG = localStorage.getItem('vf_segment') || 'ALL';
+var PG = 'pg-home', CX = {}, CH = {}, DC = {};
 
 /** Query params for APIs that support period + optional ref_month (YYYY-MM). */
 function vfApiParams(extra) {
-  var o = { period: PD, region: RG };
+  PD = PD || localStorage.getItem('vf_period') || 'MTD';
+  CMP = CMP || localStorage.getItem('vf_compare') || 'vs_pp';
+  UT = UT || localStorage.getItem('vf_unit') || 'MT';
+  VF_REF_MONTH = VF_REF_MONTH || localStorage.getItem('vf_ref_month') || '';
+  RG = RG || localStorage.getItem('vf_region') || 'ALL';
+  SEG = SEG || localStorage.getItem('vf_segment') || 'ALL';
+  var o = { period: PD, region: RG, segment: SEG };
   if (VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) o.ref_month = VF_REF_MONTH;
   if (extra && typeof extra === 'object') {
     for (var k in extra) {
@@ -3945,7 +3984,78 @@ function setRefMonth(val) {
     else localStorage.removeItem('vf_ref_month');
   } catch (e) {}
   DC = {};
+  renderGlobalFilterBar();
   loadPage(PG);
+}
+function setRegion(val) {
+  RG = val || 'ALL';
+  try {
+    if (RG && RG !== 'ALL') localStorage.setItem('vf_region', RG);
+    else localStorage.removeItem('vf_region');
+  } catch (e) {}
+  if(typeof CF !== 'undefined') CF = RG;
+  if(typeof DA !== 'undefined') DA.loaded = false;
+  DC = {};
+  renderGlobalFilterBar();
+  loadPage(PG);
+}
+function setSegment(val) {
+  SEG = val || 'ALL';
+  try {
+    if (SEG && SEG !== 'ALL') localStorage.setItem('vf_segment', SEG);
+    else localStorage.removeItem('vf_segment');
+  } catch (e) {}
+  if(typeof DA !== 'undefined') DA.loaded = false;
+  DC = {};
+  renderGlobalFilterBar();
+  loadPage(PG);
+}
+function setRegionAndNav(region, pageId) {
+  RG = region || 'ALL';
+  try {
+    if (RG && RG !== 'ALL') localStorage.setItem('vf_region', RG);
+    else localStorage.removeItem('vf_region');
+  } catch (e) {}
+  if(typeof CF !== 'undefined') CF = RG;
+  if(typeof DA !== 'undefined') DA.loaded = false;
+  DC = {};
+  syncFilterUI();
+  navTo(pageId || 'pg-sales');
+}
+function setSegmentAndNav(segment, pageId) {
+  SEG = segment || 'ALL';
+  try {
+    if (SEG && SEG !== 'ALL') localStorage.setItem('vf_segment', SEG);
+    else localStorage.removeItem('vf_segment');
+  } catch (e) {}
+  if(typeof DA !== 'undefined') DA.loaded = false;
+  DC = {};
+  syncFilterUI();
+  navTo(pageId || 'pg-sales');
+}
+function clearGlobalFilter(key) {
+  if(key === 'region') setRegion('ALL');
+  else if(key === 'segment') setSegment('ALL');
+  else if(key === 'ref_month') setRefMonth('');
+}
+function segmentLabel(v){
+  if(v === 'KA') return 'Key Accounts';
+  if(v === 'DIST') return 'Distribution';
+  if(v === 'PET') return 'Pet Care';
+  return 'All Segments';
+}
+function renderGlobalFilterBar(){
+  var el = document.getElementById('hq-filter-bar');
+  if(!el) return;
+  var parts = [];
+  parts.push('<span class="hq-filter-chip">Period <b>'+esc(PD)+'</b></span>');
+  parts.push('<span class="hq-filter-chip">Compare <b>'+esc(CMP === 'vs_ly' ? 'vs LY' : 'vs PP')+'</b></span>');
+  parts.push('<span class="hq-filter-chip">Unit <b>'+esc(UT)+'</b></span>');
+  if(VF_REF_MONTH) parts.push('<span class="hq-filter-chip">As of <b>'+esc(VF_REF_MONTH)+'</b><button onclick="clearGlobalFilter(\'ref_month\')" aria-label="Clear month">x</button></span>');
+  if(RG && RG !== 'ALL') parts.push('<span class="hq-filter-chip">Region <b>'+esc(RG)+'</b><button onclick="clearGlobalFilter(\'region\')" aria-label="Clear region">x</button></span>');
+  if(SEG && SEG !== 'ALL') parts.push('<span class="hq-filter-chip">Segment <b>'+esc(segmentLabel(SEG))+'</b><button onclick="clearGlobalFilter(\'segment\')" aria-label="Clear segment">x</button></span>');
+  parts.push('<span class="hq-source-note">Volume source: ODLN/DR where available. Segment classifier is review mode.</span>');
+  el.innerHTML = parts.join('');
 }
 function populateRefMonthSelect() {
   var el = document.getElementById('vf-ref-month');
@@ -4263,6 +4373,7 @@ function setPd(el){
   el.classList.add('active');
   PD = el.textContent.trim();
   try{localStorage.setItem('vf_period',PD)}catch(e){}
+  renderGlobalFilterBar();
   DC = {};               // clear cache — period change = refetch
   loadPage(PG);
 }
@@ -4273,6 +4384,7 @@ function setCmp(el){
   el.classList.add('active');
   CMP = el.textContent.trim().toLowerCase().indexOf('ly')>=0 ? 'vs_ly' : 'vs_pp';
   try{localStorage.setItem('vf_compare',CMP)}catch(e){}
+  renderGlobalFilterBar();
   // No refetch needed — data already has both delta_pct and delta_pct_ly; just re-render
   loadPage(PG);
 }
@@ -4283,11 +4395,18 @@ function setU(el){
   el.classList.add('active');
   UT = el.textContent.trim();
   try{localStorage.setItem('vf_unit',UT)}catch(e){}
+  renderGlobalFilterBar();
   // No refetch — volume_mt and volume_bags already returned; re-render switches display
   loadPage(PG);
 }
 // Sync UI on boot with persisted prefs
 function syncFilterUI(){
+  PD = PD || localStorage.getItem('vf_period') || 'MTD';
+  CMP = CMP || localStorage.getItem('vf_compare') || 'vs_pp';
+  UT = UT || localStorage.getItem('vf_unit') || 'MT';
+  VF_REF_MONTH = VF_REF_MONTH || localStorage.getItem('vf_ref_month') || '';
+  RG = RG || localStorage.getItem('vf_region') || 'ALL';
+  SEG = SEG || localStorage.getItem('vf_segment') || 'ALL';
   document.querySelectorAll('.tb-chip').forEach(function(c){
     if(c.textContent.trim()===PD) c.classList.add('active'); else c.classList.remove('active');
   });
@@ -4305,6 +4424,11 @@ function syncFilterUI(){
     if(VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) rm.value = VF_REF_MONTH;
     else rm.value = '';
   }
+  var rgSel = document.getElementById('vf-region');
+  if(rgSel) rgSel.value = RG || 'ALL';
+  var segSel = document.getElementById('vf-segment');
+  if(segSel) segSel.value = SEG || 'ALL';
+  renderGlobalFilterBar();
 }
 function setF(el){if(!el)return;addClickAnimation(el);el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
 function doSearch(){var q=document.getElementById('global-search').value.trim();if(q){navTo('pg-customers');loadCust(q)}}
@@ -4364,16 +4488,15 @@ async function loadHome(){
     if(!DC['pg-home']){
       var results = await Promise.all([
         getDashboardData(vfApiParams()).catch(function(e){console.error('dashboard:',e);return null}),
-        getSalesData(vfApiParams()).catch(function(e){console.error('sales:',e);return null}),
         getARData().catch(function(e){console.error('ar:',e);return null}),
         getSpeedData(vfApiParams()).catch(function(e){console.error('speed:',e);return null})
       ]);
-      DC['pg-home'] = {d:results[0], sl:results[1], ar:results[2], sp:results[3]};
+      DC['pg-home'] = {d:results[0], ar:results[1], sp:results[2]};
     }
     var c=DC['pg-home']||{};
-    var d=c.d||null, sl=c.sl||null, ar=c.ar||null, sp=c.sp||null;
-    if(!d && !sl && !ar && !sp){showError('pg-home','Unable to load live data');return}
-    console.log('[HOME] Rendering:', {d:!!d, sl:!!sl, ar:!!ar, sp:!!sp});
+    var d=c.d||null, ar=c.ar||null, sp=c.sp||null;
+    if(!d && !ar && !sp){showError('pg-home','Unable to load live data');return}
+    console.log('[HOME] Rendering:', {d:!!d, ar:!!ar, sp:!!sp});
     // KPI row — enriched cards (MTD value + delta + divider + YTD/Budget + progress)
     function statusClass(pct){ return pct>=95?'ok' : pct>=80?'warn' : 'bad'; }
     function barColor(pct){ return pct>=95?'var(--green)' : pct>=80?'var(--gold)' : 'var(--red)'; }
@@ -4474,7 +4597,7 @@ async function loadHome(){
           } else {
             cmpTd='<td class="num '+(cmpVs>=0?'up':'down')+'">'+(cmpVs>=0?'+':'')+cmpVs.toFixed(1)+'%</td>';
           }
-          rhtml+='<tr><td style="font-weight:700">'+esc(r.region||r.name||'').toUpperCase()+'</td>';
+          rhtml+='<tr class="drill-clickable" onclick="setRegionAndNav(\''+esc(r.region||r.name||'ALL')+'\',\'pg-sales\')" title="Open Sales filtered to this shipping region"><td style="font-weight:700">'+esc(r.region||r.name||'').toUpperCase()+'</td>';
           rhtml+='<td class="num">'+fcn(Math.round(r.vol||r.volume_mt||0))+'</td>';
           rhtml+='<td class="num">'+fc(r.sales||r.revenue||0)+'</td>';
           rhtml+=cmpTd;
@@ -4500,6 +4623,26 @@ async function loadHome(){
           tchtml+='<div style="font-size:9px;color:var(--text3)">'+fcn(Math.round(c.vol||c.volume_mt||0))+' MT</div></div></div>';
         });
         seth('home-topcust',tchtml);
+      }
+      if(d.segment_mix && d.segment_mix.length){
+        var totalSeg = d.segment_mix.reduce(function(s,x){return s+(+x.volume_mt||0)},0);
+        var segNames = { DIST:'Distribution', KA:'Key Accounts', PET:'Pet Care' };
+        var segColors = { DIST:'linear-gradient(135deg,var(--blue),var(--blue2))', KA:'linear-gradient(135deg,var(--green),var(--green2))', PET:'linear-gradient(135deg,var(--gold),#E0A800)' };
+        var segHtml = '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:14px">';
+        ['DIST','KA','PET'].forEach(function(k){
+          var row = d.segment_mix.find(function(x){ return x.segment === k; }) || { volume_mt: 0 };
+          var vol = +row.volume_mt || 0;
+          var pct = totalSeg > 0 ? Math.round(vol / totalSeg * 100) : 0;
+          var flex = Math.max(8, pct);
+          segHtml += '<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="setSegmentAndNav(\''+k+'\',\'pg-sales\')" title="Open Sales filtered to '+esc(segNames[k])+'">'
+            + '<div style="height:22px;flex:'+flex+';background:'+segColors[k]+';border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800;color:'+(k==='DIST'?'#fff':'#000')+'">'+k+'</div>'
+            + '<span style="font-family:var(--mono);font-size:12px;font-weight:700;width:58px;text-align:right">'+fcn(Math.round(vol))+'</span>'
+            + '<span style="font-size:10px;color:var(--text3);width:34px">'+pct+'%</span></div>';
+        });
+        segHtml += '</div><div style="border-top:1px solid var(--divider);padding-top:10px">'
+          + '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px"><span style="color:var(--text3)">Total '+esc(PD)+'</span><span style="font-family:var(--mono);font-weight:700">'+fcn(Math.round(totalSeg))+' MT</span></div>'
+          + '</div>';
+        seth('home-bu-body', segHtml);
       }
       var _hrRegCmp = document.getElementById('home-region-cmp-label');
       if(_hrRegCmp) _hrRegCmp.textContent = (CMP==='vs_ly' ? 'vs LY' : 'vs PP');
@@ -4682,7 +4825,7 @@ async function loadSales(){
       if(pp.by_region && pp.by_region.length){
         var totR = pp.by_region.reduce(function(s,r){return s+r.mt},0);
         var rhtml = pp.by_region.map(function(r){
-          return '<tr><td class="rn">'+esc((r.region||'').toUpperCase())+'</td>'
+          return '<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Filter Sales to this region"><td class="rn">'+esc((r.region||'').toUpperCase())+'</td>'
             +'<td class="rv">—</td>'
             +'<td class="rv">'+fcn(Math.round(r.mt||0))+'</td>'
             +'<td class="rv">'+(totR>0?((r.mt/totR*100).toFixed(1)+'%'):'—')+'</td></tr>';
@@ -4692,7 +4835,7 @@ async function loadSales(){
       // Region detail (big, 5-col with orders + value + avg)
       if(pp.by_region_detail && pp.by_region_detail.length){
         var rdhtml = pp.by_region_detail.map(function(r){
-          return '<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>'
+          return '<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Filter Sales to this region"><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>'
             +'<td class="num">'+fcn(r.orders||0)+'</td>'
             +'<td class="num">'+fcn(Math.round(r.mt||0))+' MT</td>'
             +'<td class="num">'+fc(r.value||0)+'</td>'
@@ -4734,8 +4877,10 @@ async function loadSales(){
       }
       // PO Detail
       if(pp.detail && pp.detail.length){
-        sett('po-detail-count', pp.detail.length + ' lines shown');
-        var pohtml = pp.detail.map(function(x){
+        var poCap = 25;
+        var poShown = pp.detail.slice(0, poCap);
+        sett('po-detail-count', poShown.length + ' of ' + pp.detail.length + ' lines shown');
+        var pohtml = poShown.map(function(x){
           var region = ['AC','ACEXT','BAC'].indexOf(x.plant)>=0?'Luzon' : ['HOREB','ARGAO','ALAE'].indexOf(x.plant)>=0?'Visayas' : ['BUKID','CCPC'].indexOf(x.plant)>=0?'Mindanao' : 'Other';
           var dateStr = x.date ? new Date(x.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
           return '<tr style="cursor:pointer" onclick="openCust(\''+esc(x.code||'')+'\')">'
@@ -4748,6 +4893,9 @@ async function loadSales(){
             +'<td style="font-size:11px;color:var(--text3)">'+dateStr+'</td>'
             +'<td class="num" style="font-family:var(--mono);font-size:11px">'+(x.age_days||0)+'d</td></tr>';
         }).join('');
+        if(pp.detail.length > poCap){
+          pohtml += '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:10px">Showing the freshest '+poCap+' lines first to keep this window light. Use Export for the full server payload.</td></tr>';
+        }
         seth('po-detail-tbody', pohtml);
       }
     }
@@ -4773,13 +4921,33 @@ async function loadSales(){
 var AR_CLIENTS_CACHE = [];
 var AR_SORT = { key:'balance', dir:'desc' };
 var AR_FILTER = 'ALL';  // ALL | ACTIVE | DELINQ | OVERDUE
+var AR_BUCKET_FILTER = 'ALL';
 
 function setARFilter(el, mode){
   if(el) addClickAnimation(el);
   document.querySelectorAll('[data-ar-filter]').forEach(function(b){b.classList.remove('active')});
   if(el) el.classList.add('active');
   AR_FILTER = mode;
+  AR_BUCKET_FILTER = 'ALL';
   renderARClients();
+}
+function setARAgingBucket(bucket){
+  AR_BUCKET_FILTER = (AR_BUCKET_FILTER === bucket) ? 'ALL' : bucket;
+  renderARClients();
+  var table = sel('ar-clients-tbl');
+  if(table) table.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function arBucketMatch(c, bucket){
+  if(bucket === 'ALL') return true;
+  var d = Number(c.days_overdue || 0);
+  if(bucket === 'current') return d <= 0;
+  if(bucket === 'd1_30') return d >= 1 && d <= 30;
+  if(bucket === 'd31_60') return d >= 31 && d <= 60;
+  if(bucket === 'd61_90') return d >= 61 && d <= 90;
+  if(bucket === 'd91_120') return d >= 91 && d <= 120;
+  if(bucket === 'd121_365') return d >= 121 && d <= 365;
+  if(bucket === 'over_1y') return d > 365;
+  return true;
 }
 function sortARClients(key){
   if(AR_SORT.key === key){ AR_SORT.dir = (AR_SORT.dir==='desc'?'asc':'desc'); }
@@ -4797,6 +4965,7 @@ function renderARClients(){
     if(AR_FILTER === 'ACTIVE'   && c.is_delinquent)           return false;
     if(AR_FILTER === 'DELINQ'   && !c.is_delinquent)          return false;
     if(AR_FILTER === 'OVERDUE'  && !((c.overdue||0) > 0))     return false;
+    if(!arBucketMatch(c, AR_BUCKET_FILTER)) return false;
     if(q){
       var hay = ((c.CardName||'') + ' ' + (c.CardCode||'')).toLowerCase();
       if(hay.indexOf(q) === -1) return false;
@@ -4832,7 +5001,7 @@ function renderARClients(){
   });
   if(!chtml) chtml = '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">No clients match filter</td></tr>';
   seth('ar-clients-tbody', chtml);
-  sett('ar-client-count', rows.length + ' of ' + AR_CLIENTS_CACHE.length + ' clients');
+  sett('ar-client-count', rows.length + ' of ' + AR_CLIENTS_CACHE.length + ' clients' + (AR_BUCKET_FILTER !== 'ALL' ? ' · bucket ' + AR_BUCKET_FILTER : ''));
 
   // Update sort arrows
   document.querySelectorAll('#ar-clients-tbl .sort-arrow').forEach(function(el){
@@ -4899,6 +5068,9 @@ async function loadAR(){
         var pct = total>0 ? (amt/total*100) : 0;
         var row = document.querySelector('#ar-aging-table tr[data-bucket="'+k+'"]');
         if(row){
+          row.style.cursor = 'pointer';
+          row.title = 'Filter AR clients to this aging bucket';
+          row.onclick = (function(bucket){ return function(){ setARAgingBucket(bucket); }; })(k);
           var cells = row.querySelectorAll('td');
           if(cells[1]) cells[1].textContent = fc(amt);
           if(cells[2]) cells[2].textContent = pct.toFixed(1)+'%';
@@ -5352,18 +5524,23 @@ var CF = 'ALL';
 function fltCust(r, el){
   if(el){addClickAnimation(el);el.parentElement.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active')}
   CF = r;
+  RG = r || 'ALL';
+  try{ if(RG && RG !== 'ALL') localStorage.setItem('vf_region', RG); else localStorage.removeItem('vf_region'); }catch(e){}
+  syncFilterUI();
   DC['pg-customers']=null;
   loadCust();
 }
 async function loadCust(search){
   clearError('pg-customers');
   try {
-    var p = {limit:'100'};
+    var p = {limit:'50', segment: SEG};
     if(CF !== 'ALL') p.region = CF;
+    else if(RG !== 'ALL') p.region = RG;
     if(search) p.search = search;
     var d = await getCustomersData(p);
     if(!d){showError('pg-customers','Unable to load customer data');return}
     console.log('[CUSTOMERS] Rendering:', d.total||'?', 'customers (page', d.page+'/'+d.pages+')');
+    sett('cust-count', ((d.customers||[]).length || 0) + ' of ' + (d.total || 0) + ' customers');
     if(d.customers && d.customers.length){
       var html='';
       d.customers.forEach(function(c,i){
@@ -5689,6 +5866,8 @@ async function loadMargin(){
       var cards=pg.querySelectorAll('.margin-card.critical');
       d.critical.slice(0,3).forEach(function(c,i){
         if(!cards[i])return;
+        cards[i].style.cursor = 'pointer';
+        cards[i].onclick = function(){ openCust(c.code || ''); };
         var nameEl=cards[i].querySelector('[style*="font-size:15px"]');
         if(nameEl)nameEl.textContent=c.customer||'';
         var codeEl=cards[i].querySelector('[style*="font-size:10px"]');
@@ -5708,18 +5887,22 @@ async function loadMargin(){
     // WARNING accounts table
     if(d.warning && d.warning.length){
       var whtml='';
-      d.warning.forEach(function(w){
-        whtml+='<tr><td style="font-weight:700">'+esc(w.customer||'')+'</td>';
+      var warnCap = 75;
+      d.warning.slice(0, warnCap).forEach(function(w){
+        whtml+='<tr style="cursor:pointer" onclick="openCust(\''+esc(w.code||'')+'\')"><td style="font-weight:700">'+esc(w.customer||'')+'</td>';
         whtml+='<td style="color:var(--text3);font-size:11px">'+esc(w.code||'')+'</td>';
         whtml+='<td style="font-size:11px;color:var(--text3)">'+esc(w.rep||'--')+'</td>';
         whtml+='<td class="num">'+fc(w.sales||0)+'</td>';
         whtml+='<td class="num">'+fcn(Math.round(w.vol||0))+' MT</td>';
         whtml+='<td class="num" style="color:var(--gold);font-weight:700">'+(w.gp_pct!=null?w.gp_pct.toFixed(1)+'%':'--')+'</td>';
         whtml+='<td class="num" style="color:var(--gold)">'+(w.gm_ton!=null?'₱'+fcn(Math.round(w.gm_ton)):'--')+'</td>';
-        whtml+='<td>' + ciRowMenuBtn('margin_warning', w.code, w.customer, 'GP% ' + (w.gp_pct!=null?w.gp_pct.toFixed(1):'—') + '%') + '</td></tr>';
+        whtml+='<td onclick="event.stopPropagation()">' + ciRowMenuBtn('margin_warning', w.code, w.customer, 'GP% ' + (w.gp_pct!=null?w.gp_pct.toFixed(1):'—') + '%') + '</td></tr>';
       });
+      if(d.warning.length > warnCap){
+        whtml += '<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:10px">Showing '+warnCap+' of '+d.warning.length+' warning accounts. Export for full review.</td></tr>';
+      }
       seth('margin-warn-tbody',whtml);
-      sett('margin-warn-count', d.warning.length+' accounts');
+      sett('margin-warn-count', Math.min(d.warning.length, warnCap)+' of '+d.warning.length+' accounts');
     } else {
       seth('margin-warn-tbody','<tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">No warning accounts</td></tr>');
       sett('margin-warn-count','0 accounts');
@@ -5732,7 +5915,7 @@ async function loadMargin(){
       var rhtml='';
       d.by_region.forEach(function(r){
         var col = r.gp_pct>=15?'var(--green)' : r.gp_pct>=10?'var(--gold)' : 'var(--red)';
-        rhtml+='<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
+        rhtml+='<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Open Sales filtered to this region"><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
         rhtml+='<td class="num">'+fc(r.sales||0)+'</td>';
         rhtml+='<td class="num">'+fcn(Math.round(r.vol||0))+' MT</td>';
         rhtml+='<td class="num" style="color:'+col+';font-weight:700">'+(r.gp_pct!=null?r.gp_pct.toFixed(1)+'%':'--')+'</td>';
@@ -6050,7 +6233,7 @@ async function loadIntelligence(){
   try {
     if(!DC) DC = {};
     if(!DC['pg-insights']){
-      var intelParams = { region: RG };
+      var intelParams = vfApiParams();
       if (VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) intelParams.ref_month = VF_REF_MONTH;
       DC['pg-insights'] = await getIntelligenceData(intelParams).catch(function(e){ console.error('intelligence:', e); return null; });
     }
@@ -6200,7 +6383,7 @@ async function loadIntelligence(){
 
   // Deeper Analytics — built 2026-04-19 for Joel demo. Loads independently
   // so an analytics failure cannot break the upper Intelligence bands.
-  loadDeeperAnalytics().catch(function(e){ console.error('DeeperAnalytics:', e); });
+  initDeeperAnalyticsPlaceholders();
 }
 
 
@@ -6210,7 +6393,7 @@ async function loadIntelligence(){
    independently so one failing endpoint does not blank the others.
    ==================================================================== */
 
-var DA = { unit: 'volume', sku: null, bc: null, bp: null, bpFilter: null };
+var DA = { unit: 'volume', sku: null, bc: null, bp: null, bpFilter: null, loaded: false, loading: false };
 
 // Color scale for heatmap cells — percentile within each brand column
 var DA_COLORS = ['#E8F7FC','#A8D8E8','#00C4E8','#00AEEF','#004A64'];
@@ -6239,25 +6422,50 @@ function daFmtMt(n) {
   return Math.round(n*10)/10;
 }
 
-async function loadDeeperAnalytics() {
+function initDeeperAnalyticsPlaceholders(){
+  if(DA.loaded || DA.loading) return;
+  ['da-sku-status','da-bc-status','da-bp-status'].forEach(function(id){
+    var el = sel(id);
+    if(el){ el.style.display='block'; el.style.color='var(--text3)'; el.textContent='Not loaded yet. Use "Load deeper analytics" when you need the detail.'; }
+  });
+}
+
+async function loadDeeperAnalytics(force) {
+  if(DA.loading) return;
+  if(DA.loaded && !force) return;
+  DA.loading = true;
   // Fire all 3 in parallel; render each as it returns
   var unit = DA.unit;
   var region = (sel('da-region-sel') && sel('da-region-sel').value) || 'ALL';
   var bu     = (sel('da-bu-sel')     && sel('da-bu-sel').value)     || 'ALL';
+  if(region === 'ALL' && RG !== 'ALL') {
+    region = RG;
+    if(sel('da-region-sel')) sel('da-region-sel').value = RG;
+  }
+  if(bu === 'ALL' && SEG !== 'ALL') {
+    bu = SEG;
+    if(sel('da-bu-sel')) sel('da-bu-sel').value = SEG;
+  }
+  ['da-sku-status','da-bc-status','da-bp-status'].forEach(function(id){
+    var el = sel(id);
+    if(el){ el.style.display='block'; el.style.color=''; el.textContent='Loading...'; }
+  });
 
   var pSku = getSkuMatrix({unit: unit, region: region, bu: bu})
     .then(function(d){ DA.sku = d; renderSkuMatrix(d); })
     .catch(function(e){ daShowErr('da-sku-status', e.message || 'Failed to load'); });
 
-  var pBc = getBrandCoverage({})
+  var pBc = getBrandCoverage({region: region, bu: bu})
     .then(function(d){ DA.bc = d; renderBrandCoverage(d); })
     .catch(function(e){ daShowErr('da-bc-status', e.message || 'Failed to load'); });
 
-  var pBp = getBuyingPatterns({})
+  var pBp = getBuyingPatterns({region: region, bu: bu})
     .then(function(d){ DA.bp = d; renderBuyingPatterns(d); })
     .catch(function(e){ daShowErr('da-bp-status', e.message || 'Failed to load'); });
 
   await Promise.all([pSku, pBc, pBp]);
+  DA.loaded = true;
+  DA.loading = false;
 }
 
 function daShowErr(id, msg) {
@@ -6274,9 +6482,10 @@ function daSetUnit(unit) {
   for (var i=0; i<btns.length; i++) {
     btns[i].classList.toggle('on', btns[i].getAttribute('data-unit') === unit);
   }
-  daRefreshSku();
+  daRefreshAll();
 }
 function daRefreshSku() {
+  DA.loaded = false;
   var status = sel('da-sku-status');
   if (status) { status.style.display='block'; status.style.color=''; status.textContent='Refreshing…'; }
   var unit = DA.unit;
@@ -6285,6 +6494,11 @@ function daRefreshSku() {
   getSkuMatrix({unit: unit, region: region, bu: bu})
     .then(function(d){ DA.sku = d; renderSkuMatrix(d); })
     .catch(function(e){ daShowErr('da-sku-status', e.message || 'Failed to load'); });
+}
+
+function daRefreshAll(){
+  DA.loaded = false;
+  loadDeeperAnalytics(true).catch(function(e){ console.error('DeeperAnalytics:', e); });
 }
 
 function renderSkuMatrix(d) {

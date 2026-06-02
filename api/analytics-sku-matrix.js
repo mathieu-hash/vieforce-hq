@@ -23,6 +23,7 @@ const { verifySession, verifyServiceToken } = require('./_auth')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 const { classify, FAMILIES } = require('./lib/brand-family')
+const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
 
 const REGION_CASE = `
   CASE
@@ -56,8 +57,8 @@ module.exports = async (req, res) => {
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
   const unit   = (req.query.unit   === 'revenue') ? 'revenue' : 'volume'
-  const region = (req.query.region || 'ALL').toString()
-  const bu     = (req.query.bu     || 'ALL').toString().toUpperCase()
+  const region = normalizeRegion(req.query.region)
+  const bu     = normalizeSegment(req.query.bu || req.query.segment)
 
   const cacheKey = `analytics_sku_matrix_${unit}_${region}_${bu}_${session.role}`
   const cached = cache.get(cacheKey)
@@ -212,9 +213,16 @@ module.exports = async (req, res) => {
     const result = {
       meta: {
         unit, region, bu,
+        applied_filters: filterMeta(region, bu),
         period: 'Trailing 12 months',
         generated_at: new Date().toISOString(),
-        total_customers_in_filter: customers.length
+        total_customers_in_filter: customers.length,
+        source: { volume: 'OINV trailing 12 months', region: 'dominant invoice warehouse' },
+        data_quality: {
+          contains_proxy: true,
+          proxy_fields: ['bu'],
+          notes: ['BU/segment is inferred from SlpCode/customer-name classifier until official customer master segmentation is confirmed.']
+        }
       },
       customers: top30.map(c => ({
         card_code: c.card_code,

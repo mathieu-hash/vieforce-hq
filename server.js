@@ -100,6 +100,10 @@ app.delete('/api/admin/remove-user', adminRemoveUserHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
+// Local review: serve app.html and static assets from this repo so localhost uses
+// the same in-progress API handlers via js/api.js.
+app.use(express.static(__dirname, { index: false }))
+
 app.listen(PORT, () => {
   console.log(`VieForce HQ API running on port ${PORT}`)
 })

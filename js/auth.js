@@ -3,8 +3,27 @@
 
 var SESSION_KEY = 'vf_session';
 var SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
-var AUTH_API = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api/auth/login';
-var GOOGLE_BRIDGE_API = AUTH_API.replace(/\/login\/?$/i, '') + '/google-bridge';
+
+/** Same origin rules as js/api.js — localhost uses local server.js for auth. */
+function getAuthApiBase() {
+  var remote = 'https://vieforce-hq-api-1057619753074.asia-southeast1.run.app/api';
+  try {
+    var override = localStorage.getItem('vf_api_base');
+    if (override) return override.replace(/\/+$/, '');
+    if (location.protocol.indexOf('http') === 0 && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      return location.origin + '/api';
+    }
+  } catch (e) {}
+  return remote;
+}
+
+function getAuthLoginUrl() {
+  return getAuthApiBase() + '/auth/login';
+}
+
+function getGoogleBridgeUrl() {
+  return getAuthApiBase() + '/auth/google-bridge';
+}
 var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
 
 /**
@@ -16,13 +35,6 @@ var GOOGLE_ALLOWED_DOMAIN = 'vienovo.ph';
  */
 function getHqOAuthRedirectUrl() {
   var path = '/auth/callback.html';
-  var host = '';
-  try {
-    host = String(window.location.hostname || '').toLowerCase();
-  } catch (e) {}
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'https://vieforce-hq.vercel.app' + path;
-  }
   var o = '';
   try {
     o = String(window.location.origin || '').replace(/\/$/, '');
@@ -95,7 +107,7 @@ function normalizeHqEmail(raw) {
  */
 async function login(phone, pin) {
   try {
-    var res = await fetch(AUTH_API, {
+    var res = await fetch(getAuthLoginUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: phone, pin: pin })
@@ -222,7 +234,7 @@ async function loginWithGoogle() {
 }
 
 async function bridgeGoogleSession(accessToken) {
-  var res = await fetch(GOOGLE_BRIDGE_API, {
+  var res = await fetch(getGoogleBridgeUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ access_token: accessToken })
