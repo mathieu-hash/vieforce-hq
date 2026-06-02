@@ -4783,7 +4783,9 @@ async function loadSales(){
     if(kp.ytd_volume_mt!=null) animateNumber(sel('sk-ytdvol'),  UT==='Bags' ? (kp.ytd_volume_bags!=null?kp.ytd_volume_bags:(kp.ytd_volume_mt*50)) : kp.ytd_volume_mt, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> '+(UT==='Bags'?'bags':'MT')+'</span>'});
     if(kp.revenue!=null)       animateNumber(sel('sk-sales'),   kp.revenue,       fc);
     if(kp.gmt!=null)           animateNumber(sel('sk-gmt'),     kp.gmt,           function(v){return '₱'+fcn(Math.round(v))});
-    if(kp.gross_margin!=null)  animateNumber(sel('sk-gm'),      kp.gross_margin,  function(v){return Number(v).toFixed(1)+'%'});
+    // GM% — prefer server gross_margin_pct; fall back to gross_margin/revenue (gross_margin is a PESO sum, never a percent)
+    var gmPct = (kp.gross_margin_pct!=null) ? kp.gross_margin_pct : (kp.revenue>0 ? (kp.gross_margin/kp.revenue)*100 : 0);
+    if(gmPct!=null)            animateNumber(sel('sk-gm'),      gmPct,            function(v){return Number(v).toFixed(1)+'%'});
     // Deltas — respect vs PP / vs LY (same payload as home)
     var dp = (CMP === 'vs_ly' && kp.delta_pct_ly) ? kp.delta_pct_ly : (kp.delta_pct || {});
     function setDelta(id, pct){
