@@ -334,8 +334,19 @@ module.exports = async (req, res) => {
 
     const lm_full = lastMonthRow[0]?.mt_full || 0
     const lm_same = lastMonthRow[0]?.mt_to_same_day || 0
-    const vs_lm_volume = actual_mt - lm_same
-    const vs_lm_pct = lm_same > 0 ? Math.round(((actual_mt - lm_same) / lm_same) * 1000) / 10 : 0
+    // "vs Last Month" must compare CURRENT month-to-date vs last-month-to-same-day,
+    // NOT the selected-period total (QTD/YTD total vs one month gave +3490%).
+    const curMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const curMonthRow = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @cmStart AND @cmEnd AND T0.CANCELED='N'${lineFilters}
+    `, { cmStart: curMonthStart, cmEnd: today, region })
+    const cur_mtd_mt = curMonthRow[0]?.mt || 0
+    const vs_lm_volume = cur_mtd_mt - lm_same
+    const vs_lm_pct = lm_same > 0 ? Math.round(((cur_mtd_mt - lm_same) / lm_same) * 1000) / 10 : 0
 
     // ---- vs prior period (same shape, shifted back) for dynamic Daily Pullout ----
     const prior = getPriorPeriodWindow(period, dateFrom, today)

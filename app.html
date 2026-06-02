@@ -5381,10 +5381,10 @@ async function loadSpeed(){
       var el = sel('spk-vslm');
       if(el){ el.textContent=(pct>=0?'+':'')+pct.toFixed(1)+'%'; el.style.color = pct>=0 ? 'var(--green)' : 'var(--red)'; }
     }
-    // As-of date = latest daily[].ship_date or today
-    var asOf = (d.daily && d.daily.length) ? d.daily[d.daily.length-1].ship_date : null;
+    // As-of date = period end / server date (daily[].ship_date can be a 'W23'/'2026-01' bucket, not a date)
+    var asOf = d.period_end || d.current_date_ph || null;
     var asOfDate = asOf ? new Date(asOf) : new Date();
-    sett('sp-asof', asOfDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    sett('sp-asof', isNaN(asOfDate.getTime()) ? '—' : asOfDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
     // Pullout delta — vs PP or vs LY (same response)
     var spPullCmp = (CMP === 'vs_ly' && d.vs_last_year_pct != null && !isNaN(Number(d.vs_last_year_pct)))
       ? Number(d.vs_last_year_pct)
@@ -5414,7 +5414,16 @@ async function loadSpeed(){
       }
       var ctxS = document.getElementById('speedChart');
       if(ctxS){
-        var labels=d.daily.map(function(x){return fdt(x.ship_date)||x.day_name||''});
+        // ship_date may be a real date (MTD/7D), a week bucket 'W23' (QTD), or a month '2026-01' (YTD)
+        var moAbbr=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        function speedBucketLabel(v, dayName){
+          if(!v) return dayName||'';
+          if(/^\d{4}-\d{2}-\d{2}/.test(v)) return fdt(v)||dayName||v;
+          if(/^W\d+$/i.test(v)) return 'Wk '+v.slice(1);
+          if(/^\d{4}-\d{2}$/.test(v)){ var mo=parseInt(v.split('-')[1],10); return moAbbr[mo-1]||v; }
+          return dayName||v;
+        }
+        var labels=d.daily.map(function(x){return speedBucketLabel(x.ship_date, x.day_name)});
         var vals=d.daily.map(function(x){return Math.round(x.daily_mt||0)});
         if(charts.speed){ try{charts.speed.destroy();}catch(e){} charts.speed=null; }
         charts.speed = new Chart(ctxS,{type:'bar',data:{labels:labels,datasets:[{
