@@ -1281,7 +1281,7 @@ body{
                 </tbody>
               </table>
               <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
-                <span style="font-size:10px;color:var(--text4)">Shipping days: 15 of 22 (68%)</span>
+                <span style="font-size:10px;color:var(--text4)" id="hm-shipdays">Shipping days: —</span>
                 <div class="prog" style="flex:1"><div class="prog-fill" style="width:68%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div>
               </div>
             </div>
@@ -3635,7 +3635,7 @@ body{
 
         <!-- ALERTS PER RSM -->
         <div class="card">
-          <div class="card-hdr"><div class="card-title">Account Health by RSM</div><div class="card-badge b-red">12 silent · 13 neg. margin</div></div>
+          <div class="card-hdr"><div class="card-title">Account Health by RSM</div><div class="card-badge b-red" id="team-health-badge">—</div></div>
           <div class="card-body" style="padding-top:8px">
             <table class="tbl">
               <thead><tr><th>RSM</th><th>Region</th><th class="num">Active Cust.</th><th class="num">Silent (≥30d)</th><th class="num">Neg. Margin</th></tr></thead>
@@ -4596,7 +4596,7 @@ async function loadHome(){
         rhtml+='<tr class="total"><td style="font-weight:800">NATIONAL</td><td class="num" style="font-weight:800">'+fcn(Math.round(totV))+'</td>';
         rhtml+='<td class="num" style="font-weight:800">'+fc(totS)+'</td><td class="num"></td>';
         rhtml+='<td class="num" style="font-weight:800">₱'+fcn(Math.round(d.gmt||0))+'</td>';
-        rhtml+='<td class="num" style="font-weight:800"><span class="badge b-green">'+(d.dso?Math.round(d.dso)+'d':'47d')+'</span></td></tr>';
+        rhtml+='<td class="num" style="font-weight:800"><span class="badge b-green">'+(d.dso_active!=null?Math.round(d.dso_active)+'d':(d.dso?Math.round(d.dso)+'d':'—'))+'</span></td></tr>';
         seth('home-region-tbody',rhtml);
       }
       // Top customers
@@ -4672,6 +4672,7 @@ async function loadHome(){
       var elapsed = sp.shipping_days_elapsed!=null ? sp.shipping_days_elapsed : (sp.days_elapsed!=null?sp.days_elapsed:sp.elapsed_days);
       var total   = sp.shipping_days_total!=null   ? sp.shipping_days_total   : (sp.days_total!=null?sp.days_total:sp.total_days);
       var remain  = sp.shipping_days_remaining!=null ? sp.shipping_days_remaining : (sp.days_remaining!=null?sp.days_remaining:sp.remaining_days);
+      if(elapsed!=null && total>0) sett('hm-shipdays', 'Shipping days: '+elapsed+' of '+total+' ('+Math.round(elapsed/total*100)+'%)');
       var projected = sp.projected_period_volume!=null ? sp.projected_period_volume
                     : sp.projected_mtd!=null ? sp.projected_mtd
                     : (dpVal!=null && total!=null ? dpVal * total : null);
@@ -6974,6 +6975,10 @@ async function loadTeam(){
         hhtml += '<td class="num" style="color:'+(h.neg_margin>0?'var(--red)':'var(--text)')+';font-weight:'+(h.neg_margin>0?'700':'400')+'">'+(h.neg_margin||0)+'</td></tr>';
       });
       seth('team-health-tbody', hhtml);
+      var totSilent = d.account_health.reduce(function(s,h){return s+(+h.silent||0)},0);
+      var totNeg    = d.account_health.reduce(function(s,h){return s+(+h.neg_margin||0)},0);
+      var hbadge = document.getElementById('team-health-badge');
+      if(hbadge) hbadge.textContent = totSilent+' silent · '+totNeg+' neg. margin';
     }
 
     // Performance matrix — logged, keep prototype
