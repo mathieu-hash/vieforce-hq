@@ -379,10 +379,10 @@ module.exports = async (req, res) => {
       WHERE S.Active = 'Y'
         AND S.U_rsm IS NOT NULL
         AND S.SlpCode <> S.U_rsm
-        AND EXISTS (
-          SELECT 1 FROM OSLP C
-          WHERE C.Active = 'Y' AND C.U_rsm = S.SlpCode AND C.SlpCode <> C.U_rsm
-        )
+        -- NOTE: do NOT require an OSLP sub-report here. This org is 2-tier in SAP
+        -- (RSM -> sales reps); TSRs live in Patrol/Supabase, not OSLP. So every
+        -- active rep reporting to an RSM IS a DSM for the scorecard. The old
+        -- EXISTS-subordinate check returned 0 DSMs and left every RSM unexpandable.
         AND S.U_rsm IN (
           SELECT R.SlpCode FROM OSLP R
           WHERE R.Active = 'Y' AND R.SlpCode = R.U_rsm
