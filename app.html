@@ -5797,12 +5797,12 @@ async function openCust(code){
       charts.custVolBar = new Chart(ctxCv,{type:'bar',data:{
         labels:months,
         datasets:[
-          {label:'2026 (CY)',data:cy,backgroundColor:'rgba(0,174,239,0.55)',hoverBackgroundColor:'rgba(0,174,239,0.8)',borderRadius:4,borderSkipped:false},
-          {label:'2025 (LY)',data:ly,backgroundColor:'rgba(255,255,255,0.1)',hoverBackgroundColor:'rgba(255,255,255,0.2)',borderRadius:4,borderSkipped:false}
+          {label:'2026 (this year)',data:cy,backgroundColor:'rgba(0,174,239,0.85)',hoverBackgroundColor:'rgba(0,174,239,1)',borderRadius:4,borderSkipped:false},
+          {label:'2025 (last year)',data:ly,backgroundColor:'rgba(255,184,0,0.65)',hoverBackgroundColor:'rgba(255,184,0,0.9)',borderRadius:4,borderSkipped:false}
         ]
       },options:{
         responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{afterBody:function(items){
+        plugins:{legend:{display:true,position:'top',align:'end',labels:{color:'rgba(240,244,250,0.7)',font:{size:11,weight:600},boxWidth:12,boxHeight:12,padding:14,usePointStyle:true}},tooltip:{callbacks:{afterBody:function(items){
           if(!items.length) return '';
           var i=items[0].dataIndex;
           var diff=(cy[i]||0)-(ly[i]||0);
@@ -5816,15 +5816,20 @@ async function openCust(code){
       }});
     })();
     // Monthly breakdown table
-    if(d.monthly_table && d.monthly_table.length){
+    // Only show months that actually have activity (drop empty future months + pre-customer months)
+    var mtRows = (d.monthly_table||[]).filter(function(m){return (+m.vol_cy||0)>0 || (+m.vol_ly||0)>0});
+    if(mtRows.length){
       var mhtml='';
-      d.monthly_table.slice(0,12).forEach(function(m){
-        var delta = (m.vol_cy && m.vol_ly) ? ((m.vol_cy - m.vol_ly) / m.vol_ly * 100) : null;
+      mtRows.slice(0,12).forEach(function(m){
+        var cyv=+m.vol_cy||0, lyv=+m.vol_ly||0;
+        var hasLy = lyv>0;
+        var delta = hasLy ? ((cyv - lyv)/lyv*100) : null;
         var deltaCls = delta==null?'':(delta>=0?'up':'down');
+        var deltaTxt = hasLy ? ((delta>=0?'+':'')+delta.toFixed(1)+'%') : (cyv>0?'<span style="color:var(--green)">new</span>':'—');
         mhtml+='<tr><td style="font-weight:600">'+esc(m.month_label||m.month||'')+'</td>';
-        mhtml+='<td class="num">'+fcn(Math.round(m.vol_cy||0))+'</td>';
-        mhtml+='<td class="num" style="color:var(--text3)">'+fcn(Math.round(m.vol_ly||0))+'</td>';
-        mhtml+='<td class="num '+deltaCls+'">'+(delta!=null?(delta>=0?'+':'')+delta.toFixed(1)+'%':'--')+'</td>';
+        mhtml+='<td class="num">'+(cyv>0?fcn(Math.round(cyv)):'—')+'</td>';
+        mhtml+='<td class="num" style="color:var(--text3)">'+(hasLy?fcn(Math.round(lyv)):'—')+'</td>';
+        mhtml+='<td class="num '+deltaCls+'">'+deltaTxt+'</td>';
         mhtml+='<td class="num">'+fc(m.sales||m.sales_cy||m.revenue_cy||0)+'</td></tr>';
       });
       seth('cust-monthly-tbody',mhtml);
