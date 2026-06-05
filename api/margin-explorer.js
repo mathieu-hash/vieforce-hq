@@ -136,12 +136,52 @@ module.exports = async (req, res) => {
     } else if (include.has('bridge')) {
       const itemSql = `SELECT T1.ItemCode AS item, ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.LineTotal),0) AS revenue, ISNULL(SUM(T1.GrssProfit),0) AS gp
         ${baseFrom} ${scopeWhere} GROUP BY T1.ItemCode HAVING SUM(T1.InvQty) <> 0`
-      const toRows = arr => arr.map(r => { const rev = Number(r.revenue), gp = Number(r.gp); return { item: r.item, kg: Number(r.kg), revenue: rev, gp, cost_rm: rev - gp, cost_pkg: 0, cost_feedtag: 0 } })
-      const cur1 = toRows(await query(itemSql, params))
-      const prev0 = toRows(await query(itemSql, { ...params, dateFrom: ppFrom, dateTo: ppTo }))
-      // GM/ton bridge (Mat's spec): per-unit decomposition × 1000. No volume effect (per-unit).
+
+      // Phase 2: per-SKU COGS split (RM/Packaging/Feedtag) from production orders.
+      // ratio = Σ(WOR1.IssuedQty × OITM.LastPurPrc) by class ÷ total, over YTD→anchor (stable, wide coverage).
+      // Cost field = LastPurPrc (AvgPrice is 0 in Live). Feedtag = packaging items coded FT%.
+      const yearStart = new Date(dateTo.getFullYear(), 0, 1)
+      let ratioMap = {}, cogsSplit = false
+      try {
+        const rr = await query(`
+          SELECT W.ItemCode AS sku,
+            SUM(R.IssuedQty * ISNULL(I2.LastPurPrc,0)) AS tot,
+            SUM(CASE WHEN I2.ItmsGrpCod=104 AND I2.ItemCode LIKE 'FT%' THEN R.IssuedQty*ISNULL(I2.LastPurPrc,0) ELSE 0 END) AS ft,
+            SUM(CASE WHEN I2.ItmsGrpCod=104 AND I2.ItemCode NOT LIKE 'FT%' THEN R.IssuedQty*ISNULL(I2.LastPurPrc,0) ELSE 0 END) AS pkg
+          FROM OWOR W INNER JOIN WOR1 R ON W.DocEntry=R.DocEntry INNER JOIN OITM I2 ON R.ItemCode=I2.ItemCode
+          WHERE W.PostDate BETWEEN @ys AND @de AND R.IssuedQty > 0
+          GROUP BY W.ItemCode HAVING SUM(R.IssuedQty * ISNULL(I2.LastPurPrc,0)) > 0`, { ys: yearStart, de: dateTo })
+        rr.forEach(r => { const t = Number(r.tot) || 1; ratioMap[r.sku] = { pkg: Number(r.pkg) / t, ft: Number(r.ft) / t } })
+        cogsSplit = rr.length > 0
+      } catch (e) { console.warn('[margin-explorer] cost-ratio query failed:', e.message) }
+
+      // Split each SKU's invoice COGS by its production ratio; RM = remainder (reconciles to cogs).
+      const splitRows = arr => arr.map(r => {
+        const rev = Number(r.revenue), gp = Number(r.gp), cogs = rev - gp
+        const rat = ratioMap[r.item] || { pkg: 0, ft: 0 }
+        const cp = cogs * rat.pkg, cf = cogs * rat.ft
+        return { item: r.item, kg: Number(r.kg), revenue: rev, gp, cost_pkg: cp, cost_feedtag: cf, cost_rm: cogs - cp - cf }
+      })
+      const cur1 = splitRows(await query(itemSql, params))
+      const prev0 = splitRows(await query(itemSql, { ...params, dateFrom: ppFrom, dateTo: ppTo }))
+
+      // GM/ton bridge: per-unit decomposition × 1000. No volume effect (per-unit).
       const bk = bridge.bridgeGMperKg(prev0, cur1)
       const T = 1000
+
+      // Ingredient contribution to COGS (top RM movers, production cost, current vs prior period).
+      let ingredients = []
+      try {
+        const ingSql = (f, t) => query(`SELECT TOP 10 LTRIM(RTRIM(I2.ItemName)) AS nm, SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0)) AS cost
+          FROM OWOR W INNER JOIN WOR1 R ON W.DocEntry=R.DocEntry INNER JOIN OITM FI ON W.ItemCode=FI.ItemCode AND FI.ItmsGrpCod=103
+          INNER JOIN OITM I2 ON R.ItemCode=I2.ItemCode
+          WHERE W.PostDate BETWEEN @f AND @t AND I2.ItmsGrpCod IN (101,102) AND R.IssuedQty > 0
+          GROUP BY I2.ItemName ORDER BY cost DESC`, { f, t })
+        const ci = await ingSql(dateFrom, dateTo)
+        const pm = {}; (await ingSql(ppFrom, ppTo)).forEach(x => { pm[x.nm] = Number(x.cost) })
+        ingredients = ci.map(x => ({ name: x.nm, cost: Math.round(Number(x.cost)), delta: Math.round(Number(x.cost) - (pm[x.nm] || 0)) }))
+      } catch (e) { console.warn('[margin-explorer] ingredient query failed:', e.message) }
+
       bridgeOut = {
         available: true, basis: 'vs prior period · ₱/ton', unit: 'php_per_ton',
         prior_gp: Math.round((bk.gm0_perkg || 0) * T), current_gp: Math.round((bk.gm1_perkg || 0) * T),
@@ -149,7 +189,10 @@ module.exports = async (req, res) => {
         cost: { total: Math.round((bk.cost_total || 0) * T), rm: Math.round((bk.cost_rm || 0) * T), packaging: Math.round((bk.cost_pkg || 0) * T), feedtag: Math.round((bk.cost_feedtag || 0) * T) },
         delta_gp: Math.round((bk.delta_gm_perkg || 0) * T),
         reconciles: Math.abs(((bk.price || 0) + (bk.mix || 0) + (bk.cost_total || 0)) - (bk.delta_gm_perkg || 0)) < 0.01,
-        note: 'GM/ton bridge: Price + Mix + COGS (RM/Pkg/Feedtag). Per-unit ⇒ no volume effect. Phase 1: COGS single bucket (RM); split = Phase 2.'
+        cogs_split: cogsSplit, ingredients,
+        note: cogsSplit
+          ? 'GM/ton bridge: Price + Mix + COGS split RM/Packaging/Feedtag (production-order ratio, OITM.LastPurPrc). Per-unit ⇒ no volume.'
+          : 'GM/ton bridge: COGS single bucket (no production ratio available for this slice).'
       }
     }
 
