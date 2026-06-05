@@ -1050,6 +1050,9 @@ body{
         <span class="nav-icon">⚠️</span><span class="nav-label">Margin Alerts</span>
         <span class="nav-badge b-red">3</span>
       </div>
+      <div class="nav-item" onclick="navTo('pg-margin-explorer',this)">
+        <span class="nav-icon">🔬</span><span class="nav-label">Margin Explorer</span>
+      </div>
       <div class="nav-item" onclick="navTo('pg-team',this)">
         <span class="nav-icon">👥</span><span class="nav-label">Sales Team</span>
       </div>
@@ -2825,6 +2828,10 @@ body{
 
       </div>
 
+      <!-- ===== MARGIN EXPLORER ===== -->
+      <!-- Controller (js/margin-explorer.js) fills this section on navTo('pg-margin-explorer'). -->
+      <div class="page" id="pg-margin-explorer"></div>
+
 
       <!-- ===== INSIGHTS — v2 REBUILD (2026-04-18) ===== -->
       <!-- 4 action bands: RESCUE / GROW / EARLY WARNING / DORMANT — wired to /api/intelligence (v2 shape) -->
@@ -3933,6 +3940,9 @@ body{
 <script src="js/dsm-home.js"></script>
 <script src="js/rsm-home.js"></script>
 <script src="js/table-numbers.js"></script>
+<script src="js/margin-explorer-bridge.js"></script>
+<script src="js/margin-explorer-matrix.js"></script>
+<script src="js/margin-explorer.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -4298,6 +4308,7 @@ var pageTitles = {
   'pg-customers':['Customers','OCRD'],
   'pg-custdetail':['Customer Detail',''],
   'pg-margin':['Margin Alerts','YTD'],
+  'pg-margin-explorer':['Margin Explorer','Gross-margin analysis'],
   'pg-insights':['Customer Intelligence','Buying Patterns · Whitespace · Growth Vectors'],
   'pg-team':['Sales Team','Org Scorecard · YTD vs Budget'],
   'pg-budget':['Budget & P&L','FY 2026 · vs Actual'],
@@ -4437,6 +4448,7 @@ function loadPage(id){
     case 'pg-speed': loadSpeed(); break;
     case 'pg-customers': loadCust(); break;
     case 'pg-margin': loadMargin(); break;
+    case 'pg-margin-explorer': loadMarginExplorer(); break;
     case 'pg-insights': loadIntelligence(); break;
     case 'pg-team': loadTeam(); break;
     case 'pg-budget': loadBudget(); break;
