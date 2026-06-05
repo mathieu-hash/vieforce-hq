@@ -279,20 +279,27 @@
     var p = pal();
     var unit = (trend && trend.unit) || 'gm_per_kg';
 
-    // series items may be {label/month/period, value} — normalise.
+    // series items may be {label/month/period, gm_per_ton|value|y} — normalise.
     var labels = series.map(function (s) {
       return s.label != null ? s.label : (s.month != null ? s.month : (s.period != null ? s.period : ''));
     });
     var values = series.map(function (s) {
+      if (s.gm_per_ton != null) return +s.gm_per_ton;
       return s.value != null ? +s.value : (s.y != null ? +s.y : 0);
     });
 
     destroyExisting(canvasEl);
     var ctx = canvasEl.getContext('2d');
 
-    var fmt = (unit === 'gp_pct')
-      ? function (v) { return (+v).toFixed(1) + '%'; }
-      : function (v) { return money(v); };
+    var fmt;
+    if (unit === 'gp_pct') {
+      fmt = function (v) { return (+v).toFixed(1) + '%'; };
+    } else if (unit === 'gm_per_ton') {
+      // GM per ton — full peso value (e.g. ₱6,430/t), not abbreviated.
+      fmt = function (v) { return '₱' + Math.round(+v || 0).toLocaleString() + '/t'; };
+    } else {
+      fmt = function (v) { return money(v); };
+    }
 
     var chart = new window.Chart(ctx, {
       type: 'line',

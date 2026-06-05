@@ -93,6 +93,11 @@ function getPeriodBounds(period, today) {
   let start
   switch (period) {
     case '7D':
+      // Intended 7-day semantics: a true rolling 7-day window is [today-6 .. today]
+      // INCLUSIVE (6 prior days + today = 7 calendar days). This deliberately differs
+      // from _auth.getPeriodDates, whose historical 7D start was one day earlier
+      // (an 8-day inclusive span). Do NOT "align" _auth to this — /api/speed depends
+      // on this 7-day window while other endpoints rely on _auth's wider span.
       start = new Date(y, m, today.getDate() - 6)
       break
     case 'QTD':

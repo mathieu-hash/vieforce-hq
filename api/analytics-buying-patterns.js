@@ -23,6 +23,7 @@ const { verifySession, verifyServiceToken } = require('./_auth')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
+const { resolveRefMonthAnchor } = require('./lib/shipping_days')
 
 const REGION_CASE = `
   CASE
@@ -52,7 +53,14 @@ module.exports = async (req, res) => {
 
   const regionFilter = normalizeRegion(req.query.region)
   const buFilter = normalizeSegment(req.query.bu || req.query.segment)
-  const cacheKey = `analytics_buying_patterns_${regionFilter}_${buFilter}_${session.role}`
+
+  // Anchor the trailing-12M window (and cadence "today") to ?ref_month=YYYY-MM.
+  const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
+  const refMonthKey = /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
+  const refAnchor = resolveRefMonthAnchor(refMonthKey === 'live' ? '' : refMonthKey)
+
+  // Cache key includes ref_month + session.id so distinct anchors/users never share.
+  const cacheKey = `analytics_buying_patterns_${regionFilter}_${buFilter}_${session.role}_${session.id}_${refMonthKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -74,13 +82,15 @@ module.exports = async (req, res) => {
       LEFT JOIN OSLP S   ON T0.SlpCode = S.SlpCode
       WHERE T0.CANCELED = 'N'
         AND UPPER(T1.ItemCode) LIKE 'FG%'
-        AND T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+        AND T0.DocDate >= DATEADD(MONTH, -12, @refAnchor)
+        AND T0.DocDate <= @refAnchor
       GROUP BY T0.CardCode, T0.DocDate
     `
 
+    const sqlParams = { refAnchor }
     const [curRows, histRows] = await Promise.all([
-      query(SQL_DATES).catch(e => { console.warn('[patterns] current failed:', e.message); return [] }),
-      queryH(SQL_DATES).catch(e => { console.warn('[patterns] historical failed:', e.message); return [] })
+      query(SQL_DATES, sqlParams).catch(e => { console.warn('[patterns] current failed:', e.message); return [] }),
+      queryH(SQL_DATES, sqlParams).catch(e => { console.warn('[patterns] historical failed:', e.message); return [] })
     ])
     const histKeyed = await rekeyHistoricalRows(histRows, 'CardCode').catch(() => [])
     const merged = [...curRows, ...histKeyed].filter(r => {
@@ -114,7 +124,9 @@ module.exports = async (req, res) => {
       if (r.sales_rep) c.sales_rep = r.sales_rep
     }
 
-    const today = new Date()
+    // Cadence math is anchored to the ref-month window end so "days since last" and
+    // the 90-day recent window stay consistent with the queried trailing-12M period.
+    const today = refAnchor
     const cut3mo = new Date(today.getTime() - 90 * 86400000)
 
     function classifyPattern(orders) {
@@ -264,6 +276,8 @@ module.exports = async (req, res) => {
     const result = {
       meta: {
         period: 'Trailing 12 months',
+        ref_month: refMonthKey,
+        window_end: refAnchor.toISOString(),
         filters: { region: regionFilter, bu: buFilter },
         applied_filters: filterMeta(regionFilter, buFilter),
         cutoff_for_declining: '90-day vs prior 9 months, +50% slowdown threshold',

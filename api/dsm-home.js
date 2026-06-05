@@ -109,12 +109,18 @@ module.exports = async (req, res) => {
   const dsmDistrict = session.district || ''
   const dsmRegion   = session.region || ''
 
-  const cacheKey = `dsm_home_${session.id}`
+  const period = (typeof req.query.period === 'string' && req.query.period.trim()) || 'MTD'
+  const refMonthKey = (typeof req.query.ref_month === 'string' && /^\d{4}-\d{2}$/.test(req.query.ref_month.trim()))
+    ? req.query.ref_month.trim()
+    : 'live'
+
+  const cacheKey = `dsm_home_${session.id}_${period}_${refMonthKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
-    const { dateFrom: mtdStart, dateTo: today } = getPeriodDates('MTD')
+    const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
+    const { dateFrom: mtdStart, dateTo: today } = getPeriodDates(period, periodOpts)
     // Prior month-to-date equivalent window
     const prev = new Date(mtdStart); prev.setMonth(prev.getMonth() - 1)
     const prevEnd = new Date(today);  prevEnd.setMonth(prevEnd.getMonth() - 1)

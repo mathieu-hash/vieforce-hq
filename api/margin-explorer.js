@@ -169,18 +169,99 @@ module.exports = async (req, res) => {
       const bk = bridge.bridgeGMperKg(prev0, cur1)
       const T = 1000
 
-      // Ingredient contribution to COGS (top RM movers, production cost, current vs prior period).
+      // Ingredient contribution PER TON of feed (price + inclusion decomposition), cur vs prior.
+      // For each raw-material ingredient: issued_kg, blended price (₱/kg), inclusion (kg/kg feed),
+      // and ₱-per-ton-of-feed cost. Δ split into price effect vs inclusion (recipe) effect.
       let ingredients = []
+      let ingredientsMeta = null
       try {
-        const ingSql = (f, t) => query(`SELECT TOP 10 LTRIM(RTRIM(I2.ItemName)) AS nm, SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0)) AS cost
+        // Per-ingredient issued kg + blended price, over FG (ItmsGrpCod=103) production orders,
+        // ingredient in raw-material groups 101/102. LastPurPrc = cost (AvgPrice=0 in Live).
+        const ingSql = (f, t) => query(`SELECT LTRIM(RTRIM(I2.ItemName)) AS nm,
+            SUM(R.IssuedQty) AS issued_kg,
+            SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0)) AS cost
           FROM OWOR W INNER JOIN WOR1 R ON W.DocEntry=R.DocEntry INNER JOIN OITM FI ON W.ItemCode=FI.ItemCode AND FI.ItmsGrpCod=103
           INNER JOIN OITM I2 ON R.ItemCode=I2.ItemCode
           WHERE W.PostDate BETWEEN @f AND @t AND I2.ItmsGrpCod IN (101,102) AND R.IssuedQty > 0
-          GROUP BY I2.ItemName ORDER BY cost DESC`, { f, t })
-        const ci = await ingSql(dateFrom, dateTo)
-        const pm = {}; (await ingSql(ppFrom, ppTo)).forEach(x => { pm[x.nm] = Number(x.cost) })
-        ingredients = ci.map(x => ({ name: x.nm, cost: Math.round(Number(x.cost)), delta: Math.round(Number(x.cost) - (pm[x.nm] || 0)) }))
-      } catch (e) { console.warn('[margin-explorer] ingredient query failed:', e.message) }
+          GROUP BY I2.ItemName`, { f, t })
+
+        // Feed tons produced in each window. CmpltQty = FG completed qty (kg) on FG orders.
+        // VALIDATE: if CmpltQty sums to 0/unsuitable, fall back to total issued kg as proxy.
+        const feedSql = (f, t) => query(`SELECT ISNULL(SUM(W.CmpltQty),0) AS cmplt_kg,
+            ISNULL(SUM(W.PlannedQty),0) AS planned_kg
+          FROM OWOR W INNER JOIN OITM FI ON W.ItemCode=FI.ItemCode AND FI.ItmsGrpCod=103
+          WHERE W.PostDate BETWEEN @f AND @t`, { f, t })
+
+        const [curRows, priRows] = await Promise.all([ingSql(dateFrom, dateTo), ingSql(ppFrom, ppTo)])
+        const [curFeed, priFeed] = await Promise.all([feedSql(dateFrom, dateTo), feedSql(ppFrom, ppTo)])
+
+        // Resolve feed-ton basis per window with graceful fallback + label.
+        const resolveFeed = (feedRow, ingRows) => {
+          const cmplt = Number(feedRow[0] && feedRow[0].cmplt_kg) || 0
+          const planned = Number(feedRow[0] && feedRow[0].planned_kg) || 0
+          const issuedTotal = ingRows.reduce((a, r) => a + (Number(r.issued_kg) || 0), 0)
+          if (cmplt > 0) return { kg: cmplt, basis: 'CmpltQty' }
+          if (planned > 0) return { kg: planned, basis: 'PlannedQty (CmpltQty unavailable)' }
+          return { kg: issuedTotal, basis: 'issued-kg proxy (no completed/planned qty)' }
+        }
+        const fCur = resolveFeed(curFeed, curRows)
+        const fPri = resolveFeed(priFeed, priRows)
+        const feedTonsCur = fCur.kg / 1000
+        const feedTonsPri = fPri.kg / 1000
+
+        if (feedTonsCur > 0) {
+          // Index prior by ingredient name.
+          const pri = {}
+          priRows.forEach(r => {
+            const ik = Number(r.issued_kg) || 0, c = Number(r.cost) || 0
+            pri[r.nm] = {
+              price: ik > 0 ? c / ik : 0,
+              inclusion: feedTonsPri > 0 ? ik / (feedTonsPri * 1000) : 0
+            }
+          })
+
+          const names = new Set(curRows.map(r => r.nm))
+          priRows.forEach(r => names.add(r.nm))
+          const curIdx = {}
+          curRows.forEach(r => {
+            const ik = Number(r.issued_kg) || 0, c = Number(r.cost) || 0
+            curIdx[r.nm] = {
+              price: ik > 0 ? c / ik : 0,
+              inclusion: ik / (feedTonsCur * 1000)
+            }
+          })
+
+          const built = []
+          names.forEach(nm => {
+            const c = curIdx[nm] || { price: 0, inclusion: 0 }
+            const p = pri[nm] || { price: 0, inclusion: 0 }
+            const perton_cost = c.inclusion * c.price * 1000               // ₱/ton of feed (current)
+            const perton_cost_prior = p.inclusion * p.price * 1000
+            const price_effect = c.inclusion * (c.price - p.price) * 1000  // ₱/ton from price move
+            const inclusion_effect = (c.inclusion - p.inclusion) * p.price * 1000 // ₱/ton from recipe move
+            const perton_delta = perton_cost - perton_cost_prior          // ≈ price_effect + inclusion_effect
+            built.push({
+              name: nm,
+              perton_cost: Math.round(perton_cost * 10) / 10,
+              perton_delta: Math.round(perton_delta * 10) / 10,
+              price_effect: Math.round(price_effect * 10) / 10,
+              inclusion_effect: Math.round(inclusion_effect * 10) / 10
+            })
+          })
+          built.sort((a, b) => Math.abs(b.perton_delta) - Math.abs(a.perton_delta))
+          ingredients = built.slice(0, 12)
+
+          const sumDelta = built.reduce((a, r) => a + r.perton_delta, 0)
+          ingredientsMeta = {
+            unit: 'php_per_ton_of_feed',
+            feed_tons_current: Math.round(feedTonsCur),
+            feed_tons_prior: Math.round(feedTonsPri),
+            feed_basis: fCur.basis,
+            sum_perton_delta: Math.round(sumDelta * 10) / 10,
+            note: `Per-ton ingredient cost vs prior period. Sum of perton_delta (₱${Math.round(sumDelta)}/t) approximates the bridge RM cost-per-ton Δ. Feed tons via ${fCur.basis}.`
+          }
+        }
+      } catch (e) { console.warn('[margin-explorer] ingredient per-ton query failed:', e.message); ingredients = [] }
 
       bridgeOut = {
         available: true, basis: 'vs prior period · ₱/ton', unit: 'php_per_ton',
@@ -189,11 +270,39 @@ module.exports = async (req, res) => {
         cost: { total: Math.round((bk.cost_total || 0) * T), rm: Math.round((bk.cost_rm || 0) * T), packaging: Math.round((bk.cost_pkg || 0) * T), feedtag: Math.round((bk.cost_feedtag || 0) * T) },
         delta_gp: Math.round((bk.delta_gm_perkg || 0) * T),
         reconciles: Math.abs(((bk.price || 0) + (bk.mix || 0) + (bk.cost_total || 0)) - (bk.delta_gm_perkg || 0)) < 0.01,
-        cogs_split: cogsSplit, ingredients,
+        cogs_split: cogsSplit, ingredients, ingredients_meta: ingredientsMeta,
         note: cogsSplit
           ? 'GM/ton bridge: Price + Mix + COGS split RM/Packaging/Feedtag (production-order ratio, OITM.LastPurPrc). Per-unit ⇒ no volume.'
           : 'GM/ton bridge: COGS single bucket (no production ratio available for this slice).'
       }
+    }
+
+    // ---- 12-month GM/ton trend (Live only; 2025 not comparable across consolidation) ----
+    let trendOut = include.has('trend')
+      ? { unit: 'gm_per_ton', ly_comparable: false, ly_suppressed_reason: 'pre_2026_not_comparable', series: [] }
+      : null
+    if (include.has('trend')) {
+      try {
+        // Trailing 12 months ending at the anchor month. Clamp the start to the
+        // migration cutoff so the line stays inside clean Live data (2025 excluded).
+        const trendTo = dateTo
+        let trendFrom = new Date(trendTo.getFullYear(), trendTo.getMonth() - 11, 1)
+        if (trendFrom < MIGRATION_CUTOFF) trendFrom = new Date(MIGRATION_CUTOFF)
+        const trendParams = { ...params, dateFrom: trendFrom, dateTo: trendTo }
+        // Same scope + role filter + region/bu/customer filters, but month-grouped.
+        const trendWhere = applyRoleFilter(session, `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'`)
+        const trendRows = await query(`
+          SELECT FORMAT(T0.DocDate,'yyyy-MM') AS ym,
+            ISNULL(SUM(T1.GrssProfit),0) AS gp, ISNULL(SUM(T1.InvQty),0) AS kg
+          ${baseFrom} ${trendWhere} AND I.ItmsGrpCod IN (103,105,102) ${f}
+          GROUP BY FORMAT(T0.DocDate,'yyyy-MM')
+          HAVING SUM(T1.InvQty) <> 0
+          ORDER BY ym ASC`, trendParams)
+        trendOut.series = trendRows.map(r => {
+          const gp = Number(r.gp) || 0, kg = Number(r.kg) || 0
+          return { month: r.ym, gm_per_ton: kg > 0 ? Math.round(gp / kg * 1000) : 0 }
+        })
+      } catch (e) { console.warn('[margin-explorer] trend query failed:', e.message) }
     }
 
     const result = {
@@ -206,7 +315,7 @@ module.exports = async (req, res) => {
       hero,
       matrix: { group_by: groupBy, rows: matrixRows, total_gp: Math.round(totGp) },
       bridge: bridgeOut,
-      trend: include.has('trend') ? { unit: 'gm_per_kg', ly_comparable: false, ly_suppressed_reason: 'phase1_pending', series: [] } : null,
+      trend: trendOut,
       movers: include.has('movers') ? { basis: 'mix_contribution', items: [] } : null,
       gap: include.has('gap') ? { available: false, note: 'Phase 1: gap analysis pending' } : null
     }

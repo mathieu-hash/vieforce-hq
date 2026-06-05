@@ -143,7 +143,10 @@ module.exports = async (req, res) => {
         ISNULL(SUM(IW.IsCommited), 0)                                      AS committed_bags,
         ISNULL(SUM(IW.OnOrder), 0)                                         AS on_order_bags,
         ISNULL(SUM(IW.OnHand - IW.IsCommited), 0)                          AS available_bags,
-        ISNULL(SUM(IW.OnHand * ISNULL(I.NumInSale, 1)) / 1000.0, 0)       AS on_hand_mt
+        ISNULL(SUM(IW.OnHand * ISNULL(I.NumInSale, 1)) / 1000.0, 0)       AS on_hand_mt,
+        ISNULL(SUM(IW.OnOrder * ISNULL(I.NumInSale, 1)) / 1000.0, 0)      AS on_order_mt,
+        ISNULL(SUM(IW.IsCommited * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS committed_mt,
+        ISNULL(SUM((IW.OnHand - IW.IsCommited) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS available_mt
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
