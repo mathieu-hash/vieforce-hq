@@ -72,7 +72,7 @@
   var UNITS = [
     { v: 'kg',   l: '₱/kg' },
     { v: 'ton',  l: '₱/ton' },
-    { v: 'pct',  l: 'GP%' },
+    { v: 'gp_pct', l: 'GP%' },
     { v: 'gp',   l: '₱ GP' }
   ];
   var GROUP_BYS = [
@@ -198,7 +198,6 @@
           '<div class="mexp-panel">' +
             '<div class="mexp-panel-h">' +
               '<span class="mexp-panel-t">Drill Matrix</span>' +
-              '<div class="mexp-fgroup"><span class="mexp-flabel">By</span>' + groupBySelect() + '</div>' +
             '</div>' +
             '<div id="mexp-matrix"><div class="mexp-loading">Loading…</div></div>' +
           '</div>' +

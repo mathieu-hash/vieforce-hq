@@ -139,14 +139,17 @@ module.exports = async (req, res) => {
       const toRows = arr => arr.map(r => { const rev = Number(r.revenue), gp = Number(r.gp); return { item: r.item, kg: Number(r.kg), revenue: rev, gp, cost_rm: rev - gp, cost_pkg: 0, cost_feedtag: 0 } })
       const cur1 = toRows(await query(itemSql, params))
       const prev0 = toRows(await query(itemSql, { ...params, dateFrom: ppFrom, dateTo: ppTo }))
-      const b = bridge.bridgeGP(prev0, cur1)
+      // GM/ton bridge (Mat's spec): per-unit decomposition × 1000. No volume effect (per-unit).
+      const bk = bridge.bridgeGMperKg(prev0, cur1)
+      const T = 1000
       bridgeOut = {
-        available: true, basis: 'vs prior period (item-comparable)', unit: 'php_gp',
-        prior_gp: Math.round(prev0.reduce((a, r) => a + r.gp, 0)), current_gp: Math.round(cur1.reduce((a, r) => a + r.gp, 0)),
-        volume: Math.round(b.volume), mix: Math.round(b.mix), price: Math.round(b.price),
-        cost: { total: Math.round(b.cost_total), rm: Math.round(b.cost_rm), packaging: Math.round(b.cost_pkg), feedtag: Math.round(b.cost_feedtag) },
-        delta_gp: Math.round(b.delta_gp), reconciles: Math.abs((b.volume + b.mix + b.price + b.cost_total) - b.delta_gp) < 1,
-        note: 'Phase 1: COGS shown as single bucket (rm). RM/Packaging/Feedtag split = Phase 2 (production orders).'
+        available: true, basis: 'vs prior period · ₱/ton', unit: 'php_per_ton',
+        prior_gp: Math.round((bk.gm0_perkg || 0) * T), current_gp: Math.round((bk.gm1_perkg || 0) * T),
+        price: Math.round((bk.price || 0) * T), mix: Math.round((bk.mix || 0) * T),
+        cost: { total: Math.round((bk.cost_total || 0) * T), rm: Math.round((bk.cost_rm || 0) * T), packaging: Math.round((bk.cost_pkg || 0) * T), feedtag: Math.round((bk.cost_feedtag || 0) * T) },
+        delta_gp: Math.round((bk.delta_gm_perkg || 0) * T),
+        reconciles: Math.abs(((bk.price || 0) + (bk.mix || 0) + (bk.cost_total || 0)) - (bk.delta_gm_perkg || 0)) < 0.01,
+        note: 'GM/ton bridge: Price + Mix + COGS (RM/Pkg/Feedtag). Per-unit ⇒ no volume effect. Phase 1: COGS single bucket (RM); split = Phase 2.'
       }
     }
 

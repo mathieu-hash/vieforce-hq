@@ -115,12 +115,16 @@
     // Build ordered steps. Each: { label, delta, kind }
     // kind 'anchor' = absolute bar from 0; 'delta' = floating bar.
     var cost = bridge.cost || {};
+    var perTon = bridge.unit === 'php_per_ton';
+    function fmtV(n){ if(perTon) return '₱'+Math.round(+n||0).toLocaleString()+'/t'; return money(n); }
+    function fmtD(n){ if(perTon){ var s='₱'+Math.round(Math.abs(+n||0)).toLocaleString()+'/t'; return n>0?'+'+s:(n<0?'−'+s:s);} return signedMoney(n); }
     var steps = [
-      { label: 'Prior GP', value: prior, kind: 'anchor', color: p.grey },
+      { label: perTon ? 'Prior GM/t' : 'Prior GP', value: prior, kind: 'anchor', color: p.grey },
       { label: 'Price', delta: +bridge.price || 0, kind: 'delta' },
-      { label: 'Volume', delta: +bridge.volume || 0, kind: 'delta' },
       { label: 'Mix', delta: +bridge.mix || 0, kind: 'delta' }
     ];
+    // Per-unit (GM/ton) bridge has NO volume effect; only the ₱-GP bridge shows Volume.
+    if (!perTon) steps.splice(2, 0, { label: 'Volume', delta: +bridge.volume || 0, kind: 'delta' });
 
     // COGS split — render up to three cost segments. For costs, a NEGATIVE delta
     // means cost rose (hurts GP) -> red; POSITIVE means cost fell (helps GP) -> green.
@@ -140,7 +144,7 @@
       if (c.delta !== 0 || true) steps.push({ label: c.label, delta: c.delta, kind: 'delta' });
     });
 
-    steps.push({ label: 'Current GP', value: current, kind: 'anchor', color: p.blue });
+    steps.push({ label: perTon ? 'Current GM/t' : 'Current GP', value: current, kind: 'anchor', color: p.blue });
 
     // Compute floating [base, top] ranges along a running total.
     var running = prior;
@@ -156,7 +160,7 @@
         ranges.push([0, s.value]);
         barColors.push(s.color);
         stepDeltas.push(null);
-        dataLabels.push(money(s.value));
+        dataLabels.push(fmtV(s.value));
         running = s.value; // reset running to the anchor's absolute level
       } else {
         var d = s.delta || 0;
@@ -167,7 +171,7 @@
         // Cost segments: delta sign already encodes GP impact (− = cost rose).
         barColors.push(d >= 0 ? p.green : p.red);
         stepDeltas.push(d);
-        dataLabels.push(signedMoney(d));
+        dataLabels.push(fmtD(d));
         running = end;
       }
     });
@@ -229,9 +233,9 @@
                 if (d == null) {
                   // anchor bar — show absolute
                   var r = ranges[i];
-                  return money(r[1]);
+                  return fmtV(r[1]);
                 }
-                return signedMoney(d);
+                return fmtD(d);
               }
             }
           }
@@ -243,7 +247,7 @@
             ticks: {
               color: p.text3,
               font: { size: 9 },
-              callback: function (v) { return money(v); }
+              callback: function (v) { return fmtV(v); }
             }
           },
           x: {
