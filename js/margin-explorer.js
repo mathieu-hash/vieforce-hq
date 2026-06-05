@@ -357,7 +357,7 @@
     try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
     try { renderBridge(data.bridge); } catch (e) { console.error('[MEXP] bridge:', e); }
     try { renderTrend(data.trend); }   catch (e) { console.error('[MEXP] trend:', e); }
-    try { renderMovers(data.movers, data.gap); } catch (e) { console.error('[MEXP] movers:', e); }
+    try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients); } catch (e) { console.error('[MEXP] movers:', e); }
   }
 
   function renderWindow(meta) {
@@ -487,16 +487,31 @@
     }
   }
 
-  function renderMovers(movers, gap) {
+  function renderMovers(movers, gap, ingredients) {
     var el = $('mexp-movers');
     if (!el) return;
-    var hasMovers = movers && movers.items && movers.items.length;
-    var hasGap = gap && gap.available;
-    if (!hasMovers && !hasGap) {
-      el.textContent = 'Movers & gap analysis — coming in Phase 2';
-    } else {
-      el.textContent = 'Movers & gap data available — detailed view in Phase 2';
+    // Ingredient contribution to COGS (production-cost movers vs prior period).
+    if (ingredients && ingredients.length) {
+      var m = function (n) { n = +n || 0; var s = '₱' + (Math.abs(n) / 1e6).toFixed(1) + 'M'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
+      var max = Math.max.apply(null, ingredients.map(function (i) { return Math.abs(+i.cost || 0); })) || 1;
+      var rows = ingredients.slice(0, 8).map(function (i) {
+        var w = Math.round(Math.abs(+i.cost || 0) / max * 100);
+        // delta>0 = ingredient cost rose (COGS inflation, hurts margin) → red
+        var dc = (i.delta > 0) ? 'var(--red)' : (i.delta < 0 ? 'var(--green)' : 'var(--text3)');
+        return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;margin:4px 0">' +
+          '<span style="flex:0 0 150px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (window.esc ? esc(i.name) : i.name) + '</span>' +
+          '<span style="flex:1;height:8px;background:var(--surface2,#1b2940);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:' + w + '%;background:var(--blue)"></span></span>' +
+          '<span style="flex:0 0 70px;text-align:right;font-family:var(--mono,monospace)">₱' + ((+i.cost || 0) / 1e6).toFixed(1) + 'M</span>' +
+          '<span style="flex:0 0 64px;text-align:right;color:' + dc + ';font-weight:600">' + m(i.delta) + '</span>' +
+          '</div>';
+      }).join('');
+      el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Contribution to COGS</span></div>' +
+        '<div style="font-size:9px;color:var(--text3);margin:-4px 0 6px">Production cost · Δ vs prior period (red = cost rose)</div>' + rows;
+      el.style.display = 'block';
+      return;
     }
+    var hasGap = gap && gap.available;
+    el.textContent = hasGap ? 'Gap analysis — coming in Phase 2' : 'Ingredient & gap analysis — select MTD/QTD to see ingredient contribution';
   }
 
   // Lightweight placeholder painted directly on the canvas when a renderer
