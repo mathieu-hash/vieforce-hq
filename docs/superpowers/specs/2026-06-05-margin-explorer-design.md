@@ -20,7 +20,7 @@ Each dimension can be used three ways: **Group-by** (matrix rows), **Filter** (s
 - **Brand** (`OITM.U_brands`), **Species** (`U_SPECIE`), **Sales Group** (`U_SALES_GROUP`), **Sub-Sales Group** (`U_SSG`: PIGLET/PIG/BROILER/LAYER/GAMEBIRD/PET)
 - **Customer**, **SKU**
 
-Default landing: **TBD with Mat** (BU vs Region). Drill path is re-orderable.
+**Default landing: National / All**, with **quick-filter chips for Region · BU · Customer** always visible, and **drill into Product Category** (Sales Group ▸ Sub-Sales Group). Drill path re-orderable.
 
 ## 3. Layout (top → bottom)
 1. **Topbar** — existing filters (Period 7D/MTD/QTD/YTD · As-of month · Region · Segment) **+ a new unit toggle**: `₱/kg` · `₱/ton` · `GP%` · `₱ GP` (and `revenue/kg` view).
@@ -46,13 +46,13 @@ Connection: `analytics.vienovo.ph,4444` · `Vienovo_Live` (2026) + `Vienovo_Old`
 - BU = `OCRD.GroupCode → OCRG`. Region = `INV1.OcrCode2` (Dim-2, `OOCR`; prefix L-/V-/M-). Category = OITM UDFs (`U_brands/[@OITMBRAND]`, `U_SPECIE/[@OITMSPCS]`, `U_SALES_GROUP/[@OITMSG]`, `U_SSG/[@OITMSSG]`). DSM = OSLP.
 - Freight (region net overlay, optional): GL only — `JDT1.(Debit-Credit)` by `OcrCode2` on delivery-expense accounts. Rebates: tables empty → margin is pre-rebate.
 
-### COGS decomposition (the forensic layer) — **build fresh**
-SAP stores only the *final* moving-average item cost as one number. To split it into **RM (formula) + Packaging + Feedtag** and down to **ingredient contribution**, roll up the **production BOM**:
-- Finished good → components via `OITT` (BOM header) / `ITT1` (`Father` → `Code`, `Quantity` = qty-per).
-- Component cost = `OITM.AvgPrice` (moving avg) × qty-per. Classify each component into **RM / Packaging / Feedtag** by its item group (`ItmsGrpCod`) — exact group codes to confirm live (SAP currently unreachable).
-- Per-SKU COGS = Σ component costs; **ingredient (RM) contribution** = per-ingredient `Δ(AvgPrice) × inclusion × volume`.
-- Multi-level BOMs (FG → basemix/premix → RM): recurse one level where present.
-- **Fallback:** SKUs without a maintained BOM → COGS stays the single moving-avg number, RM/Pkg/Feedtag split flagged "not available" for that SKU (no fabrication).
+### COGS decomposition (the forensic layer) — **build fresh** · SOURCE CONFIRMED LIVE 2026-06-05
+**There are NO production BOMs** (`OITT`=0). The formula/RM build-up lives in **PRODUCTION ORDERS**: `OWOR` (7,978 headers) → `WOR1` (135,130 component issues). Verified: a finished good / premix's production order issues its components (raw materials, packaging…) with `IssuedQty`.
+- Per produced item: sum `WOR1.IssuedQty × component AvgPrice` grouped by component **item group** → **RM (101 RAW MATERIALS + 102 BASEMIX) · Packaging (104) · Feedtag** (feedtag = specific item(s) within Packaging — identify by name).
+- **Confirmed item groups (OITB):** 101 RAW MATERIALS · 102 BASEMIX · 103 FINISHED GOODS · 104 PACKAGING · 105 TRADING-IMPORT.
+- **Multi-level**: premixes (e.g. "PRE-MIX VIEPRO PULLET") are themselves produced, then consumed by the finished feed's production order → explode the production tree to reach ultimate RM for ingredient contribution.
+- Link sold line (INV1 finished good) → its production order(s) → component group sums → apply the RM/Pkg/Feedtag ratio to the invoice-line moving-avg COGS. **Ingredient contribution** = per-RM-component `Δ(AvgPrice) × issued-share × volume`.
+- **Fallback:** sold items with no production order (TRADING-IMPORT 105) → COGS stays moving-avg, split flagged "n/a" (no fabrication).
 
 ### Scope-break honesty (Jan-2026 consolidation)
 0% customer-code overlap, ~98% SKU recode, region only from 2026. So **vs-LY / trailing-12-month are trustworthy only at category level** (Sales Group / Species / SSG — codes identical). At customer / SKU / region across the boundary: suppress the LY series and show a "not comparable pre-2026" note rather than a misleading year-ago number.
@@ -92,8 +92,11 @@ New endpoint **`/api/margin/explorer`** (or extend `api/margin.js`):
 - SQL smoke: totals reconcile to the existing `_margin_audit` headline (Jan–May 2026: ₱2,686M rev · 525.9M GP · 81,830 t · 19.6% · ₱6.43/kg).
 - E2E: drill Region→BU→DSM→SKU updates bridge; LY suppressed at SKU level; leaks chips filter.
 
-## 10. Open decisions (for Mat)
-1. **Default landing dimension** — BU or Region?
-2. **Phase 1 ship first** (live now) then Phase 2 BOM, or wait and ship together?
-3. Confirm the **item-group codes** for RM vs Packaging vs Feedtag once SAP is back.
-4. Keep it as the **Margin tab** replacement, or a new **"Margin Explorer"** tab alongside the current one during transition?
+## 10. Decisions (resolved by Mat 2026-06-05)
+1. **Default landing = National / All** + quick filters (Region · BU · Customer) + drill to Product Category. ✓
+2. **Build Phase 1 + Phase 2 in parallel.** ✓
+3. **New tab** — "Margin Explorer" added alongside the existing Margin tab (no replacement during transition). ✓
+4. **RM / Packaging / Feedtag classification** — propose from SAP product master (item groups / UDFs); confirm live when SAP reachable. ✓
+5. Build via **full multi-agent orchestration**. ✓
+
+**Constraint:** SAP (`analytics.vienovo.ph:4444`) is intermittently unreachable; live SQL/BOM validation is gated on it being back. Offline-buildable now: decomposition math + tests, endpoint/SQL drafts, frontend new-tab scaffold.
