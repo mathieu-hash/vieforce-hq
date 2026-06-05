@@ -5,3 +5,7 @@ node_modules
 .DS_Store
 
 .vercel
+
+_audit_snapshots/
+
+.superpowers/
