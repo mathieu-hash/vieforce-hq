@@ -52,10 +52,19 @@
 
     // Fire all 5 API calls in parallel — each is independent for graceful partial render
     var calls;
-    var _pd = (typeof PD !== 'undefined' && PD) ? PD : 'MTD';
-    var _rm = (typeof VF_REF_MONTH !== 'undefined' && VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) ? VF_REF_MONTH : undefined;
-    var _p = { period: _pd };
-    if(_rm) _p.ref_month = _rm;
+    // Topbar scope: period + ref_month + region/segment. Prefer the canonical
+    // vfApiParams() builder so the EVP page honors the same scope as desktop pages.
+    var _p;
+    if (typeof vfApiParams === 'function') {
+      _p = vfApiParams();
+    } else {
+      var _pd = (typeof PD !== 'undefined' && PD) ? PD : 'MTD';
+      var _rm = (typeof VF_REF_MONTH !== 'undefined' && VF_REF_MONTH && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) ? VF_REF_MONTH : undefined;
+      var _rg = (typeof RG !== 'undefined' && RG) ? RG : 'ALL';
+      var _seg = (typeof SEG !== 'undefined' && SEG) ? SEG : 'ALL';
+      _p = { period: _pd, region: _rg, segment: _seg };
+      if(_rm) _p.ref_month = _rm;
+    }
     try{
       calls = await Promise.all([
         (typeof getDashboardData==='function'  ? getDashboardData(_p)  : Promise.resolve(null)).catch(function(e){console.error('[EVP] dash:',e);return null}),

@@ -1820,10 +1820,6 @@ body{
             </div>
           </div>
           <div class="card">
-            <div class="card-hdr"><div><div class="card-title">Monthly Volume Trend</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Trailing 12 months <span style="color:var(--text4)">· Period chip does not apply</span></div></div></div>
-            <div class="card-body"><div class="chart-wrap chart-wrap-sm"><canvas id="salesTrendChart"></canvas></div></div>
-          </div>
-          <div class="card">
             <div class="card-hdr"><div class="card-title">BU Split · MTD</div></div>
             <div class="card-body">
               <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px">
@@ -1831,8 +1827,6 @@ body{
                 <div style="display:flex;align-items:center;gap:6px"><div style="height:20px;flex:30;background:linear-gradient(135deg,var(--green),var(--green2));border-radius:3px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800;color:#000">KA</div><span style="font-family:var(--mono);font-size:11px;font-weight:700;min-width:42px;text-align:right">4,260</span></div>
                 <div style="display:flex;align-items:center;gap:6px"><div style="height:20px;flex:15;background:linear-gradient(135deg,var(--gold),#E0A800);border-radius:3px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800;color:#000">PET</div><span style="font-family:var(--mono);font-size:11px;font-weight:700;min-width:42px;text-align:right">2,130</span></div>
               </div>
-              <div class="card-hdr" style="padding:8px 0 0"><div class="card-title">GM/Ton by Group</div></div>
-              <div style="margin-top:8px"><div class="chart-wrap" style="height:130px"><canvas id="gmGroupChart"></canvas></div></div>
             </div>
           </div>
         </div>
@@ -2211,8 +2205,8 @@ body{
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Floor</div><div class="kpi-val" style="font-size:20px" id="inv-k-floor">—</div><div class="kpi-src" id="inv-k-floor-sub">bags</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="inv-k-po">—</div><div class="kpi-src">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src" id="inv-k-prod-src">bags · OWOR + WOR1</div><div id="inv-k-prod-stale" style="display:none;margin-top:6px;padding:3px 6px;border-radius:4px;background:rgba(241,177,29,0.12);border:1px solid rgba(241,177,29,0.25);color:var(--gold);font-size:9px;font-weight:600;letter-spacing:0.3px;cursor:help" title=""></div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src">bags (floor − PO)</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src" id="inv-k-prod-src">bags · OWOR</div><div id="inv-k-prod-stale" style="display:none;margin-top:6px;padding:3px 6px;border-radius:4px;background:rgba(241,177,29,0.12);border:1px solid rgba(241,177,29,0.25);color:var(--gold);font-size:9px;font-weight:600;letter-spacing:0.3px;cursor:help" title=""></div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src">bags (on-hand − committed)</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Cover Days</div><div class="kpi-val" style="font-size:20px"><span id="inv-k-cover">—</span><span style="font-size:10px;color:var(--text3)"> d</span></div><div class="kpi-src">at current speed</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Negative Avail.</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="inv-k-neg">—</div><div class="kpi-src">plants short</div></div>
         </div>
@@ -2314,17 +2308,6 @@ body{
             <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Projected (End of Month)</div>
             <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">13,104</div>
             <div style="font-size:11px;font-weight:700;color:var(--text3)">MT at current pace</div>
-          </div>
-          <!-- Mini speed sparkline area -->
-          <div style="padding:12px 20px;display:flex;flex-direction:column;justify-content:center">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <span style="font-size:9px;color:var(--text4);font-weight:600">40K</span>
-              <span style="font-size:11px;font-weight:800;color:var(--text2);letter-spacing:0.5px">Speed</span>
-            </div>
-            <div style="height:60px;position:relative">
-              <canvas id="speedSparkline" style="width:100%;height:100%"></canvas>
-            </div>
-            <div style="font-size:9px;color:var(--text4);text-align:left">0</div>
           </div>
         </div>
 
@@ -2568,11 +2551,6 @@ body{
               </div>
             </div>
 
-            <!-- Sales & GM trend line chart -->
-            <div class="card">
-              <div class="card-hdr"><div class="card-title">Sales & GM/Ton Trend</div></div>
-              <div class="card-body"><div class="chart-wrap chart-wrap-sm"><canvas id="custSalesGmChart"></canvas></div></div>
-            </div>
           </div>
 
           <!-- Right column -->
@@ -2778,9 +2756,8 @@ body{
           </table></div></div>
         </div>
 
-        <!-- GM TREND CHART + HEATMAP -->
-        <div class="grid-2">
-          <div class="card"><div class="card-hdr"><div class="card-title">GM/Ton Trend by Region (6mo)</div></div><div class="card-body"><div class="chart-wrap"><canvas id="marginRegionChart"></canvas></div></div></div>
+        <!-- GP% HEATMAP -->
+        <div>
           <div class="card"><div class="card-hdr"><div class="card-title">GP% Heatmap — Region × Group</div></div><div class="card-body" style="padding-top:8px">
             <table class="matrix">
               <tr><th></th><th>Hogs</th><th>Poultry</th><th>Gamefowl</th><th>Specialties</th><th>Pet</th></tr>
@@ -3605,16 +3582,9 @@ body{
           <div class="card">
             <div class="card-hdr"><div class="card-title">RSM Performance Matrix — Monthly Volume (MT)</div></div>
             <div class="card-body" style="padding-top:8px">
-              <table class="matrix">
-                <tr><th style="text-align:left;min-width:160px">RSM</th><th>Nov</th><th>Dec</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr MTD</th></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">MART ESPLIGUEZ</td><td class="heat-4">3,820</td><td class="heat-4">3,640</td><td class="heat-4">3,920</td><td class="heat-3">3,480</td><td class="heat-4">4,120</td><td class="heat-2">2,203</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">JOE EYOY</td><td class="heat-3">3,240</td><td class="heat-3">3,180</td><td class="heat-3">3,420</td><td class="heat-3">3,080</td><td class="heat-3">3,540</td><td class="heat-1">1,300</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">ERIC SALAZAR</td><td class="heat-2">2,120</td><td class="heat-2">2,040</td><td class="heat-2">2,280</td><td class="heat-2">1,960</td><td class="heat-2">2,380</td><td class="heat-1">871</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">MATHIEU GUILLAUME</td><td class="heat-2">1,640</td><td class="heat-3">1,920</td><td class="heat-2">1,780</td><td class="heat-2">1,580</td><td class="heat-3">1,940</td><td class="heat-0">457</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">EDFREY BUENAVENTURA</td><td class="heat-1">1,180</td><td class="heat-2">1,240</td><td class="heat-1">1,120</td><td class="heat-1">980</td><td class="heat-1">1,140</td><td class="heat-0">563</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">CARMINDA CALDERON</td><td class="heat-1">1,080</td><td class="heat-1">920</td><td class="heat-1">1,040</td><td class="heat-1">860</td><td class="heat-1">980</td><td class="heat-0">244</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">RICHARD LAGDAAN</td><td class="heat-1">880</td><td class="heat-1">920</td><td class="heat-1">940</td><td class="heat-1">820</td><td class="heat-1">960</td><td class="heat-0">380</td></tr>
-                <tr><td style="font-weight:700;text-align:left;font-size:10px">MA LYNIE GASINGAN</td><td class="heat-0">42</td><td class="heat-0">38</td><td class="heat-0">44</td><td class="heat-0">36</td><td class="heat-0">48</td><td class="heat-0">1</td></tr>
+              <table class="matrix" id="team-matrix-tbl">
+                <thead id="team-matrix-thead"></thead>
+                <tbody id="team-matrix-tbody"><tr><td style="text-align:center;color:var(--text3);font-size:11px;padding:20px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3701,20 +3671,8 @@ body{
                 .bud-region td{background:rgba(0,174,239,0.06);font-weight:700 !important}
               </style>
               <table class="bud-tbl">
-                <tr><th></th><th class="bud-q">Q1</th><th class="bud-q">Q2</th><th class="bud-q">Q3</th><th class="bud-q">Q4</th><th class="bud-26">2026</th><th class="bud-25">2025</th><th class="bud-gr">Growth %</th></tr>
-                <tr class="bud-region"><td class="rh">Visayas</td><td class="bud-q">17,008</td><td class="bud-q">18,091</td><td class="bud-q">19,637</td><td class="bud-q">21,535</td><td class="bud-26">76,271</td><td class="bud-25">52,716</td><td class="bud-gr">45%</td></tr>
-                <tr><td class="rsub">Hogs</td><td>9,308</td><td>9,975</td><td>10,913</td><td>13,065</td><td class="bud-26">46,270</td><td class="bud-25">—</td><td class="bud-gr">61%</td></tr>
-                <tr><td class="rsub">Poultry</td><td>4,089</td><td>4,469</td><td>4,853</td><td>5,436</td><td class="bud-26">18,847</td><td class="bud-25">—</td><td class="bud-gr">25%</td></tr>
-                <tr><td class="rsub">Gamefowl</td><td>1,686</td><td>1,794</td><td>1,946</td><td>2,135</td><td class="bud-26">7,562</td><td class="bud-25">—</td><td class="bud-gr">10%</td></tr>
-                <tr class="bud-region"><td class="rh">Mindanao</td><td class="bud-q">14,844</td><td class="bud-q">16,082</td><td class="bud-q">17,210</td><td class="bud-q">16,974</td><td class="bud-26">65,110</td><td class="bud-25">46,901</td><td class="bud-gr">39%</td></tr>
-                <tr><td class="rsub">Hogs</td><td>8,578</td><td>9,293</td><td>9,906</td><td>9,848</td><td class="bud-26">37,625</td><td class="bud-25">—</td><td class="bud-gr">58%</td></tr>
-                <tr><td class="rsub">Poultry</td><td>4,218</td><td>4,786</td><td>5,123</td><td>5,052</td><td class="bud-26">19,379</td><td class="bud-25">—</td><td class="bud-gr">30%</td></tr>
-                <tr><td class="rsub">Gamefowl</td><td>1,531</td><td>1,658</td><td>1,775</td><td>1,750</td><td class="bud-26">6,714</td><td class="bud-25">—</td><td class="bud-gr">10%</td></tr>
-                <tr class="bud-region"><td class="rh">Luzon</td><td class="bud-q">11,161</td><td class="bud-q">12,063</td><td class="bud-q">11,608</td><td class="bud-q">12,054</td><td class="bud-26">46,886</td><td class="bud-25">36,901</td><td class="bud-gr">27%</td></tr>
-                <tr><td class="rsub">Hogs</td><td>7,214</td><td>7,797</td><td>7,506</td><td>7,785</td><td class="bud-26">30,302</td><td class="bud-25">—</td><td class="bud-gr">65%</td></tr>
-                <tr><td class="rsub">Poultry</td><td>2,809</td><td>3,017</td><td>2,966</td><td>3,064</td><td class="bud-26">12,656</td><td class="bud-25">—</td><td class="bud-gr">27%</td></tr>
-                <tr><td class="rsub">Gamefowl</td><td>943</td><td>989</td><td>964</td><td>988</td><td class="bud-26">3,066</td><td class="bud-25">—</td><td class="bud-gr">7%</td></tr>
-                <tr class="bud-total"><td class="rh" style="font-size:12px">TOTAL</td><td class="bud-q" style="font-weight:800">43,013</td><td class="bud-q" style="font-weight:800">46,236</td><td class="bud-q" style="font-weight:800">48,455</td><td class="bud-q" style="font-weight:800">50,563</td><td class="bud-26" style="font-size:12px">188,266</td><td class="bud-25">136,972</td><td class="bud-gr" style="font-size:12px">37.4%</td></tr>
+                <thead><tr><th></th><th class="bud-q">Q1</th><th class="bud-q">Q2</th><th class="bud-q">Q3</th><th class="bud-q">Q4</th><th class="bud-26">2026</th><th class="bud-25">2025</th><th class="bud-gr">Growth %</th></tr></thead>
+                <tbody id="bud-volume-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px;padding:20px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -3742,15 +3700,8 @@ body{
               .pl-ach-warn{color:var(--gold);font-weight:700}
             </style>
             <table class="pl-tbl">
-              <tr><th style="min-width:200px"></th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th style="color:var(--blue)">YTD Actual</th><th>YTD Budget</th><th>Ach %</th><th style="color:var(--text2)">FY 2026 Budget</th></tr>
-              <tr class="pl-row-bold"><td>Volume (MT)</td><td>14,010</td><td>12,999</td><td>14,791</td><td>15,104</td><td style="color:var(--blue)">56,904</td><td>62,604</td><td class="pl-ach-warn">91%</td><td>188,266</td></tr>
-              <tr class="pl-row-bold"><td>Net Sales</td><td>444.6M</td><td>412.5M</td><td>469.4M</td><td>479.3M</td><td style="color:var(--blue)">1,806M</td><td>1,990M</td><td class="pl-ach-warn">91%</td><td>5,975M</td></tr>
-              <tr class="pl-row-sub"><td>Net Sales / Ton</td><td>31,735</td><td>31,735</td><td>31,735</td><td>31,735</td><td style="color:var(--blue)">31,735</td><td>31,735</td><td>100%</td><td>31,735</td></tr>
-              <tr class="pl-row-bold"><td>Cost of Goods Sold</td><td>(352.8M)</td><td>(327.4M)</td><td>(372.5M)</td><td>(380.4M)</td><td style="color:var(--blue)">(1,433M)</td><td>(1,579M)</td><td class="pl-ach-good">91%</td><td>(4,741M)</td></tr>
-              <tr class="pl-row-sub"><td>COGS / Ton</td><td>(25,185)</td><td>(25,185)</td><td>(25,185)</td><td>(25,185)</td><td style="color:var(--blue)">(25,185)</td><td>(25,185)</td><td>100%</td><td>(25,185)</td></tr>
-              <tr class="pl-row-section"><td>TOTAL GROSS MARGIN</td><td>91.8M</td><td>85.1M</td><td>96.9M</td><td>98.9M</td><td style="color:var(--blue)">372.7M</td><td>411M</td><td class="pl-ach-warn">91%</td><td>1,233M</td></tr>
-              <tr class="pl-row-sub"><td>GM/Ton — Total</td><td>6,550</td><td>6,550</td><td>6,550</td><td>6,550</td><td style="color:var(--blue)">6,550</td><td>6,550</td><td>100%</td><td>6,550</td></tr>
-              <tr class="pl-row-sub"><td>GM %</td><td>20.6%</td><td>20.6%</td><td>20.6%</td><td>20.6%</td><td style="color:var(--blue)">20.6%</td><td>20.6%</td><td>100%</td><td>20.6%</td></tr>
+              <thead id="bud-pl-thead"></thead>
+              <tbody id="bud-pl-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text3);font-size:11px;padding:20px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -3774,12 +3725,8 @@ body{
             <div class="card-hdr"><div class="card-title">GM Achievement by Region</div></div>
             <div class="card-body" style="padding-top:8px">
               <table class="tbl">
-                <tr><th>Region</th><th class="num">GM Actual</th><th class="num">GM Budget</th><th class="num">Ach %</th><th class="num">GM/Ton</th></tr>
-                <tr><td style="font-weight:700">VISAYAS</td><td class="num">₱122M</td><td class="num">₱134M</td><td class="num" style="color:var(--green);font-weight:700">91%</td><td class="num">₱5,210</td></tr>
-                <tr><td style="font-weight:700">MINDANAO</td><td class="num">₱66M</td><td class="num">₱88M</td><td class="num" style="color:var(--red);font-weight:700">75%</td><td class="num" style="color:var(--red)">₱3,500</td></tr>
-                <tr><td style="font-weight:700">LUZON</td><td class="num">₱70M</td><td class="num">₱74M</td><td class="num" style="color:var(--green);font-weight:700">95%</td><td class="num" style="color:var(--green)">₱5,890</td></tr>
-                <tr><td style="font-weight:700">PET CARE</td><td class="num">₱2.0M</td><td class="num">₱1.8M</td><td class="num" style="color:var(--green);font-weight:700">111%</td><td class="num" style="color:var(--green)">₱12,640</td></tr>
-                <tr class="total"><td style="font-weight:800">TOTAL</td><td class="num" style="font-weight:800">₱260M</td><td class="num" style="font-weight:800">₱298M</td><td class="num" style="font-weight:800;color:var(--gold)">87%</td><td class="num" style="font-weight:800">₱6,550</td></tr>
+                <thead><tr><th>Region</th><th class="num">GM Actual</th><th class="num">GM Budget</th><th class="num">Ach %</th><th class="num">GM/Ton</th></tr></thead>
+                <tbody id="bud-gm-region-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -5200,7 +5147,7 @@ function renderInv(){
                        : (prod.on_production_mt != null ? prod.on_production_mt : s.on_production_mt);
   sett('inv-k-prod', prodVal != null ? (fcn(Math.round(prodVal)) + (isBags ? '' : ' MT')) : '—');
   var prodSrc = sel('inv-k-prod-src');
-  if(prodSrc) prodSrc.textContent = (isBags ? 'bags' : 'MT') + ' · OWOR + WOR1';
+  if(prodSrc) prodSrc.textContent = (isBags ? 'bags' : 'MT') + ' · OWOR';
   var staleEl = sel('inv-k-prod-stale');
   if(staleEl){
     if(prod.stale_wo_count > 0){
@@ -5276,9 +5223,9 @@ function renderInv(){
     var totOHg=0, totPOg=0, totCMg=0, totAVg=0;
     var ghtml = d.by_sales_group.map(function(g){
       var onHand = isBags ? g.on_hand_bags : g.on_hand_mt;
-      var po     = isBags ? g.on_order_bags : (g.on_hand_mt*0);  // MT form doesn't have on_order — keep bags
-      var com    = isBags ? g.committed_bags : 0;
-      var avail  = isBags ? g.available_bags : 0;
+      var po     = isBags ? g.on_order_bags : g.on_order_mt;
+      var com    = isBags ? g.committed_bags : g.committed_mt;
+      var avail  = isBags ? g.available_bags : g.available_mt;
       totOHg+=onHand||0; totPOg+=po||0; totCMg+=com||0; totAVg+=avail||0;
       var availSty = avail < 0 ? 'class="inv-neg"' : (avail > 0 ? 'style="color:var(--green)"' : '');
       return '<tr><td>'+esc((g.group_name||'').toUpperCase())+'</td>'
@@ -6998,9 +6945,34 @@ async function loadTeam(){
       if(hbadge) hbadge.textContent = totSilent+' silent · '+totNeg+' neg. margin';
     }
 
-    // Performance matrix — logged, keep prototype
-    if(d.performance_matrix){
-      console.log('[TEAM] Performance matrix: '+((d.performance_matrix.months||[]).length)+' months × '+((d.performance_matrix.rsms||[]).length)+' RSMs');
+    // Performance matrix — RSM × month heat grid (#9 orphaned data)
+    if(d.performance_matrix && d.performance_matrix.grid){
+      var pm = d.performance_matrix;
+      var months = pm.months || [];
+      var pmRsms = pm.rsms || [];
+      var grid = pm.grid || [];
+      // Global max across the grid drives heat bucketing (heat-0..heat-4)
+      var gMax = 0;
+      grid.forEach(function(row){ (row||[]).forEach(function(v){ if((v||0)>gMax) gMax=v||0; }); });
+      function heatCls(v){
+        if(!v || gMax<=0) return 'heat-0';
+        var r = v/gMax;
+        return r>=0.8?'heat-4' : r>=0.6?'heat-3' : r>=0.4?'heat-2' : r>=0.2?'heat-1' : 'heat-0';
+      }
+      var thead = '<tr><th style="text-align:left;min-width:160px">RSM</th>';
+      months.forEach(function(m){ thead += '<th>'+esc(m)+'</th>'; });
+      thead += '</tr>';
+      seth('team-matrix-thead', thead);
+      var mhtml='';
+      pmRsms.forEach(function(name,ri){
+        mhtml += '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc((name||'').toUpperCase())+'</td>';
+        (grid[ri]||[]).forEach(function(v){
+          mhtml += '<td class="'+heatCls(v)+'">'+fcn(Math.round(v||0))+'</td>';
+        });
+        mhtml += '</tr>';
+      });
+      if(!mhtml) mhtml = '<tr><td colspan="'+(months.length+1)+'" style="text-align:center;color:var(--text3);font-size:11px;padding:20px">No matrix data</td></tr>';
+      seth('team-matrix-tbody', mhtml);
     }
     pulseRefresh('pg-team');
   } catch(e) { console.error('Team:', e); showError('pg-team','Unable to load team data'); }
@@ -7072,9 +7044,92 @@ async function loadBudget(){
       rhtml+='<td class="num" style="font-weight:800">'+fcn(Math.round(totFy))+'</td></tr>';
       seth('bud-region-tbody', rhtml);
     }
-    // P&L summary — logged (table is complex prototype-bound)
-    if(d.pl_summary){
-      console.log('[BUDGET] P&L summary: '+((d.pl_summary.months||[]).length)+' months — prototype table retained');
+    // Budgeted Volume table (#9 orphaned data) — region groups + sub-rows + total
+    if(d.budgeted_volume && d.budgeted_volume.regions){
+      var bv = d.budgeted_volume;
+      function bvNum(v){ return v==null?'—':fcn(Math.round(v)); }
+      function bvGrowth(v){ return v==null?'—':(Math.round(v)+'%'); }
+      var bvhtml='';
+      bv.regions.forEach(function(r){
+        bvhtml += '<tr class="bud-region"><td class="rh">'+esc(r.region)+'</td>'
+          + '<td class="bud-q">'+bvNum(r.q1)+'</td><td class="bud-q">'+bvNum(r.q2)+'</td>'
+          + '<td class="bud-q">'+bvNum(r.q3)+'</td><td class="bud-q">'+bvNum(r.q4)+'</td>'
+          + '<td class="bud-26">'+bvNum(r.fy26)+'</td><td class="bud-25">'+bvNum(r.fy25)+'</td>'
+          + '<td class="bud-gr">'+bvGrowth(r.growth_pct)+'</td></tr>';
+        (r.sub_rows||[]).forEach(function(s){
+          bvhtml += '<tr><td class="rsub">'+esc(s.name)+'</td>'
+            + '<td>'+bvNum(s.q1)+'</td><td>'+bvNum(s.q2)+'</td>'
+            + '<td>'+bvNum(s.q3)+'</td><td>'+bvNum(s.q4)+'</td>'
+            + '<td class="bud-26">'+bvNum(s.fy26)+'</td><td class="bud-25">—</td>'
+            + '<td class="bud-gr">'+bvGrowth(s.growth_pct)+'</td></tr>';
+        });
+      });
+      if(bv.total){
+        var t=bv.total;
+        bvhtml += '<tr class="bud-total"><td class="rh" style="font-size:12px">TOTAL</td>'
+          + '<td class="bud-q" style="font-weight:800">'+bvNum(t.q1)+'</td><td class="bud-q" style="font-weight:800">'+bvNum(t.q2)+'</td>'
+          + '<td class="bud-q" style="font-weight:800">'+bvNum(t.q3)+'</td><td class="bud-q" style="font-weight:800">'+bvNum(t.q4)+'</td>'
+          + '<td class="bud-26" style="font-size:12px">'+bvNum(t.fy26)+'</td><td class="bud-25">'+bvNum(t.fy25)+'</td>'
+          + '<td class="bud-gr" style="font-size:12px">'+bvGrowth(t.growth_pct)+'</td></tr>';
+      }
+      seth('bud-volume-tbody', bvhtml);
+    }
+
+    // Sales P&L table (#9 orphaned data) — render from pl_summary.rows
+    if(d.pl_summary && d.pl_summary.rows){
+      var pl = d.pl_summary;
+      var plMonths = pl.months || [];
+      function plFmt(v, isVol){
+        if(v==null) return '—';
+        if(isVol) return fcn(Math.round(v));
+        var neg = v<0; var a=Math.abs(v);
+        var s = a>=1e6 ? (a/1e6).toFixed(1)+'M' : a>=1e3 ? (a/1e3).toFixed(0)+'K' : fcn(Math.round(a));
+        return neg ? '('+s+')' : s;
+      }
+      var plThead = '<tr><th style="min-width:200px"></th>';
+      plMonths.forEach(function(m){ plThead += '<th>'+esc(m)+'</th>'; });
+      plThead += '<th style="color:var(--blue)">YTD Actual</th><th>YTD Budget</th><th>Ach %</th><th style="color:var(--text2)">FY 2026 Budget</th></tr>';
+      seth('bud-pl-thead', plThead);
+      var plhtml='';
+      pl.rows.forEach(function(row){
+        var isVol = /volume/i.test(row.label||'');
+        var isGM  = /gross\s*margin/i.test(row.label||'');
+        var rowCls = isGM ? 'pl-row-section' : 'pl-row-bold';
+        var ach = row.ach_pct!=null?row.ach_pct:null;
+        var achCls = ach==null?'' : ach>=95?'pl-ach-good' : ach>=80?'pl-ach-warn' : 'pl-ach-bad';
+        plhtml += '<tr class="'+rowCls+'"><td>'+esc(row.label)+'</td>';
+        (row.values||[]).forEach(function(v){ plhtml += '<td>'+plFmt(v,isVol)+'</td>'; });
+        plhtml += '<td style="color:var(--blue)">'+plFmt(row.ytd_actual,isVol)+'</td>';
+        plhtml += '<td>'+plFmt(row.ytd_budget,isVol)+'</td>';
+        plhtml += '<td class="'+achCls+'">'+(ach==null?'—':Math.round(ach)+'%')+'</td>';
+        plhtml += '<td>'+plFmt(row.fy_budget,isVol)+'</td></tr>';
+      });
+      seth('bud-pl-tbody', plhtml);
+    }
+
+    // GM Achievement by Region table (#9 orphaned data)
+    if(d.gm_by_region && d.gm_by_region.length){
+      function gmM(v){ return v==null?'—':'₱'+(Math.abs(v)>=1e6?(v/1e6).toFixed(0)+'M':fcn(Math.round(v))); }
+      var gmhtml='';
+      var gtAct=0, gtBud=0, gtVol=0;
+      d.gm_by_region.forEach(function(r){
+        var ach = r.ach_pct!=null?r.ach_pct:0;
+        var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
+        var gmtCol = (r.gm_ton||0)>=5000?'var(--green)' : (r.gm_ton||0)>=4000?'var(--text)' : 'var(--red)';
+        gmhtml += '<tr><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>';
+        gmhtml += '<td class="num">'+gmM(r.gm_actual)+'</td>';
+        gmhtml += '<td class="num">'+gmM(r.gm_budget)+'</td>';
+        gmhtml += '<td class="num" style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
+        gmhtml += '<td class="num" style="color:'+gmtCol+'">₱'+fcn(Math.round(r.gm_ton||0))+'</td></tr>';
+        gtAct+=(+r.gm_actual||0); gtBud+=(+r.gm_budget||0);
+      });
+      var gtAch = gtBud>0 ? gtAct/gtBud*100 : 0;
+      gmhtml += '<tr class="total"><td style="font-weight:800">TOTAL</td>';
+      gmhtml += '<td class="num" style="font-weight:800">'+gmM(gtAct)+'</td>';
+      gmhtml += '<td class="num" style="font-weight:800">'+gmM(gtBud)+'</td>';
+      gmhtml += '<td class="num" style="font-weight:800;color:var(--gold)">'+gtAch.toFixed(0)+'%</td>';
+      gmhtml += '<td class="num"></td></tr>';
+      seth('bud-gm-region-tbody', gmhtml);
     }
     pulseRefresh('pg-budget');
   } catch(e) { console.error('Budget:', e); showError('pg-budget','Unable to load budget data'); }

@@ -24,6 +24,7 @@ const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 const { classify, FAMILIES } = require('./lib/brand-family')
 const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
+const { resolveRefMonthAnchor } = require('./lib/shipping_days')
 
 const REGION_CASE = `
   CASE
@@ -60,7 +61,13 @@ module.exports = async (req, res) => {
   const region = normalizeRegion(req.query.region)
   const bu     = normalizeSegment(req.query.bu || req.query.segment)
 
-  const cacheKey = `analytics_sku_matrix_${unit}_${region}_${bu}_${session.role}`
+  // Anchor the trailing-12M window to ?ref_month=YYYY-MM (defaults to live "today").
+  const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
+  const refMonthKey = /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
+  const refAnchor = resolveRefMonthAnchor(refMonthKey === 'live' ? '' : refMonthKey)
+
+  // Cache key includes ref_month + session.id so distinct anchors/users never share.
+  const cacheKey = `analytics_sku_matrix_${unit}_${region}_${bu}_${session.role}_${session.id}_${refMonthKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -82,15 +89,17 @@ module.exports = async (req, res) => {
       INNER JOIN OITM I  ON I.ItemCode = T1.ItemCode
       WHERE T0.CANCELED = 'N'
         AND UPPER(T1.ItemCode) LIKE 'FG%'
-        AND T0.DocDate >= DATEADD(MONTH, -12, GETDATE())
+        AND T0.DocDate >= DATEADD(MONTH, -12, @refAnchor)
+        AND T0.DocDate <= @refAnchor
       GROUP BY T0.CardCode, T1.Dscription, ${REGION_CASE}
     `
 
     // 12-month window crosses 2026-01-01 cutoff. Run on each pool explicitly
     // so we can re-key historical CardCodes (CL00xxx → CA000xxx) before merging.
+    const sqlParams = { refAnchor }
     const [curRows, histRows] = await Promise.all([
-      query(SQL).catch(e => { console.warn('[sku-matrix] current failed:', e.message); return [] }),
-      queryH(SQL).catch(e => { console.warn('[sku-matrix] historical failed:', e.message); return [] })
+      query(SQL, sqlParams).catch(e => { console.warn('[sku-matrix] current failed:', e.message); return [] }),
+      queryH(SQL, sqlParams).catch(e => { console.warn('[sku-matrix] historical failed:', e.message); return [] })
     ])
     const histKeyed = await rekeyHistoricalRows(histRows, 'CardCode').catch(() => [])
     const merged = [...curRows, ...histKeyed]
@@ -215,6 +224,8 @@ module.exports = async (req, res) => {
         unit, region, bu,
         applied_filters: filterMeta(region, bu),
         period: 'Trailing 12 months',
+        ref_month: refMonthKey,
+        window_end: refAnchor.toISOString(),
         generated_at: new Date().toISOString(),
         total_customers_in_filter: customers.length,
         source: { volume: 'OINV trailing 12 months', region: 'dominant invoice warehouse' },

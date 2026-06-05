@@ -2,68 +2,14 @@ const { query, queryH } = require('./_db')
 const { verifySession, applyRoleFilter, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
 const { countShippingDays, getPeriodEndBound, resolveRefMonthAnchor } = require('./lib/shipping_days')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql } = require('./lib/business_filters')
 
-// FY2026 Budget — from Sales Volume Budget 2026 Excel
-const BUDGET = {
-  fy_target_mt: 188266,
-  fy_target_sales: 5975000000,  // ₱5.975B
-  fy_target_gm: 1233000000,    // ₱1.233B
-  net_sales_per_ton: 31735,
-  cogs_per_ton: 25185,
-  gm_per_ton: 6550,
-  gm_pct: 20.6,
-
-  // Monthly budget in MT (Jan-Dec)
-  monthly: [14010, 12999, 14791, 15334, 15536, 15005, 16735, 16247, 17097, 18391, 17211, 16981],
-
-  // Quarterly
-  quarterly: [41800, 45875, 50079, 52572],
-
-  // Regional breakdown
-  regions: {
-    Visayas: {
-      fy26: 76271, fy25: 52716, growth_pct: 45,
-      quarterly: [17008, 18091, 19637, 21535],
-      sub: [
-        { name: 'Hogs', quarterly: [9308, 9975, 10913, 13065], fy26: 46270, growth_pct: 61 },
-        { name: 'Poultry', quarterly: [4089, 4469, 4853, 5436], fy26: 18847, growth_pct: 25 },
-        { name: 'Gamefowl', quarterly: [1686, 1794, 1946, 2135], fy26: 7562, growth_pct: 10 }
-      ]
-    },
-    Mindanao: {
-      fy26: 65110, fy25: 46901, growth_pct: 39,
-      quarterly: [14844, 16082, 17210, 16974],
-      sub: [
-        { name: 'Hogs', quarterly: [8578, 9293, 9906, 9848], fy26: 37625, growth_pct: 58 },
-        { name: 'Poultry', quarterly: [4218, 4786, 5123, 5052], fy26: 19379, growth_pct: 30 },
-        { name: 'Gamefowl', quarterly: [1531, 1658, 1775, 1750], fy26: 6714, growth_pct: 10 }
-      ]
-    },
-    Luzon: {
-      fy26: 46886, fy25: 36901, growth_pct: 27,
-      quarterly: [11161, 12063, 11608, 12054],
-      sub: [
-        { name: 'Hogs', quarterly: [7214, 7797, 7506, 7785], fy26: 30302, growth_pct: 65 },
-        { name: 'Poultry', quarterly: [2809, 3017, 2966, 3064], fy26: 12656, growth_pct: 27 },
-        { name: 'Gamefowl', quarterly: [943, 989, 964, 988], fy26: 3066, growth_pct: 7 }
-      ]
-    }
-  },
-
-  // Volume history (K MT) 2017-2026
-  volume_history: [
-    { year: 2017, volume_k: 4 },
-    { year: 2018, volume_k: 25 },
-    { year: 2019, volume_k: 68 },
-    { year: 2020, volume_k: 80 },
-    { year: 2021, volume_k: 70 },
-    { year: 2022, volume_k: 90 },
-    { year: 2023, volume_k: 90 },
-    { year: 2024, volume_k: 110 },
-    { year: 2025, volume_k: 136 },
-    { year: 2026, volume_k: 188 }
-  ]
-}
+// FY2026 Budget — single source of truth in api/lib/budget_2026.js.
+// This endpoint formerly held its own duplicated copy; consuming the shared
+// module eliminates drift (e.g. the previously divergent April figure now always
+// trusts budget_2026). All fields used below (fy_target_*, *_per_ton, monthly,
+// quarterly, regions, volume_history) live in that module.
+const { BUDGET } = require('./lib/budget_2026')
 
 module.exports = async (req, res) => {
   // CORS
@@ -80,8 +26,16 @@ module.exports = async (req, res) => {
   const refMonthRaw = typeof req.query.ref_month === 'string' ? req.query.ref_month.trim() : ''
   const refMonthKey = /^\d{4}-\d{2}$/.test(refMonthRaw) ? refMonthRaw : 'live'
 
-  // Cache check
-  const cacheKey = `budget_v2_${session.role}_${session.region || 'ALL'}_${period}_${refMonthKey}`
+  // Optional commercial filters (region = shipping warehouse, segment = DIST/KA/PET).
+  // These narrow the SAP actuals only; budgeted figures stay full-scope because the
+  // FY2026 budget is not broken down by segment and its regional split is its own
+  // (warehouse) basis. Honored on top of the session role filter.
+  const region = normalizeRegion(req.query.region)
+  const segment = normalizeSegment(req.query.segment || req.query.bu)
+
+  // Cache check — keyed by session role/region AND the requested region/segment so a
+  // narrowed query never returns another scope's cached payload.
+  const cacheKey = `budget_v2_${session.role}_${session.region || 'ALL'}_${region}_${segment}_${period}_${refMonthKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -104,7 +58,10 @@ module.exports = async (req, res) => {
     const budgetPacingGm = BUDGET.fy_target_gm * pacingRatio
 
     const baseWhere = `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED = 'N'`
-    const filteredWhere = applyRoleFilter(session, baseWhere)
+    // Layer: role scope first, then optional region (T1.WhsCode) + segment (T0.CardName/SlpCode).
+    const commercialFilter = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
+    const filteredWhere = applyRoleFilter(session, baseWhere) + commercialFilter
+    const sqlParams = region !== 'ALL' ? { region } : {}
 
     // --- Period Actual from SAP ---
     const periodActual = await query(`
@@ -116,7 +73,7 @@ module.exports = async (req, res) => {
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, ...sqlParams })
 
     // --- LY same-period actual ---
     const lyFrom = new Date(dateFrom)
@@ -164,7 +121,7 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY MONTH(T0.DocDate), FORMAT(T0.DocDate, 'MMM')
       ORDER BY month_num ASC
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, ...sqlParams })
 
     // --- Actual by region (YTD, approximate via warehouse) ---
     const regionActual = await query(`
@@ -189,7 +146,7 @@ module.exports = async (req, res) => {
           WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
           ELSE 'Other'
         END
-    `, { dateFrom, dateTo })
+    `, { dateFrom, dateTo, ...sqlParams })
 
     // Build results
     const actual = periodActual[0] || { actual_vol: 0, actual_sales: 0, actual_gm: 0 }

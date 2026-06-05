@@ -75,6 +75,24 @@
     { v: 'gp_pct', l: 'GP%' },
     { v: 'gp',   l: '₱ GP' }
   ];
+  var PERIODS = [
+    { v: '7D',  l: '7D' },
+    { v: 'MTD', l: 'MTD' },
+    { v: 'QTD', l: 'QTD' },
+    { v: 'YTD', l: 'YTD' }
+  ];
+  // Build "As of" options: Live + trailing 18 months as YYYY-MM.
+  function asOfOptions() {
+    var out = [{ v: 'live', l: 'Live' }];
+    var now = new Date();
+    for (var i = 0; i < 18; i++) {
+      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+      var lab = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+      out.push({ v: key, l: lab });
+    }
+    return out;
+  }
   var GROUP_BYS = [
     { v: 'bu',          l: 'BU' },
     { v: 'region',      l: 'Region' },
@@ -144,6 +162,15 @@
     }).join('');
   }
 
+  function asOfSelect() {
+    var cur = STATE.ref_month || 'live';
+    var opts = asOfOptions().map(function (o) {
+      var sel = (o.v === cur) ? ' selected' : '';
+      return '<option value="' + _esc(o.v) + '"' + sel + '>' + _esc(o.l) + '</option>';
+    }).join('');
+    return '<select id="mexp-asof" class="mexp-search" style="min-width:120px">' + opts + '</select>';
+  }
+
   function groupBySelect() {
     var opts = GROUP_BYS.map(function (g) {
       var sel = (g.v === STATE.group_by) ? ' selected' : '';
@@ -164,6 +191,15 @@
             '<div class="mexp-sub" id="mexp-window">Loading window…</div>' +
           '</div>' +
           '<button class="mexp-clear" id="mexp-clear">Clear filters</button>' +
+        '</div>' +
+
+        // ---- period control row (tab-owned; no longer depends on global topbar) ----
+        '<div class="mexp-filters">' +
+          '<div class="mexp-fgroup"><span class="mexp-flabel">Period</span>' +
+            chipRow('period', PERIODS, STATE.period) + '</div>' +
+          '<div class="mexp-divider"></div>' +
+          '<div class="mexp-fgroup"><span class="mexp-flabel">As of</span>' +
+            asOfSelect() + '</div>' +
         '</div>' +
 
         // ---- quick-filter bar ----
@@ -250,6 +286,13 @@
       fetchAndRender();
     });
 
+    var asof = $('mexp-asof');
+    if (asof) asof.addEventListener('change', function () {
+      // 'live' clears ref_month so the API anchors on real today.
+      STATE.ref_month = (asof.value && asof.value !== 'live') ? asof.value : undefined;
+      fetchAndRender();
+    });
+
     var cust = $('mexp-customer');
     if (cust) {
       var t = null;
@@ -282,6 +325,13 @@
       STATE.unit = val;
       setChipActive('unit', val);
       renderMatrixOnly();
+      return;
+    }
+    if (group === 'period') {
+      if (STATE.period === val) return;
+      STATE.period = val;
+      setChipActive('period', val);
+      fetchAndRender();
       return;
     }
     if (group === 'region') { STATE.region = val; setChipActive('region', val); }
@@ -357,7 +407,7 @@
     try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
     try { renderBridge(data.bridge); } catch (e) { console.error('[MEXP] bridge:', e); }
     try { renderTrend(data.trend); }   catch (e) { console.error('[MEXP] trend:', e); }
-    try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients); } catch (e) { console.error('[MEXP] movers:', e); }
+    try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
   }
 
   function renderWindow(meta) {
@@ -487,31 +537,36 @@
     }
   }
 
-  function renderMovers(movers, gap, ingredients) {
+  function renderMovers(movers, gap, ingredients, ingMeta) {
     var el = $('mexp-movers');
     if (!el) return;
-    // Ingredient contribution to COGS (production-cost movers vs prior period).
+    // Ingredient contribution PER TON of feed (price + inclusion), Δ vs prior period.
     if (ingredients && ingredients.length) {
-      var m = function (n) { n = +n || 0; var s = '₱' + (Math.abs(n) / 1e6).toFixed(1) + 'M'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
-      var max = Math.max.apply(null, ingredients.map(function (i) { return Math.abs(+i.cost || 0); })) || 1;
-      var rows = ingredients.slice(0, 8).map(function (i) {
-        var w = Math.round(Math.abs(+i.cost || 0) / max * 100);
-        // delta>0 = ingredient cost rose (COGS inflation, hurts margin) → red
-        var dc = (i.delta > 0) ? 'var(--red)' : (i.delta < 0 ? 'var(--green)' : 'var(--text3)');
+      // ₱/t signed for deltas, plain ₱/t for level.
+      var pt  = function (n) { return '₱' + (Math.round((+n || 0) * 10) / 10).toLocaleString() + '/t'; };
+      var ptD = function (n) { n = +n || 0; var s = '₱' + (Math.round(Math.abs(n) * 10) / 10).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
+      var max = Math.max.apply(null, ingredients.map(function (i) { return Math.abs(+i.perton_cost || 0); })) || 1;
+      var rows = ingredients.slice(0, 12).map(function (i) {
+        var w = Math.round(Math.abs(+i.perton_cost || 0) / max * 100);
+        // perton_delta>0 = ingredient cost per ton ROSE (hurts margin) → red
+        var dc = (i.perton_delta > 0) ? 'var(--red)' : (i.perton_delta < 0 ? 'var(--green)' : 'var(--text3)');
         return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;margin:4px 0">' +
-          '<span style="flex:0 0 150px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (window.esc ? esc(i.name) : i.name) + '</span>' +
+          '<span style="flex:0 0 130px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (window.esc ? esc(i.name) : i.name) + '</span>' +
           '<span style="flex:1;height:8px;background:var(--surface2,#1b2940);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:' + w + '%;background:var(--blue)"></span></span>' +
-          '<span style="flex:0 0 70px;text-align:right;font-family:var(--mono,monospace)">₱' + ((+i.cost || 0) / 1e6).toFixed(1) + 'M</span>' +
-          '<span style="flex:0 0 64px;text-align:right;color:' + dc + ';font-weight:600">' + m(i.delta) + '</span>' +
+          '<span style="flex:0 0 78px;text-align:right;font-family:var(--mono,monospace)">' + pt(i.perton_cost) + '</span>' +
+          '<span style="flex:0 0 78px;text-align:right;color:' + dc + ';font-weight:600">Δ ' + ptD(i.perton_delta) + '</span>' +
           '</div>';
       }).join('');
-      el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Contribution to COGS</span></div>' +
-        '<div style="font-size:9px;color:var(--text3);margin:-4px 0 6px">Production cost · Δ vs prior period (red = cost rose)</div>' + rows;
+      var sub = (ingMeta && ingMeta.note)
+        ? esc(ingMeta.note)
+        : 'Per-ton ingredient cost · Δ vs prior period (red = cost rose)';
+      el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Cost / Ton of Feed</span></div>' +
+        '<div style="font-size:9px;color:var(--text3);margin:-4px 0 6px;line-height:1.4">' + sub + '</div>' + rows;
       el.style.display = 'block';
       return;
     }
     var hasGap = gap && gap.available;
-    el.textContent = hasGap ? 'Gap analysis — coming in Phase 2' : 'Ingredient & gap analysis — select MTD/QTD to see ingredient contribution';
+    el.textContent = hasGap ? 'Gap analysis — coming in Phase 2' : 'Ingredient & gap analysis — select MTD/QTD to see per-ton ingredient cost';
   }
 
   // Lightweight placeholder painted directly on the canvas when a renderer
@@ -536,12 +591,14 @@
   // PUBLIC ENTRY
   // =========================================================================
   window.loadMarginExplorer = function loadMarginExplorer() {
-    // Pick up any globally-changed period/ref_month on each entry.
-    if (typeof window.PD === 'string' && window.PD) STATE.period = window.PD;
-    if (typeof window.VF_REF_MONTH === 'string' && /^\d{4}-\d{2}$/.test(window.VF_REF_MONTH)) {
-      STATE.ref_month = window.VF_REF_MONTH;
-    }
     if (!built) {
+      // Seed the INITIAL default from the global topbar only on first build.
+      // After that the tab owns its own Period / As-of controls and no longer
+      // tracks the global topbar (so it works without the user setting it).
+      if (typeof window.PD === 'string' && window.PD) STATE.period = window.PD;
+      if (typeof window.VF_REF_MONTH === 'string' && /^\d{4}-\d{2}$/.test(window.VF_REF_MONTH)) {
+        STATE.ref_month = window.VF_REF_MONTH;
+      }
       built = buildSkeleton();
       if (!built) return;
     }

@@ -58,18 +58,38 @@
     });
   };
 
+  // Build {period, ref_month} from globals (PD / VF_REF_MONTH) so the DSM
+  // dashboard honors the topbar period + ref-month scope. Mirrors vfApiParams()
+  // but keeps only the params api/dsm-home.js reads.
+  function dsmParams(){
+    if (typeof vfApiParams === 'function'){
+      var p = vfApiParams();
+      var out = { period: p.period || 'MTD' };
+      if (p.ref_month) out.ref_month = p.ref_month;
+      return out;
+    }
+    var period = (typeof PD !== 'undefined' && PD) ? PD : 'MTD';
+    var out = { period: period };
+    if (typeof VF_REF_MONTH === 'string' && /^\d{4}-\d{2}$/.test(VF_REF_MONTH)) out.ref_month = VF_REF_MONTH;
+    return out;
+  }
+
   // ===== Main loader =====
   window.loadDsmHome = async function loadDsmHome(){
     var page = document.getElementById('pg-dsm-home');
     if (!page) return;
     try {
       if (!window.DC) window.DC = {};
-      if (!DC['pg-dsm-home']){
-        DC['pg-dsm-home'] = await getDsmHome().catch(function(e){
+      // Cache key includes period + ref_month so changing the topbar scope
+      // re-fetches instead of serving the previous period's data.
+      var p = dsmParams();
+      var ckey = 'pg-dsm-home::' + p.period + '::' + (p.ref_month || 'live');
+      if (!DC[ckey]){
+        DC[ckey] = await apiFetch('dsm/home', p).catch(function(e){
           console.error('[dsm] fetch failed:', e); return null;
         });
       }
-      var d = DC['pg-dsm-home'];
+      var d = DC[ckey];
       if (!d) {
         renderEmpty('Unable to load DSM data — retry or contact admin.');
         return;
