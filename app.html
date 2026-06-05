@@ -7197,6 +7197,18 @@ async function loadItemized(){
     }
     // Mapping flag (Phase 1)
     document.getElementById('itm-mapping-flag').style.display = d.district_mapping_pending ? '' : 'none';
+    // Auto-hide LY columns when 2025 data is absent (avoids a wall of '—' across the matrix)
+    var lyChk = document.getElementById('itm-show-ly');
+    var hasLY = !!(d.district_total && (Number(d.district_total.total_mt_ly) || 0) > 0);
+    if (lyChk){
+      var lbl = lyChk.closest('label');
+      if (!hasLY){
+        lyChk.checked = false; lyChk.disabled = true;
+        if (lbl && !lbl.querySelector('.itm-noly')){ var s=document.createElement('span'); s.className='itm-noly'; s.style.cssText='font-size:9px;color:var(--text3);margin-left:4px'; s.textContent='(no 2025 data)'; lbl.appendChild(s); }
+      } else {
+        lyChk.disabled = false; var n = lbl && lbl.querySelector('.itm-noly'); if (n) n.remove();
+      }
+    }
     // Render table
     renderItemized();
     pulseRefresh('pg-itemized');
