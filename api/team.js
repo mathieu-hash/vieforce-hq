@@ -150,7 +150,14 @@ module.exports = async (req, res) => {
     // 2. RSM ROSTER — discover RSMs from OSLP.U_rsm self-references
     // ───────────────────────────────────────────────────────────────────────
     const rsmRows = await query(`
-      SELECT R.SlpCode AS rsm_code, R.SlpName AS rsm_name
+      SELECT R.SlpCode AS rsm_code, R.SlpName AS rsm_name,
+        -- dominant sales region of the RSM's territory (OcrCode2 L-/V-/M-), for hero region-match.
+        -- OSLP.Memo holds the rep name (not a region), so derive region from actual shipments.
+        (SELECT TOP 1 CASE WHEN T1.OcrCode2 LIKE 'L-%' THEN 'Luzon' WHEN T1.OcrCode2 LIKE 'V-%' THEN 'Visayas' WHEN T1.OcrCode2 LIKE 'M-%' THEN 'Mindanao' ELSE 'Other' END
+         FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+         WHERE T0.SlpCode IN (SELECT S2.SlpCode FROM OSLP S2 WHERE S2.U_rsm = R.SlpCode) AND T0.CANCELED = 'N'
+         GROUP BY CASE WHEN T1.OcrCode2 LIKE 'L-%' THEN 'Luzon' WHEN T1.OcrCode2 LIKE 'V-%' THEN 'Visayas' WHEN T1.OcrCode2 LIKE 'M-%' THEN 'Mindanao' ELSE 'Other' END
+         ORDER BY SUM(T1.InvQty) DESC) AS dom_region
       FROM OSLP R
       WHERE R.Active = 'Y'
         AND R.SlpCode = R.U_rsm   -- self-pointer = is_an_RSM
@@ -600,6 +607,7 @@ module.exports = async (req, res) => {
       return {
         slp_code:  rc,
         name:      r.rsm_name,
+        region:    r.dom_region || 'Other',
         ytd_vol:   Math.round(ytdVolR),
         ytd_revenue: Math.round(ytdRevR),
         ytd_target: 0,            // FLAG: real RSM-level budgets not in SAP

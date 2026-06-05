@@ -134,7 +134,7 @@
     }
 
     // GM % — margin.national_gp_pct preferred; fallback derived
-    var gmPct = (margin && margin.national_gp_pct) || (margin && margin.summary && margin.summary.gp_pct);
+    var gmPct = (margin && margin.kpis && margin.kpis.natl_gp_pct) || (margin && margin.national_gp_pct) || (margin && margin.summary && margin.summary.gp_pct);
     if(gmPct===undefined || gmPct===null){
       var gm = dash && dash.gross_margin, r = dash && dash.revenue;
       if(gm && r) gmPct = (gm/r)*100;
@@ -201,7 +201,7 @@
     var bOld = 0;
     if(ar && ar.buckets){
       var b = ar.buckets;
-      bOld = (b['61_90']||b.bucket_61_90||0) + (b['90plus']||b['91_120']||b.bucket_91_120||0) + (b['over_year']||b.bucket_over_year||0);
+      bOld = (b.d61_90||0) + (b.d91_120||0) + (b.d121_365||0) + (b.over_1y||0);
     }
     if(bOld > 1000000){
       risks.push({
@@ -211,8 +211,9 @@
     }
 
     // 2 · Critical margin customers (negative GP)
-    var critCount = (margin && margin.summary && margin.summary.critical) ||
-                    (margin && margin.alert_counts && margin.alert_counts.critical) || 0;
+    var critCount = (margin && margin.kpis && margin.kpis.critical) ||
+                    (margin && margin.hero && margin.hero.critical_count) ||
+                    (margin && margin.summary && margin.summary.critical) || 0;
     if(critCount > 0){
       risks.push({
         title: critCount+' customers at negative GP',
