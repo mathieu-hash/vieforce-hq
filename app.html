@@ -4396,6 +4396,7 @@ function loadPage(id){
     case 'pg-customers': loadCust(); break;
     case 'pg-margin': loadMargin(); break;
     case 'pg-margin-explorer': loadMarginExplorer(); break;
+    case 'pg-custdetail': loadCustDetail(); break;
     case 'pg-insights': loadIntelligence(); break;
     case 'pg-team': loadTeam(); break;
     case 'pg-budget': loadBudget(); break;
@@ -5525,16 +5526,23 @@ async function loadCust(search){
 }
 
 /* ===== CUSTOMER DETAIL — wired to /api/customer?id= ===== */
-async function openCust(code){
+// openCust only NAVIGATES; navTo → loadPage('pg-custdetail') → loadCustDetail() does the
+// fetch. This split lets a topbar period change re-fetch the customer (setPd → loadPage).
+function openCust(code){
+  if(code) CURRENT_CUSTOMER = { code: code, name: code };
   navTo('pg-custdetail');
+}
+async function loadCustDetail(){
+  var code = CURRENT_CUSTOMER && CURRENT_CUSTOMER.code;
+  if(!code) return;
   clearError('pg-custdetail');
   try {
-    var d = await getCustomerProfile({id:code});
+    var d = await getCustomerProfile({id:code, period:(typeof PD!=='undefined'?PD:'YTD')});
     if(!d){showError('pg-custdetail','Unable to load customer profile');return}
-    console.log('[CUSTDETAIL] Rendering:', code, Object.keys(d));
+    console.log('[CUSTDETAIL] Rendering:', code, 'period', PD, Object.keys(d));
     var pg=sel('pg-custdetail');
     var info = d.info || {};
-    // Track for Issue SOA button
+    // Track for Issue SOA button (refresh name from live info)
     CURRENT_CUSTOMER = { code: info.CardCode || code, name: info.CardName || code };
     // Hero — wire explicit IDs
     sett('cd-name', info.CardName || code);
@@ -5628,17 +5636,30 @@ async function openCust(code){
     sett('cd-acct-rep',     info.rsm || '—');
     sett('cd-acct-code',    info.CardCode || code || '—');
 
-    // KPI row — bind by ID
+    // KPI row — Vol/Sales/GM/Orders/Avg follow the selected PERIOD; MTD tiles stay a fixed
+    // this-month reference; DSO is rolling. (AR/age/rank above are as-of/lifetime by design.)
     var k = d.kpis || {};
-    var ytdSales = d.ytd_sales || {};
-    animateNumber(sel('cd-kpi-ytdvol'),   k.ytd_vol    != null ? k.ytd_vol    : (ytdSales.volume || 0), function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
-    animateNumber(sel('cd-kpi-ytdsales'), k.ytd_sales  != null ? k.ytd_sales  : (ytdSales.revenue || 0), fc);
-    animateNumber(sel('cd-kpi-mtdvol'),   k.mtd_vol    || 0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
-    animateNumber(sel('cd-kpi-mtdsales'), k.mtd_sales  || 0, fc);
-    if(k.gm_ton    != null) sett('cd-kpi-gmt',  '₱'+fcn(Math.round(k.gm_ton)));
-    if(k.dso       != null) seth('cd-kpi-dso',  Math.round(k.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>');
-    if(k.avg_order != null) seth('cd-kpi-avg',  fc(Math.round(k.avg_order)));  // peso per order, not MT
-    if(k.frequency != null) seth('cd-kpi-freq', fcn(Math.round(k.frequency))+'<span style="font-size:10px;color:var(--text3)"> orders</span>');
+    var ps = d.period_sales || {};
+    var pd = d.period || (typeof PD!=='undefined'?PD:'YTD');
+    function setKpiLabel(valId, text){ var v=sel(valId); if(v){ var lbl=v.parentElement.querySelector('.kpi-label'); if(lbl) lbl.textContent=text; } }
+    var volSpan = function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'};
+    // Tiles 1-2 → period Vol / Sales (dynamic label e.g. "QTD Vol")
+    setKpiLabel('cd-kpi-ytdvol',   pd+' Vol');
+    setKpiLabel('cd-kpi-ytdsales', pd+' Sales');
+    animateNumber(sel('cd-kpi-ytdvol'),   ps.volume  || 0, volSpan);
+    animateNumber(sel('cd-kpi-ytdsales'), ps.revenue || 0, fc);
+    // Tiles 3-4 → fixed MTD reference (unchanged)
+    animateNumber(sel('cd-kpi-mtdvol'),   k.mtd_vol   || 0, volSpan);
+    animateNumber(sel('cd-kpi-mtdsales'), k.mtd_sales || 0, fc);
+    // GM/Ton → period-scoped
+    setKpiLabel('cd-kpi-gmt', 'GM/Ton ('+pd+')');
+    sett('cd-kpi-gmt', '₱'+fcn(Math.round(ps.gm_ton || 0)));
+    // DSO → rolling (as-of)
+    if(k.dso != null) seth('cd-kpi-dso',  Math.round(k.dso)+'<span style="font-size:10px;color:var(--text3)">d</span>');
+    // Avg Order + Orders → period-scoped
+    seth('cd-kpi-avg',  fc(Math.round(ps.avg_order || 0)));
+    setKpiLabel('cd-kpi-freq', pd+' Orders');
+    seth('cd-kpi-freq', fcn(Math.round(ps.orders || 0))+'<span style="font-size:10px;color:var(--text3)"> orders</span>');
     // YTD vs LY delta — from monthly_table
     if(d.monthly_table && d.monthly_table.length){
       var ytdCy = d.monthly_table.reduce(function(s,m){return s+(+m.vol_cy||0)},0);

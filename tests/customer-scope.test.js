@@ -92,7 +92,8 @@ function buildEnv(scopeResolvedBy, queryStub) {
   registerMock(customerPath, path.join(apiDir, '_auth.js'), {
     verifySession: async () => null,
     verifyServiceToken: async () => ({ id: 'svc:patrol', name: 'Patrol Service', role: 'service',
-                                        region: 'ALL', district: 'ALL', territory: null, is_service: true })
+                                        region: 'ALL', district: 'ALL', territory: null, is_service: true }),
+    getPeriodDates: () => ({ dateFrom: new Date('2026-01-01'), dateTo: new Date('2026-06-06') })
   })
 
   // Stub _scope — scopeForUser returns whatever the test asked for
