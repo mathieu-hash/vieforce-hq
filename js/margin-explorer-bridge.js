@@ -78,8 +78,8 @@
     var h = canvasEl.height = canvasEl.clientHeight || canvasEl.height || 160;
     ctx.clearRect(0, 0, w, h);
     ctx.save();
-    ctx.fillStyle = p.text3;
-    ctx.font = '500 12px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillStyle = p.text;   // full-contrast (was text3 @40% — read as blank)
+    ctx.font = '600 13px system-ui, -apple-system, Segoe UI, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     // simple word-wrap
@@ -91,7 +91,7 @@
       else { line = test; }
     }
     if (line) lines.push(line);
-    var lh = 18, startY = h / 2 - ((lines.length - 1) * lh) / 2;
+    var lh = 20, startY = h / 2 - ((lines.length - 1) * lh) / 2;
     lines.forEach(function (ln, idx) { ctx.fillText(ln, w / 2, startY + idx * lh); });
     ctx.restore();
   }
@@ -307,12 +307,13 @@
         labels: labels,
         datasets: [{
           data: values,
-          borderColor: p.blue,
-          backgroundColor: 'rgba(0,174,239,0.10)',
-          borderWidth: 2,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          pointBackgroundColor: p.blue,
+          borderColor: p.green,
+          backgroundColor: 'rgba(151,215,0,0.12)',
+          borderWidth: 3,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: p.green,
+          pointBorderColor: p.green,
           tension: 0.32,
           fill: true
         }]
