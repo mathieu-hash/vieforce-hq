@@ -366,7 +366,7 @@
       bu:       STATE.bu,
       group_by: STATE.group_by,
       compare:  STATE.compare,
-      include:  'bridge,trend,movers,gap'
+      include:  'bridge,trend,movers,gap,dissection'
     };
     if (STATE.ref_month) p.ref_month = STATE.ref_month;
     if (STATE.customer)  p.customer = STATE.customer;
@@ -410,6 +410,7 @@
     try { renderBridge(data.bridge); } catch (e) { console.error('[MEXP] bridge:', e); }
     try { renderTrend(data.trend); }   catch (e) { console.error('[MEXP] trend:', e); }
     try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
+    try { if (typeof window.MEXP_renderDissection === 'function') window.MEXP_renderDissection(data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
   }
 
   function renderWindow(meta) {
