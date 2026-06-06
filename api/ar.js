@@ -2,6 +2,7 @@ const { query, queryH } = require('./_db')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const { scopeForUser, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
+const { normalizeRegion, normalizeSegment, regionCaseSql, segmentFilterSql } = require('./lib/business_filters')
 
 // Finance-matching definitions (calibrated against Looker Studio dashboard 2026-04-17)
 const ACTIVE      = `(ISNULL(C.frozenFor,'N')<>'Y' AND C.U_BpStatus='Active')`
@@ -74,9 +75,22 @@ module.exports = async (req, res) => {
            ` AND EXISTS (SELECT 1 FROM OCRD SC WHERE SC.CardCode = ${alias}.CardCode AND SC.SlpCode <> 1)`
   }
 
-  // Cache key includes the resolved scope so user A's rows can't leak to user B.
+  // Topbar Region/Segment narrowing (additive — ALL produces byte-identical results).
+  //   region → scoped via EXISTS over INV1 lines (OINV is header-level, no WhsCode line)
+  //   segment → SlpCode/CardName classifier on the OINV header alias
+  const region = normalizeRegion(req.query.region)
+  const segment = normalizeSegment(req.query.segment)
+  const regionExistsFor = (headerAlias) =>
+    region === 'ALL'
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM INV1 L WHERE L.DocEntry = ${headerAlias}.DocEntry AND ${regionCaseSql('L')} = @region)`
+  const bizFilterFor = (headerAlias) =>
+    regionExistsFor(headerAlias) + segmentFilterSql(segment, headerAlias)
+
+  // Cache key includes the resolved scope so user A's rows can't leak to user B,
+  // plus region+segment so scoped responses don't collide with national ones.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
-  const cacheKey = `ar_v3_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const cacheKey = `ar_v3_${req.url}_${session.role}_${session.region || 'ALL'}_${region}_${segment}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -99,20 +113,20 @@ module.exports = async (req, res) => {
       DECLARE @ar_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE} ${filterFor('O')});
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE} ${filterFor('O')} ${bizFilterFor('O')});
       DECLARE @ar_total DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate ${filterFor('O')});
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate ${filterFor('O')} ${bizFilterFor('O')});
       DECLARE @ar_delinq DECIMAL(18,2) = @ar_total - @ar_active;
       DECLARE @sales_90d_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE} ${filterFor('O')});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE} ${filterFor('O')} ${bizFilterFor('O')});
       DECLARE @sales_90d_total DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) ${filterFor('O')});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) ${filterFor('O')} ${bizFilterFor('O')});
 
       SELECT
         @ar_active  AS active_balance,
@@ -120,7 +134,7 @@ module.exports = async (req, res) => {
         @ar_delinq  AS delinquent_balance,
         CASE WHEN @sales_90d_active > 0 THEN @ar_active / (@sales_90d_active/90.0) ELSE 0 END AS dso_active,
         CASE WHEN @sales_90d_total  > 0 THEN @ar_total  / (@sales_90d_total /90.0) ELSE 0 END AS dso_total
-    `)
+    `, { region })
 
     // -------------------- 3. 7-BUCKET AGING (active only) --------------------
     const aging = await query(`
@@ -134,8 +148,8 @@ module.exports = async (req, res) => {
         ISNULL(SUM(CASE WHEN DATEDIFF(DAY,O.DocDueDate,GETDATE()) > 365 THEN O.DocTotal - O.PaidToDate ELSE 0 END),0) AS over_1y
       FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
       WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE}
-        ${filterFor('O')}
-    `)
+        ${filterFor('O')} ${bizFilterFor('O')}
+    `, { region })
 
     // -------------------- 4. REGIONAL DSO --------------------
     const byRegion = await query(`
@@ -217,10 +231,10 @@ module.exports = async (req, res) => {
       INNER JOIN OCRD C ON T0.CardCode = C.CardCode
       LEFT JOIN OCTG PT ON C.GroupNum = PT.GroupNum
       WHERE T0.CANCELED='N' AND T0.DocTotal > T0.PaidToDate
-        ${filterFor('T0')}
+        ${filterFor('T0')} ${bizFilterFor('T0')}
       GROUP BY T0.CardCode, T0.CardName
       ORDER BY balance DESC
-    `)
+    `, { region })
 
     // -------------------- 6. 7-DAY COMPARISON (as of 7 days ago) --------------------
     // Current-period comparison — scoped so a DSM's "DSO 7 days ago" reflects

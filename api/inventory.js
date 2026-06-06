@@ -2,6 +2,19 @@ const { query } = require('./_db')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const { scopeForUser } = require('./_scope')
 const cache = require('../lib/cache')
+const { normalizeRegion, normalizeSegment, regionFilterSql } = require('./lib/business_filters')
+
+// Inventory has no customer/doc alias (no OINV/OCRD), so segment can only be
+// narrowed by ItemName. Of the commercial segments (DIST/KA/PET), only PET is
+// derivable from the product name — KA vs DIST is a customer attribute that
+// inventory stock rows don't carry. So PET narrows; KA/DIST/ALL = no narrowing
+// (returns '' → byte-identical to today). Mirrors the by_sales_group PET classifier.
+function segmentItemFilter(segment, itemAlias = 'I') {
+  const s = normalizeSegment(segment)
+  if (s !== 'PET') return ''
+  const nameExpr = `UPPER(${itemAlias}.ItemName)`
+  return ` AND (${nameExpr} LIKE '%KEOS%' OR ${nameExpr} LIKE '%PLAISIR%' OR ${nameExpr} LIKE '%NOVOPET%')`
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -38,13 +51,26 @@ module.exports = async (req, res) => {
   // Cache key includes req.url (which encodes the scope param) so a scoped
   // call and an unscoped call get separate envelopes — prevents the scope
   // meta field from leaking into / out of the cached response incorrectly.
-  const cacheKey = `inventory_v2_${req.url}_${session.role}_${session.region || 'ALL'}`
+  const reqRegion = normalizeRegion(req.query.region)
+  const reqSegment = normalizeSegment(req.query.segment)
+  const cacheKey = `inventory_v2_${req.url}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const { plant = 'ALL' } = req.query
     const plantFilter = plant === 'ALL' ? '' : 'AND W.WhsCode = @plant'
+
+    // Topbar Region/Segment narrowing (ADD-only; ALL/ALL = byte-identical to before).
+    // Region keys off the WhsCode line alias 'W' (OWHS). Segment keys off ItemName 'I'
+    // (OITM) since inventory carries no customer/doc alias. regionFilterSql / segmentItemFilter
+    // both return '' for the ALL case, so we only ever append.
+    const region = reqRegion
+    const segment = reqSegment
+    const regionFilter = regionFilterSql(region, 'W')      // ' AND <case> = @region' or ''
+    const segmentFilter = segmentItemFilter(segment, 'I')  // ' AND <ItemName preds>' or ''
+    const narrowFilters = regionFilter + segmentFilter
+    const params = { plant, region }
 
     // --- Plant-level summary (bags + MT) ---
     const plants = await query(`
@@ -65,9 +91,10 @@ module.exports = async (req, res) => {
       WHERE W.Inactive = 'N'
         AND UPPER(IW.ItemCode) LIKE 'FG%'   -- FINISHED GOODS only (match itemized classifier)
         ${plantFilter}
+        ${narrowFilters}
       GROUP BY W.WhsCode, W.WhsName
       ORDER BY W.WhsCode
-    `, { plant })
+    `, params)
 
     // --- Item-level detail ---
     const items = await query(`
@@ -91,8 +118,9 @@ module.exports = async (req, res) => {
         AND IW.OnHand > 0
         AND UPPER(IW.ItemCode) LIKE 'FG%'
         ${plantFilter}
+        ${narrowFilters}
       ORDER BY W.WhsCode, I.ItemName
-    `, { plant })
+    `, params)
 
     // --- By region (bags + MT) ---
     const by_region = await query(`
@@ -116,6 +144,7 @@ module.exports = async (req, res) => {
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
       WHERE W.Inactive = 'N'
         AND UPPER(IW.ItemCode) LIKE 'FG%'
+        ${segmentFilter}
       GROUP BY
         CASE
           WHEN W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
@@ -152,6 +181,7 @@ module.exports = async (req, res) => {
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
       WHERE W.Inactive = 'N'
         AND UPPER(IW.ItemCode) LIKE 'FG%'
+        ${narrowFilters}
       GROUP BY
         CASE
           WHEN UPPER(I.ItemName) LIKE '%HOG%' OR UPPER(I.ItemName) LIKE '%PIGLET%' OR UPPER(I.ItemName) LIKE '%SOW%' OR UPPER(I.ItemName) LIKE '%BOAR%' THEN 'HOGS'
@@ -162,7 +192,7 @@ module.exports = async (req, res) => {
           ELSE 'OTHERS'
         END
       ORDER BY on_hand_bags DESC
-    `)
+    `, { region })
 
     // --- Negative available count ---
     const negRow = await query(`
@@ -173,7 +203,8 @@ module.exports = async (req, res) => {
         AND IW.OnHand > 0
         AND (IW.OnHand - IW.IsCommited) < 0
         AND UPPER(IW.ItemCode) LIKE 'FG%'
-    `)
+        ${regionFilter}
+    `, { region })
 
     // --- ON PRODUCTION (OWOR work orders, Status='R' = Released/in-progress) ---
     // Split into REAL (DueDate within 30 days) vs STALE (DueDate > 30 days ago — abandoned).
@@ -249,7 +280,12 @@ module.exports = async (req, res) => {
       oldest_stale_days:  oldestStaleDays
     }
 
-    // --- Cover days (national: total on-hand / avg daily shipment last 30d) ---
+    // --- Cover days (total on-hand / avg daily shipment last 30d) ---
+    // Narrow the denominator to the same Region/Segment scope as the on-hand
+    // numerator so cover_days stays coherent when scoped. DLN1 line alias 'T1'
+    // carries WhsCode (region); OITM 'I' carries ItemName (segment).
+    const shipRegionFilter = regionFilterSql(region, 'T1')
+    const shipSegmentFilter = segmentItemFilter(segment, 'I')
     const dailyShip = await query(`
       SELECT
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0 / 30.0, 0) AS avg_daily
@@ -257,7 +293,9 @@ module.exports = async (req, res) => {
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       WHERE T0.DocDate >= DATEADD(DAY, -30, GETDATE()) AND T0.CANCELED = 'N'
-    `)
+        ${shipRegionFilter}
+        ${shipSegmentFilter}
+    `, { region })
 
     // --- Summary totals (for KPI strip) ---
     const totalOnHand    = plants.reduce((s, p) => s + Number(p.total_on_hand || 0), 0)

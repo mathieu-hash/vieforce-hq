@@ -171,8 +171,13 @@ module.exports = async (req, res) => {
     `, { ytdFrom, today: now, region })
 
     // --- AR Balance (total + active) ---
+    // OINV header has no line (INV1) here → scope region via EXISTS over its INV1 lines
+    // (regionCaseSql on the line WhsCode). Segment keys off the OINV header alias T0.
+    const arRegionExists = region === 'ALL'
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM INV1 L WHERE L.DocEntry = T0.DocEntry AND ${regionCaseSql('L')} = @region)`
     const arWhere = `WHERE T0.CANCELED = 'N' AND T0.DocTotal > T0.PaidToDate`
-    const arFilteredWhere = applyRoleFilter(session, arWhere)
+    const arFilteredWhere = applyRoleFilter(session, arWhere) + arRegionExists + segmentFilterSql(segment, 'T0')
     const arBalance = await query(`
       SELECT
         ISNULL(SUM(T0.DocTotal - T0.PaidToDate), 0) AS total_balance,
@@ -184,25 +189,32 @@ module.exports = async (req, res) => {
     `, { region })
 
     // --- DSO (active + total) — trailing 90-day formula calibrated to Finance Dashboard ---
+    // Scope numerator (AR) and denominator (trailing-90 sales) identically so the ratio stays
+    // meaningful: region via EXISTS over INV1 (keyed on OINV alias O), segment off O. ALL = no-op.
+    const dsoRegionExists = region === 'ALL'
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM INV1 L WHERE L.DocEntry = O.DocEntry AND ${regionCaseSql('L')} = @region)`
+    const dsoSegment = segmentFilterSql(segment, 'O')
+    const dsoScope = dsoRegionExists + dsoSegment
     const dsoRow = await query(`
       DECLARE @ar_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE});
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE}${dsoScope});
       DECLARE @ar_total  DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
-        FROM OINV O WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate);
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate${dsoScope});
       DECLARE @s90_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE}${dsoScope});
       DECLARE @s90_total  DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
-        FROM OINV O WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()));
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE())${dsoScope});
       SELECT
         CASE WHEN @s90_active > 0 THEN @ar_active / (@s90_active/90.0) ELSE 0 END AS dso_active,
         CASE WHEN @s90_total  > 0 THEN @ar_total  / (@s90_total /90.0) ELSE 0 END AS dso_total
-    `)
+    `, { region })
 
     // --- Pending PO (open sales orders) + oldest age ---
     const pendingPO = await query(`

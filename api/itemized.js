@@ -1,6 +1,7 @@
 const { query } = require('./_db')
 const { verifySession } = require('./_auth')
 const cache = require('../lib/cache')
+const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql } = require('./lib/business_filters')
 const hierarchy = require('./data/product_hierarchy.json')
 const districtManagers = require('./data/district_managers.json')
 const districtList = require('./data/district_list.json')
@@ -90,8 +91,10 @@ module.exports = async (req, res) => {
   const district      = canonDistrict(districtRaw)
   const year          = parseInt(req.query.year) || new Date().getFullYear()
   const compareYear   = parseInt(req.query.compare_year) || (year - 1)
+  const region        = normalizeRegion(req.query.region)
+  const segment       = normalizeSegment(req.query.segment)
 
-  const cacheKey = `itemized_v1_${district}_${year}_${compareYear}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `itemized_v1_${district}_${year}_${compareYear}_${region}_${segment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) {
     res.setHeader('X-Query-Cached', '1')
@@ -108,6 +111,7 @@ module.exports = async (req, res) => {
 
     if (isTotalNational) {
       const qStart = Date.now()
+      const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
       rawByItemMonth = await query(`
         SELECT
           T1.ItemCode                                                           AS item_code,
@@ -123,9 +127,9 @@ module.exports = async (req, res) => {
         LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
         WHERE T0.CANCELED = 'N'
           AND YEAR(T0.DocDate) IN (@year, @cy)
-          AND UPPER(T1.ItemCode) LIKE 'FG%'
+          AND UPPER(T1.ItemCode) LIKE 'FG%'${lineFilters}
         GROUP BY T1.ItemCode, MONTH(T0.DocDate), YEAR(T0.DocDate)
-      `, { year, cy: compareYear })
+      `, { year, cy: compareYear, region })
       queryMs = Date.now() - qStart
     }
 
