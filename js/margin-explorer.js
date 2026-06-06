@@ -143,6 +143,7 @@
     '.mexp-panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}',
     '.mexp-panel-t{font-size:12px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;color:var(--text2)}',
     '.mexp-canvas-wrap{position:relative;width:100%;min-height:170px}',
+    '.mexp-canvas-wrap canvas{width:100%!important;display:block}',
     '.mexp-note{font-size:10px;color:var(--text3);font-weight:600;margin-top:10px;line-height:1.5}',
     '.mexp-coming{font-size:11px;color:var(--text3);font-weight:700;padding:18px 8px;text-align:center;border:1px dashed var(--glass-border);border-radius:10px;margin-top:12px}',
     // states
@@ -623,7 +624,12 @@
       // Seed the INITIAL default from the global topbar only on first build.
       // After that the tab owns its own Period / As-of controls and no longer
       // tracks the global topbar (so it works without the user setting it).
-      if (typeof window.PD === 'string' && window.PD) STATE.period = window.PD;
+      // The GM bridge + ingredient decomposition need a like-for-like prior period
+      // WITHIN 2026; YTD/7D priors cross the Jan-2026 consolidation (no bridge). So land
+      // on QTD (fully populated: bridge + ingredients + trend) rather than inherit a YTD
+      // topbar that would open with two empty panels. The user can still switch period.
+      var seedP = (typeof window.PD === 'string' && window.PD) ? window.PD : 'QTD';
+      STATE.period = (seedP === 'YTD' || seedP === '7D') ? 'QTD' : seedP;
       if (typeof window.VF_REF_MONTH === 'string' && /^\d{4}-\d{2}$/.test(window.VF_REF_MONTH)) {
         STATE.ref_month = window.VF_REF_MONTH;
       }
