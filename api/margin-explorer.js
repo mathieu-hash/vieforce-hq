@@ -261,19 +261,31 @@ module.exports = async (req, res) => {
             const price_effect = c.inclusion * (cP - pP) * 1000        // ₱/ton from price move (0 unless bothPriced)
             const inclusion_effect = (c.inclusion - p.inclusion) * pP * 1000 // ₱/ton from recipe move
             const nm = c.nm || p.nm || code
-            const b = byName[nm] || (byName[nm] = { name: nm, perton_cost: 0, perton_delta: 0, price_effect: 0, inclusion_effect: 0 })
+            const b = byName[nm] || (byName[nm] = { name: nm, perton_cost: 0, perton_cost_prior: 0, perton_delta: 0, price_effect: 0, inclusion_effect: 0, incl_now: 0, incl_prior: 0 })
             b.perton_cost += perton_cost
+            b.perton_cost_prior += perton_cost_prior
             b.perton_delta += (perton_cost - perton_cost_prior)
             b.price_effect += price_effect
             b.inclusion_effect += inclusion_effect
+            b.incl_now += c.inclusion
+            b.incl_prior += p.inclusion
           })
-          const built = Object.values(byName).map(b => ({
-            name: b.name,
-            perton_cost: Math.round(b.perton_cost * 10) / 10,
-            perton_delta: Math.round(b.perton_delta * 10) / 10,
-            price_effect: Math.round(b.price_effect * 10) / 10,
-            inclusion_effect: Math.round(b.inclusion_effect * 10) / 10
-          }))
+          const built = Object.values(byName).map(b => {
+            // Name-level blended ₱/kg = qty-weighted avg = cost/ton ÷ (inclusion × 1000).
+            const priceNow = b.incl_now > 0 ? b.perton_cost / (b.incl_now * 1000) : 0
+            const pricePrior = b.incl_prior > 0 ? b.perton_cost_prior / (b.incl_prior * 1000) : null
+            return {
+              name: b.name,
+              price_now: Math.round(priceNow * 100) / 100,            // ₱/kg current
+              price_prior: pricePrior == null ? null : Math.round(pricePrior * 100) / 100, // ₱/kg prior (null = new this period)
+              incl_now_pct: Math.round(b.incl_now * 100 * 100) / 100, // % of feed mass (kg ingredient / kg feed)
+              incl_prior_pct: b.incl_prior > 0 ? Math.round(b.incl_prior * 100 * 100) / 100 : null,
+              perton_cost: Math.round(b.perton_cost * 10) / 10,
+              perton_delta: Math.round(b.perton_delta * 10) / 10,
+              price_effect: Math.round(b.price_effect * 10) / 10,
+              inclusion_effect: Math.round(b.inclusion_effect * 10) / 10
+            }
+          })
           built.sort((a, b) => Math.abs(b.perton_delta) - Math.abs(a.perton_delta))
           ingredients = built.slice(0, 12)
 
