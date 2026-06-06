@@ -1,5 +1,5 @@
 const { query, queryH, queryBoth } = require('./_db')
-const { verifySession, verifyServiceToken } = require('./_auth')
+const { verifySession, verifyServiceToken, getPeriodDates } = require('./_auth')
 const { scopeForUser } = require('./_scope')
 const { toHistoricalCode } = require('./lib/customer-map')
 const cache = require('../lib/cache')
@@ -26,6 +26,11 @@ module.exports = async (req, res) => {
 
   const { id } = req.query
   if (!id) return res.status(400).json({ error: 'Missing required parameter: id' })
+
+  // Selected period drives the period_sales block (volume / revenue / GM-ton / orders).
+  // Lifetime/as-of figures (AR, account age, rank, DSO, CY-vs-LY chart) ignore it by design.
+  const period = ['7D', 'MTD', 'QTD', 'YTD'].includes(String(req.query.period || '').toUpperCase())
+    ? String(req.query.period).toUpperCase() : 'YTD'
 
   // Parse optional scope=user:<uuid>. When present, resolve to SlpCode / district
   // whitelist and enforce access control BEFORE running the 360° query.
@@ -79,7 +84,7 @@ module.exports = async (req, res) => {
   // Cache key MUST include the resolved scope user — otherwise user A's cached
   // response could leak to user B on the next request with a different scope.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
-  const cacheKey = `customer_${id}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const cacheKey = `customer_${id}_${period}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -343,6 +348,34 @@ module.exports = async (req, res) => {
       ) sub
     `, { id, custVol: ytd_sales.volume })
 
+    // --- Period-scoped sales (driven by the topbar period: 7D/MTD/QTD/YTD) ---
+    // All current periods resolve within 2026 (Live). Volume in MT (bags × NumInSale ÷ 1000),
+    // consistent with the rest of this endpoint.
+    const { dateFrom: pFrom, dateTo: pTo } = getPeriodDates(period)
+    const periodRows = await query(`
+      SELECT
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)     AS volume,
+        ISNULL(SUM(T1.LineTotal), 0)                                       AS revenue,
+        COUNT(DISTINCT T0.DocEntry)                                        AS orders,
+        CASE WHEN SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) > 0
+          THEN SUM(T1.GrssProfit) / (SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0)
+          ELSE 0 END                                                        AS gm_ton
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.CardCode = @id AND T0.CANCELED = 'N'
+        AND T0.DocDate BETWEEN @pFrom AND @pTo
+    `, { id, pFrom, pTo })
+    const pr = periodRows[0] || {}
+    const period_sales = {
+      period,
+      volume:    Math.round((pr.volume || 0) * 10) / 10,
+      revenue:   Math.round(pr.revenue || 0),
+      orders:    pr.orders || 0,
+      gm_ton:    Math.round(pr.gm_ton || 0),
+      avg_order: (pr.orders > 0) ? Math.round((pr.revenue || 0) / pr.orders) : 0
+    }
+
     // 8 enriched KPIs
     const kpis = {
       ytd_vol: Math.round(ytd_sales.volume * 10) / 10,
@@ -357,7 +390,9 @@ module.exports = async (req, res) => {
 
     const result = {
       info,
+      period,
       ytd_sales,
+      period_sales,
       kpis,
       ar_invoices,
       product_breakdown,
