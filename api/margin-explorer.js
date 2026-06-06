@@ -394,14 +394,22 @@ module.exports = async (req, res) => {
         const C = await cube.buildCube({ query, queryH }, { region, bu, customer, ssg: null })
         if (C.months.length) {
           const fromM = dateFrom.toISOString().slice(0, 7), toM = dateTo.toISOString().slice(0, 7)
+          const nowYM = new Date().toISOString().slice(0, 7)   // current (partial) calendar month
           let inRange = C.months.filter(m => m >= fromM && m <= toM)
           if (!inRange.length) inRange = C.months.slice()
-          let baseMonth = inRange[0], cmpMonth = inRange[inRange.length - 1]
+          // Bridge/mix/ingredient anchors must be COMPLETE months — exclude the running
+          // partial month so we don't compare a full month against a few days. Trajectory
+          // keeps every month (the last point is flagged partial for the chart).
+          let anchorMonths = inRange.filter(m => m !== nowYM)
+          if (!anchorMonths.length) anchorMonths = inRange.slice()
+          let baseMonth = anchorMonths[0], cmpMonth = anchorMonths[anchorMonths.length - 1]
           if (baseMonth === cmpMonth) { const i = C.months.indexOf(cmpMonth); if (i > 0) baseMonth = C.months[i - 1] }  // single-month → MoM
+          const traj = cube.trajectory(C.rows, C.months)
+          if (traj.length && traj[traj.length - 1].month === nowYM) traj[traj.length - 1].partial = true
           dissection = {
             available: true, scope: 'finished_feed', basis: 'Live 103 / Old 103+104 · ₱/ton',
             base_month: baseMonth, compare_month: cmpMonth, months: C.months,
-            trajectory: cube.trajectory(C.rows, C.months),
+            trajectory: traj,
             bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
             ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth)
