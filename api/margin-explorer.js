@@ -16,6 +16,7 @@ const { query, queryH, queryDateRange, MIGRATION_CUTOFF } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const bridge = require('./lib/margin_bridge')
+const cube = require('./lib/margin_cube')
 
 // group_by key -> validated SQL fragment (select expr + group expr + extra joins).
 // User input only selects a key; never reaches SQL as a string.
@@ -385,6 +386,32 @@ module.exports = async (req, res) => {
       } catch (e) { console.warn('[margin-explorer] trend query failed:', e.message) }
     }
 
+    // ---- DISSECTION panels: finished-feed (Live 103 / Old 103+104), cross-DB, SSG spine ----
+    // Faithful port of the Margin Dissection Analyser (see margin_cube.js + METHODOLOGY.md).
+    let dissection = null
+    if (include.has('dissection')) {
+      try {
+        const C = await cube.buildCube({ query, queryH }, { region, bu, customer, ssg: null })
+        if (C.months.length) {
+          const fromM = dateFrom.toISOString().slice(0, 7), toM = dateTo.toISOString().slice(0, 7)
+          let inRange = C.months.filter(m => m >= fromM && m <= toM)
+          if (!inRange.length) inRange = C.months.slice()
+          let baseMonth = inRange[0], cmpMonth = inRange[inRange.length - 1]
+          if (baseMonth === cmpMonth) { const i = C.months.indexOf(cmpMonth); if (i > 0) baseMonth = C.months[i - 1] }  // single-month → MoM
+          dissection = {
+            available: true, scope: 'finished_feed', basis: 'Live 103 / Old 103+104 · ₱/ton',
+            base_month: baseMonth, compare_month: cmpMonth, months: C.months,
+            trajectory: cube.trajectory(C.rows, C.months),
+            bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
+            mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
+            ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth)
+          }
+        } else {
+          dissection = { available: false, reason: 'No finished-feed rows for this selection.' }
+        }
+      } catch (e) { console.warn('[margin-explorer] dissection failed:', e.message); dissection = { available: false, reason: e.message } }
+    }
+
     const result = {
       meta: {
         endpoint: 'margin-explorer', sap_validated: true, data_source: 'sap_b1',
@@ -396,6 +423,7 @@ module.exports = async (req, res) => {
       matrix: { group_by: groupBy, rows: matrixRows, total_gp: Math.round(totGp) },
       bridge: bridgeOut,
       trend: trendOut,
+      dissection,
       movers: include.has('movers') ? { basis: 'mix_contribution', items: [] } : null,
       gap: include.has('gap') ? { available: false, note: 'Phase 1: gap analysis pending' } : null
     }
