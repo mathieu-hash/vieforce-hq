@@ -177,13 +177,28 @@ module.exports = async (req, res) => {
       try {
         // Per-ingredient issued kg + blended price, over FG (ItmsGrpCod=103) production orders,
         // ingredient in raw-material groups 101/102. LastPurPrc = cost (AvgPrice=0 in Live).
-        const ingSql = (f, t) => query(`SELECT LTRIM(RTRIM(I2.ItemName)) AS nm,
+        // Issued RM per ITEM (group by code, not name — fixes duplicate-name collisions and
+        // gives a clean key to join the period-actual purchase price). LastPurPrc carried only
+        // as a price fallback for items not purchased in-window.
+        const ingSql = (f, t) => query(`SELECT R.ItemCode AS code,
+            MAX(LTRIM(RTRIM(I2.ItemName))) AS nm,
             SUM(R.IssuedQty) AS issued_kg,
-            SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0)) AS cost
+            MAX(ISNULL(I2.LastPurPrc,0)) AS lastpur
           FROM OWOR W INNER JOIN WOR1 R ON W.DocEntry=R.DocEntry INNER JOIN OITM FI ON W.ItemCode=FI.ItemCode AND FI.ItmsGrpCod=103
           INNER JOIN OITM I2 ON R.ItemCode=I2.ItemCode
           WHERE W.PostDate BETWEEN @f AND @t AND I2.ItmsGrpCod IN (101,102) AND R.IssuedQty > 0
-          GROUP BY I2.ItemName`, { f, t })
+          GROUP BY R.ItemCode`, { f, t })
+
+        // Period-ACTUAL purchase price per RM item (PCH1 window average ₱/kg). This is the
+        // price signal that VARIES period-to-period — LastPurPrc is point-in-time and would
+        // zero out every price effect. Mirrors the approved BOD-deck DS4 basket (actual PCH1
+        // prices). RM purchase history exists only from Jan-2026; the bridge gate guarantees
+        // the prior window is >= the migration cutoff, so both windows are in-range.
+        const priceSql = (f, t) => query(`SELECT P1.ItemCode AS code,
+            SUM(P1.LineTotal) AS spend, SUM(P1.Quantity) AS qty
+          FROM OPCH P0 INNER JOIN PCH1 P1 ON P1.DocEntry=P0.DocEntry INNER JOIN OITM I3 ON P1.ItemCode=I3.ItemCode
+          WHERE P0.CANCELED='N' AND I3.ItmsGrpCod IN (101,102) AND P0.DocDate BETWEEN @f AND @t AND P1.Quantity > 0
+          GROUP BY P1.ItemCode`, { f, t })
 
         // Feed tons produced in each window. CmpltQty = FG completed qty (kg) on FG orders.
         // VALIDATE: if CmpltQty sums to 0/unsuitable, fall back to total issued kg as proxy.
@@ -194,6 +209,9 @@ module.exports = async (req, res) => {
 
         const [curRows, priRows] = await Promise.all([ingSql(dateFrom, dateTo), ingSql(ppFrom, ppTo)])
         const [curFeed, priFeed] = await Promise.all([feedSql(dateFrom, dateTo), feedSql(ppFrom, ppTo)])
+        const [curPx, priPx] = await Promise.all([priceSql(dateFrom, dateTo), priceSql(ppFrom, ppTo)])
+        const pxMap = rows => { const m = {}; rows.forEach(r => { const q = Number(r.qty) || 0; if (q > 0) m[r.code] = Number(r.spend) / q }); return m }
+        const curPxMap = pxMap(curPx), priPxMap = pxMap(priPx)
 
         // Resolve feed-ton basis per window with graceful fallback + label.
         const resolveFeed = (feedRow, ingRows) => {
@@ -210,55 +228,69 @@ module.exports = async (req, res) => {
         const feedTonsPri = fPri.kg / 1000
 
         if (feedTonsCur > 0) {
-          // Index prior by ingredient name.
-          const pri = {}
-          priRows.forEach(r => {
-            const ik = Number(r.issued_kg) || 0, c = Number(r.cost) || 0
-            pri[r.nm] = {
-              price: ik > 0 ? c / ik : 0,
-              inclusion: feedTonsPri > 0 ? ik / (feedTonsPri * 1000) : 0
-            }
-          })
-
-          const names = new Set(curRows.map(r => r.nm))
-          priRows.forEach(r => names.add(r.nm))
-          const curIdx = {}
-          curRows.forEach(r => {
-            const ik = Number(r.issued_kg) || 0, c = Number(r.cost) || 0
-            curIdx[r.nm] = {
-              price: ik > 0 ? c / ik : 0,
-              inclusion: ik / (feedTonsCur * 1000)
-            }
-          })
-
-          const built = []
-          names.forEach(nm => {
-            const c = curIdx[nm] || { price: 0, inclusion: 0 }
-            const p = pri[nm] || { price: 0, inclusion: 0 }
-            const perton_cost = c.inclusion * c.price * 1000               // ₱/ton of feed (current)
-            const perton_cost_prior = p.inclusion * p.price * 1000
-            const price_effect = c.inclusion * (c.price - p.price) * 1000  // ₱/ton from price move
-            const inclusion_effect = (c.inclusion - p.inclusion) * p.price * 1000 // ₱/ton from recipe move
-            const perton_delta = perton_cost - perton_cost_prior          // ≈ price_effect + inclusion_effect
-            built.push({
-              name: nm,
-              perton_cost: Math.round(perton_cost * 10) / 10,
-              perton_delta: Math.round(perton_delta * 10) / 10,
-              price_effect: Math.round(price_effect * 10) / 10,
-              inclusion_effect: Math.round(inclusion_effect * 10) / 10
+          // Build per-ITEM {price, priced, inclusion, name} for each window. Price = PCH1
+          // window-average (period-actual); priced=false when the item wasn't purchased
+          // in-window (then it carries LastPurPrc only as a level, never as a price MOVE).
+          const idx = (rows, feedTons, pm) => {
+            const o = {}
+            rows.forEach(r => {
+              const ik = Number(r.issued_kg) || 0
+              const obs = pm[r.code]
+              const priced = obs != null && obs > 0
+              o[r.code] = { price: priced ? obs : (Number(r.lastpur) || 0), priced, inclusion: feedTons > 0 ? ik / (feedTons * 1000) : 0, nm: r.nm }
             })
+            return o
+          }
+          const curIdx = idx(curRows, feedTonsCur, curPxMap)
+          const priIdx = idx(priRows, feedTonsPri, priPxMap)
+
+          const codes = new Set([...Object.keys(curIdx), ...Object.keys(priIdx)])
+          let nBothPriced = 0
+          const byName = {}   // sum effects across item codes that share a display name
+          codes.forEach(code => {
+            const c = curIdx[code] || { price: 0, priced: false, inclusion: 0, nm: priIdx[code] && priIdx[code].nm }
+            const p = priIdx[code] || { price: 0, priced: false, inclusion: 0, nm: curIdx[code] && curIdx[code].nm }
+            // Only attribute a PRICE move when a real purchase price exists in BOTH windows;
+            // otherwise hold price flat (price_effect=0) so a static fallback never fakes inflation.
+            const bothPriced = c.priced && p.priced
+            if (bothPriced) nBothPriced++
+            const cP = c.price
+            const pP = bothPriced ? p.price : c.price
+            const perton_cost = c.inclusion * cP * 1000               // ₱/ton of feed (current)
+            const perton_cost_prior = p.inclusion * pP * 1000
+            const price_effect = c.inclusion * (cP - pP) * 1000        // ₱/ton from price move (0 unless bothPriced)
+            const inclusion_effect = (c.inclusion - p.inclusion) * pP * 1000 // ₱/ton from recipe move
+            const nm = c.nm || p.nm || code
+            const b = byName[nm] || (byName[nm] = { name: nm, perton_cost: 0, perton_delta: 0, price_effect: 0, inclusion_effect: 0 })
+            b.perton_cost += perton_cost
+            b.perton_delta += (perton_cost - perton_cost_prior)
+            b.price_effect += price_effect
+            b.inclusion_effect += inclusion_effect
           })
+          const built = Object.values(byName).map(b => ({
+            name: b.name,
+            perton_cost: Math.round(b.perton_cost * 10) / 10,
+            perton_delta: Math.round(b.perton_delta * 10) / 10,
+            price_effect: Math.round(b.price_effect * 10) / 10,
+            inclusion_effect: Math.round(b.inclusion_effect * 10) / 10
+          }))
           built.sort((a, b) => Math.abs(b.perton_delta) - Math.abs(a.perton_delta))
           ingredients = built.slice(0, 12)
 
           const sumDelta = built.reduce((a, r) => a + r.perton_delta, 0)
+          const sumPrice = built.reduce((a, r) => a + r.price_effect, 0)
+          const sumIncl = built.reduce((a, r) => a + r.inclusion_effect, 0)
           ingredientsMeta = {
             unit: 'php_per_ton_of_feed',
             feed_tons_current: Math.round(feedTonsCur),
             feed_tons_prior: Math.round(feedTonsPri),
             feed_basis: fCur.basis,
+            price_source: 'PCH1 actual purchase price/kg (window avg); LastPurPrc level fallback',
+            items_priced_both_windows: nBothPriced,
             sum_perton_delta: Math.round(sumDelta * 10) / 10,
-            note: `Per-ton ingredient cost vs prior period. Sum of perton_delta (₱${Math.round(sumDelta)}/t) approximates the bridge RM cost-per-ton Δ. Feed tons via ${fCur.basis}.`
+            sum_price_effect: Math.round(sumPrice * 10) / 10,
+            sum_inclusion_effect: Math.round(sumIncl * 10) / 10,
+            note: `Recipe cost per ton of feed produced (basis: ${fCur.basis}). Price = actual purchase ₱/kg (PCH1) per window, split into price vs inclusion (recipe) effect. Indicative procurement lens — not reconciled to the sales-based GM/ton bridge.`
           }
         }
       } catch (e) { console.warn('[margin-explorer] ingredient per-ton query failed:', e.message); ingredients = [] }

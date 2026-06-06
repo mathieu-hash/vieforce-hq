@@ -546,15 +546,24 @@
       var pt  = function (n) { return '₱' + (Math.round((+n || 0) * 10) / 10).toLocaleString() + '/t'; };
       var ptD = function (n) { n = +n || 0; var s = '₱' + (Math.round(Math.abs(n) * 10) / 10).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
       var max = Math.max.apply(null, ingredients.map(function (i) { return Math.abs(+i.perton_cost || 0); })) || 1;
+      // colored signed chip: cost UP (>0) = red (hurts margin), DOWN = green
+      var chip = function (n) { n = +n || 0; var c = n > 0 ? 'var(--red)' : (n < 0 ? 'var(--green)' : 'var(--text3)'); return '<span style="color:' + c + '">' + ptD(n) + '</span>'; };
       var rows = ingredients.slice(0, 12).map(function (i) {
         var w = Math.round(Math.abs(+i.perton_cost || 0) / max * 100);
         // perton_delta>0 = ingredient cost per ton ROSE (hurts margin) → red
         var dc = (i.perton_delta > 0) ? 'var(--red)' : (i.perton_delta < 0 ? 'var(--green)' : 'var(--text3)');
-        return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;margin:4px 0">' +
+        var pe = +i.price_effect || 0, ie = +i.inclusion_effect || 0;
+        // breakdown sub-line: split the Δ into price move vs recipe (inclusion) move
+        var split = (pe || ie)
+          ? '<div style="font-size:9px;color:var(--text3);padding-left:138px;margin-top:1px;line-height:1.3">price ' + chip(pe) + ' · recipe ' + chip(ie) + '</div>'
+          : '';
+        return '<div style="margin:5px 0">' +
+          '<div style="display:flex;align-items:center;gap:8px;font-size:11px">' +
           '<span style="flex:0 0 130px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (window.esc ? esc(i.name) : i.name) + '</span>' +
           '<span style="flex:1;height:8px;background:var(--surface2,#1b2940);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:' + w + '%;background:var(--blue)"></span></span>' +
           '<span style="flex:0 0 78px;text-align:right;font-family:var(--mono,monospace)">' + pt(i.perton_cost) + '</span>' +
           '<span style="flex:0 0 78px;text-align:right;color:' + dc + ';font-weight:600">Δ ' + ptD(i.perton_delta) + '</span>' +
+          '</div>' + split +
           '</div>';
       }).join('');
       var sub = (ingMeta && ingMeta.note)
