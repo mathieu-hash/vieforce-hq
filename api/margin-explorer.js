@@ -12,7 +12,7 @@
 // Phase 2 (separate): COGS split RM/Packaging/Feedtag from production orders (OWOR/WOR1).
 // Spec: docs/superpowers/specs/2026-06-05-margin-explorer-design.md · SQL: margin-explorer-SQL.md
 
-const { query, queryDateRange, MIGRATION_CUTOFF } = require('./_db')
+const { query, queryH, queryDateRange, MIGRATION_CUTOFF } = require('./_db')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const bridge = require('./lib/margin_bridge')
@@ -33,6 +33,13 @@ const DIMS = {
 }
 const DEFAULT_GROUP_BY = 'sales_group'
 const REGION_PREFIX = { Luzon: 'L-%', Visayas: 'V-%', Mindanao: 'M-%' }
+
+// Live's sellable scope (103,105,102) = Finished Goods + Trading-Import + Basemix.
+// In Vienovo_Old (2025) the SAME economic basket is coded DIFFERENTLY (codes are
+// scrambled across the Jan-2026 consolidation): finished feed = 103+104 (Luzon+Vismin,
+// 104 ≈ 70%), basemix = 105+106, trading = 101+102. Reusing Live's codes on Old drops
+// all Vismin feed (~70% undercount). See reference_sap_b1_margin_model memory.
+const OLD_LY_SCOPE = '(103,104,105,106,101,102)'
 
 const norm = (v, allow, def) => { const k = String(v || '').trim().toLowerCase(); return allow.includes(k) ? k : def }
 const normRegion = (r) => { const v = String(r || 'ALL').trim(); return /^(luzon|visayas|mindanao|other)$/i.test(v) ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : 'ALL' }
@@ -109,9 +116,32 @@ module.exports = async (req, res) => {
     const totalsSql = `SELECT ISNULL(SUM(T1.LineTotal),0) AS sales, ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.GrssProfit),0) AS gp
       ${baseFrom} ${scopeWhere}`
     const cur = (await query(totalsSql, params))[0] || { sales: 0, kg: 0, gp: 0 }
-    // comparison totals via queryDateRange so a pre-2026 window correctly reads the historical DB
     const [cmpFrom, cmpTo] = compare === 'ly' ? [lyFrom, lyTo] : [ppFrom, ppTo]
-    let cmp = (await queryDateRange(totalsSql, params, cmpFrom, cmpTo))[0] || { sales: 0, kg: 0, gp: 0 }
+    // DB-aware comparison. A pre-2026 window lives in Vienovo_Old, which (a) codes the
+    // sellable basket differently (OLD_LY_SCOPE) and (b) fully re-coded customers/SKUs/
+    // region — so a like-for-like vs-LY only holds at the NATIONAL aggregate. For a
+    // region/BU/customer slice we null the deltas rather than show a number that compares
+    // a 2026 slice against a non-matching 2025 code space.
+    const cmpPreCutoff = cmpTo < MIGRATION_CUTOFF
+    const sliceFilterActive = (region !== 'ALL') || (bu !== 'ALL') || !!customer
+    let lyComparable = true
+    let cmp
+    if (compare === 'ly' && cmpPreCutoff) {
+      if (sliceFilterActive) {
+        lyComparable = false
+        cmp = { sales: 0, kg: 0, gp: 0 }   // zeros ⇒ all hero deltas resolve to null below
+      } else {
+        // National Old-DB totals at the Old-equivalent scope (fixes the ~70% Vismin undercount).
+        const oldSql = `SELECT ISNULL(SUM(T1.LineTotal),0) AS sales, ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.GrssProfit),0) AS gp
+          FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry=T1.DocEntry INNER JOIN OITM I ON T1.ItemCode=I.ItemCode
+          ${applyRoleFilter(session, `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'`)}
+          AND I.ItmsGrpCod IN ${OLD_LY_SCOPE} AND T1.OcrCode2 IS NOT NULL`
+        cmp = (await queryH(oldSql, { ...params, dateFrom: cmpFrom, dateTo: cmpTo }))[0] || { sales: 0, kg: 0, gp: 0 }
+      }
+    } else {
+      // pp (within Live), or any window that resolves post-cutoff — original path.
+      cmp = (await queryDateRange(totalsSql, params, cmpFrom, cmpTo))[0] || { sales: 0, kg: 0, gp: 0 }
+    }
     const mk = (c, p, kind) => {
       const cv = Number(c || 0), pv = Number(p || 0)
       const pct = pv !== 0 ? Math.round((cv - pv) / Math.abs(pv) * 1000) / 10 : null
@@ -124,7 +154,13 @@ module.exports = async (req, res) => {
       gross_profit: mk(cur.gp, cmp.gp, 'round'),
       gp_pct: { value: Number(cur.sales) > 0 ? Math.round(Number(cur.gp) / Number(cur.sales) * 1000) / 10 : 0, delta_pp: (Number(cur.sales) > 0 && Number(cmp.sales) > 0) ? Math.round((Number(cur.gp) / Number(cur.sales) - Number(cmp.gp) / Number(cmp.sales)) * 1000) / 10 : null },
       gm_per_kg: { value: Math.round(curGpkg * 100) / 100, delta: cmpGpkg ? Math.round((curGpkg - cmpGpkg) * 100) / 100 : null },
-      compare_basis: compare
+      compare_basis: compare,
+      ly_comparable: !(compare === 'ly' && cmpPreCutoff && sliceFilterActive),
+      compare_note: (compare === 'ly' && cmpPreCutoff)
+        ? (sliceFilterActive
+            ? 'vs-LY unavailable for a region/BU/customer slice — 2025 (pre-consolidation) used a different customer/SKU/region coding. Clear filters for national vs-LY.'
+            : 'vs-LY = national, finished-feed+trading+basemix at 2025 (Vienovo_Old) scope (feed 103+104). Aggregate only; not comparable at customer/SKU level across the Jan-2026 consolidation.')
+        : null
     }
 
     // ---- bridge: current vs prior-period at SKU level (item-comparable within 2026) ----

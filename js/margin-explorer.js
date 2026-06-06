@@ -228,6 +228,7 @@
           heroCard('gppct', 'GP %') +
           heroCard('gmkg',  'GM / kg') +
         '</div>' +
+        '<div class="mexp-note" id="mexp-hero-note" style="display:none"></div>' +
 
         // ---- 2-col body ----
         '<div class="mexp-body">' +
@@ -427,6 +428,11 @@
     setHero('gp',    hero.gross_profit, 'php',  hero.gross_profit && hero.gross_profit.delta_pct, 'pct');
     setHero('gppct', hero.gp_pct,       'pct0', hero.gp_pct && hero.gp_pct.delta_pp, 'pp');
     setHero('gmkg',  hero.gm_per_kg,    'kg',   hero.gm_per_kg && hero.gm_per_kg.delta, 'abs');
+    var noteEl = $('mexp-hero-note');
+    if (noteEl) {
+      if (hero.compare_note) { noteEl.textContent = (hero.ly_comparable === false ? '⚠ ' : 'ⓘ ') + hero.compare_note; noteEl.style.display = 'block'; }
+      else { noteEl.style.display = 'none'; }
+    }
   }
 
   function setHero(key, obj, valFmt, delta, deltaFmt) {
