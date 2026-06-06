@@ -540,37 +540,50 @@
   function renderMovers(movers, gap, ingredients, ingMeta) {
     var el = $('mexp-movers');
     if (!el) return;
-    // Ingredient contribution PER TON of feed (price + inclusion), Δ vs prior period.
+    // Ingredient cost — now-vs-prior table (raw ₱/kg price move + inclusion% + ₱/ton-of-feed Δ).
     if (ingredients && ingredients.length) {
-      // ₱/t signed for deltas, plain ₱/t for level.
-      var pt  = function (n) { return '₱' + (Math.round((+n || 0) * 10) / 10).toLocaleString() + '/t'; };
-      var ptD = function (n) { n = +n || 0; var s = '₱' + (Math.round(Math.abs(n) * 10) / 10).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
-      var max = Math.max.apply(null, ingredients.map(function (i) { return Math.abs(+i.perton_cost || 0); })) || 1;
-      // colored signed chip: cost UP (>0) = red (hurts margin), DOWN = green
-      var chip = function (n) { n = +n || 0; var c = n > 0 ? 'var(--red)' : (n < 0 ? 'var(--green)' : 'var(--text3)'); return '<span style="color:' + c + '">' + ptD(n) + '</span>'; };
+      var es = window.esc || function (x) { return x; };
+      var nz = function (n) { return n == null ? null : (+n || 0); };
+      var fkg = function (n) { if (n == null) return '—'; return (Math.round((+n || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      var fpct = function (n) { if (n == null) return '—'; var v = +n || 0; return (v < 1 ? (Math.round(v * 100) / 100) : (Math.round(v * 10) / 10)); };
+      var fpt = function (n) { return '₱' + Math.round(+n || 0).toLocaleString(); };
+      var fdt = function (n) { n = +n || 0; var s = '₱' + Math.round(Math.abs(n)).toLocaleString(); return n > 0 ? '▲ +' + s : (n < 0 ? '▼ −' + s : '·'); };
+      var f1 = function (n) { return (Math.round((+n || 0) * 10) / 10).toLocaleString(); };
       var rows = ingredients.slice(0, 12).map(function (i) {
-        var w = Math.round(Math.abs(+i.perton_cost || 0) / max * 100);
-        // perton_delta>0 = ingredient cost per ton ROSE (hurts margin) → red
-        var dc = (i.perton_delta > 0) ? 'var(--red)' : (i.perton_delta < 0 ? 'var(--green)' : 'var(--text3)');
-        var pe = +i.price_effect || 0, ie = +i.inclusion_effect || 0;
-        // breakdown sub-line: split the Δ into price move vs recipe (inclusion) move
-        var split = (pe || ie)
-          ? '<div style="font-size:9px;color:var(--text3);padding-left:138px;margin-top:1px;line-height:1.3">price ' + chip(pe) + ' · recipe ' + chip(ie) + '</div>'
-          : '';
-        return '<div style="margin:5px 0">' +
-          '<div style="display:flex;align-items:center;gap:8px;font-size:11px">' +
-          '<span style="flex:0 0 130px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (window.esc ? esc(i.name) : i.name) + '</span>' +
-          '<span style="flex:1;height:8px;background:var(--surface2,#1b2940);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:' + w + '%;background:var(--blue)"></span></span>' +
-          '<span style="flex:0 0 78px;text-align:right;font-family:var(--mono,monospace)">' + pt(i.perton_cost) + '</span>' +
-          '<span style="flex:0 0 78px;text-align:right;color:' + dc + ';font-weight:600">Δ ' + ptD(i.perton_delta) + '</span>' +
-          '</div>' + split +
-          '</div>';
+        var rose = i.perton_delta > 0, fell = i.perton_delta < 0;
+        var dCol = rose ? 'var(--red)' : (fell ? 'var(--green)' : 'var(--text3)');
+        var pNow = nz(i.price_now), pPri = nz(i.price_prior);
+        var pUp = pPri != null && pNow > pPri, pDn = pPri != null && pNow < pPri;
+        var pCol = pUp ? 'var(--red)' : (pDn ? 'var(--green)' : 'var(--text)');
+        var pArr = pUp ? ' ▲' : (pDn ? ' ▼' : '');
+        var priceCell = (pPri == null ? '<span style="color:var(--gold)">new</span> ' : '<span style="color:var(--text3)">' + fkg(pPri) + '</span> → ')
+          + '<b style="color:' + pCol + '">' + fkg(pNow) + '</b>' + pArr;
+        var inclCell = (i.incl_prior_pct == null ? '' : '<span style="color:var(--text3)">' + fpct(i.incl_prior_pct) + '</span>→') + fpct(i.incl_now_pct);
+        // price vs recipe split kept on hover (the decomposition)
+        var tip = 'price ' + (i.price_effect > 0 ? '+' : (i.price_effect < 0 ? '−' : '')) + '₱' + f1(Math.abs(i.price_effect)) + '/t  ·  recipe ' + (i.inclusion_effect > 0 ? '+' : (i.inclusion_effect < 0 ? '−' : '')) + '₱' + f1(Math.abs(i.inclusion_effect)) + '/t';
+        return '<tr>' +
+          '<td class="ing-nm" title="' + es(i.name) + '">' + es(i.name) + '</td>' +
+          '<td class="num">' + priceCell + '</td>' +
+          '<td class="num">' + inclCell + '</td>' +
+          '<td class="num">' + fpt(i.perton_cost) + '</td>' +
+          '<td class="num" style="color:' + dCol + ';font-weight:600;cursor:help" title="' + tip + '">' + fdt(i.perton_delta) + '</td>' +
+          '</tr>';
       }).join('');
-      var sub = (ingMeta && ingMeta.note)
-        ? esc(ingMeta.note)
-        : 'Per-ton ingredient cost · Δ vs prior period (red = cost rose)';
+      var sub = (ingMeta && ingMeta.note) ? es(ingMeta.note) : '';
       el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Cost / Ton of Feed</span></div>' +
-        '<div style="font-size:9px;color:var(--text3);margin:-4px 0 6px;line-height:1.4">' + sub + '</div>' + rows;
+        '<style>' +
+        '.mexp-ing-tbl{width:100%;border-collapse:collapse;font-size:11px}' +
+        '.mexp-ing-tbl th,.mexp-ing-tbl td{padding:3px 6px;border-bottom:1px solid var(--surface2,#1b2940)}' +
+        '.mexp-ing-tbl th{color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:right;font-weight:600;white-space:nowrap}' +
+        '.mexp-ing-tbl th:first-child{text-align:left}' +
+        '.mexp-ing-tbl td.num{text-align:right;font-family:var(--mono,monospace);white-space:nowrap}' +
+        '.mexp-ing-tbl td.ing-nm{color:var(--text2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '</style>' +
+        '<div style="font-size:9px;color:var(--text3);margin:-2px 0 6px;line-height:1.4">' + sub + '</div>' +
+        '<table class="mexp-ing-tbl"><thead><tr>' +
+        '<th>Ingredient</th><th>₱/kg was→now</th><th>incl %</th><th>₱/t feed</th><th>Δ ₱/t</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.4">▲ red = cost rose · ▼ green = cost fell · hover Δ for price vs recipe split. Short windows (early MTD) have few purchase invoices — use QTD/YTD for a stable price read.</div>';
       el.style.display = 'block';
       return;
     }
