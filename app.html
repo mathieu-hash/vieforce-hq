@@ -2285,7 +2285,7 @@ body{
           <!-- Days block -->
           <div style="background:rgba(0,74,100,0.15);padding:16px 20px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;gap:6px">
             <div style="display:flex;justify-content:space-between;gap:20px">
-              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Days In Month</div><div style="font-family:var(--mono);font-size:24px;font-weight:700" id="sp-daysmonth">26</div></div>
+              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px" id="sp-lbl-days">Days In Month</div><div style="font-family:var(--mono);font-size:24px;font-weight:700" id="sp-daysmonth">26</div></div>
             </div>
             <div style="display:flex;gap:20px">
               <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Shipping Days</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue)" id="sp-elapsed">10</div></div>
@@ -2305,14 +2305,14 @@ body{
           </div>
           <!-- Projected (End of Month) -->
           <div style="padding:16px 28px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;text-align:center">
-            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Projected (End of Month)</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px" id="sp-lbl-proj">Projected (End of Month)</div>
             <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">13,104</div>
             <div style="font-size:11px;font-weight:700;color:var(--text3)">MT at current pace</div>
           </div>
           <!-- Month pace bar (fills the formerly-empty hero column) -->
           <div style="padding:16px 28px;display:flex;flex-direction:column;justify-content:center;gap:9px">
             <div style="display:flex;align-items:baseline;justify-content:space-between">
-              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Month Pace</div>
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px" id="sp-lbl-pace">Month Pace</div>
               <div style="font-size:11px;color:var(--text3)" id="sp-pace-days">—</div>
             </div>
             <div style="height:11px;border-radius:6px;background:rgba(255,255,255,0.06);overflow:hidden">
@@ -5330,6 +5330,11 @@ async function loadSpeed(){
     if(spPaceBar && projMtd && mtdActual!=null){
       spPaceBar.style.width = Math.max(2, Math.min(100, mtdActual/projMtd*100)).toFixed(0)+'%';
     }
+    // Period-aware hero labels (the hero follows the selected period, not always the month)
+    var spPW = {'7D':'Week','MTD':'Month','QTD':'Quarter','YTD':'Year'}[PD] || 'Period';
+    sett('sp-lbl-days', 'Days In '+spPW);
+    sett('sp-lbl-proj', 'Projected ('+spPW+' End)');
+    sett('sp-lbl-pace', spPW+' Pace');
     // Update "Average Speed" label -> "Projected (End of Month)"
     var avgSpeedLabel = sel('sp-avgspeed') && sel('sp-avgspeed').parentElement && sel('sp-avgspeed').parentElement.querySelector('div:first-child');
     if(avgSpeedLabel && avgSpeedLabel.textContent.trim().toLowerCase()==='average speed') avgSpeedLabel.textContent='Projected (End of Month)';
