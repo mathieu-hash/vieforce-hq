@@ -636,6 +636,13 @@
       built = buildSkeleton();
       if (!built) return;
     }
+    // H4: on EVERY entry, inherit the topbar region window so the tab's own
+    // region chip stays in sync with window.RG (set elsewhere). Only when RG
+    // is a non-empty string; reflect it on the chip like period/region do.
+    if (typeof window.RG === 'string' && window.RG) {
+      STATE.region = window.RG;
+      setChipActive('region', STATE.region);
+    }
     fetchAndRender();
   };
 })();

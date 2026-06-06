@@ -3928,9 +3928,12 @@ function setRefMonth(val) {
     if (VF_REF_MONTH) localStorage.setItem('vf_ref_month', VF_REF_MONTH);
     else localStorage.removeItem('vf_ref_month');
   } catch (e) {}
+  var _daWasLoaded = (typeof DA !== 'undefined') && DA.loaded;
+  if(typeof DA !== 'undefined') DA.loaded = false;
   DC = {};
   renderGlobalFilterBar();
   loadPage(PG);
+  if(_daWasLoaded && PG === 'pg-insights' && typeof loadDeeperAnalytics === 'function') loadDeeperAnalytics(true);
 }
 function setRegion(val) {
   RG = val || 'ALL';
@@ -3939,10 +3942,12 @@ function setRegion(val) {
     else localStorage.removeItem('vf_region');
   } catch (e) {}
   if(typeof CF !== 'undefined') CF = RG;
+  var _daWasLoaded = (typeof DA !== 'undefined') && DA.loaded;
   if(typeof DA !== 'undefined') DA.loaded = false;
   DC = {};
   renderGlobalFilterBar();
   loadPage(PG);
+  if(_daWasLoaded && PG === 'pg-insights' && typeof loadDeeperAnalytics === 'function') loadDeeperAnalytics(true);
 }
 function setSegment(val) {
   SEG = val || 'ALL';
@@ -3950,10 +3955,12 @@ function setSegment(val) {
     if (SEG && SEG !== 'ALL') localStorage.setItem('vf_segment', SEG);
     else localStorage.removeItem('vf_segment');
   } catch (e) {}
+  var _daWasLoaded = (typeof DA !== 'undefined') && DA.loaded;
   if(typeof DA !== 'undefined') DA.loaded = false;
   DC = {};
   renderGlobalFilterBar();
   loadPage(PG);
+  if(_daWasLoaded && PG === 'pg-insights' && typeof loadDeeperAnalytics === 'function') loadDeeperAnalytics(true);
 }
 function setRegionAndNav(region, pageId) {
   RG = region || 'ALL';
@@ -4436,10 +4443,9 @@ async function loadHome(){
     if(!DC['pg-home']){
       var results = await Promise.all([
         getDashboardData(vfApiParams()).catch(function(e){console.error('dashboard:',e);return null}),
-        getARData().catch(function(e){console.error('ar:',e);return null}),
         getSpeedData(vfApiParams()).catch(function(e){console.error('speed:',e);return null})
       ]);
-      DC['pg-home'] = {d:results[0], ar:results[1], sp:results[2]};
+      DC['pg-home'] = {d:results[0], ar:null, sp:results[1]};
     }
     var c=DC['pg-home']||{};
     var d=c.d||null, ar=c.ar||null, sp=c.sp||null;
@@ -4963,7 +4969,7 @@ function renderARClients(){
 async function loadAR(){
   clearError('pg-ar');
   try {
-    var d = await getARData();
+    var d = await getARData(vfApiParams());
     if(!d){showError('pg-ar','Unable to load AR data');return}
     console.log('[AR] Rendering:', Object.keys(d));
     var showDelinq = !!(sel('ar-show-delinq') && sel('ar-show-delinq').checked);
@@ -5113,7 +5119,7 @@ function availClass(v){
 async function loadInv(){
   clearError('pg-inv');
   try {
-    var d = await getInventoryData({plant:'ALL'});
+    var d = await getInventoryData(vfApiParams({plant:'ALL'}));
     if(!d){showError('pg-inv','Unable to load inventory data');return}
     INV_STATE.data = d;
     console.log('[INV] Rendering:', Object.keys(d), '|', (d.plants||[]).length, 'plants,', (d.items||[]).length, 'items');
@@ -6480,15 +6486,15 @@ async function loadDeeperAnalytics(force) {
     if(el){ el.style.display='block'; el.style.color=''; el.textContent='Loading...'; }
   });
 
-  var pSku = getSkuMatrix({unit: unit, region: region, bu: bu})
+  var pSku = getSkuMatrix(vfApiParams({unit: unit, region: region, bu: bu}))
     .then(function(d){ DA.sku = d; renderSkuMatrix(d); })
     .catch(function(e){ daShowErr('da-sku-status', e.message || 'Failed to load'); });
 
-  var pBc = getBrandCoverage({region: region, bu: bu})
+  var pBc = getBrandCoverage(vfApiParams({region: region, bu: bu}))
     .then(function(d){ DA.bc = d; renderBrandCoverage(d); })
     .catch(function(e){ daShowErr('da-bc-status', e.message || 'Failed to load'); });
 
-  var pBp = getBuyingPatterns({region: region, bu: bu})
+  var pBp = getBuyingPatterns(vfApiParams({region: region, bu: bu}))
     .then(function(d){ DA.bp = d; renderBuyingPatterns(d); })
     .catch(function(e){ daShowErr('da-bp-status', e.message || 'Failed to load'); });
 
@@ -7238,7 +7244,7 @@ async function loadItemized(){
     try { ITM_STATE.collapsed = JSON.parse(localStorage.getItem('itm-collapse') || '{}'); } catch(e){ ITM_STATE.collapsed = {}; }
     var tbody = document.getElementById('itm-tbody');
     if (tbody) tbody.innerHTML = '<tr><td style="text-align:center;color:var(--text3);padding:40px" colspan="30">Loading SAP data…</td></tr>';
-    var d = await apiFetch('itemized', { district: district, year: year, compare_year: year - 1 });
+    var d = await apiFetch('itemized', Object.assign(vfApiParams(), { district: district, year: year, compare_year: year - 1 }));
     if (!d){ showError('pg-itemized','Unable to load itemized data'); return; }
     console.log('[ITM] loaded', d.district, d.active_sku_count+'/'+d.total_sku_count+' SKUs', d.query_ms+'ms SQL');
     ITM_STATE.data = d;

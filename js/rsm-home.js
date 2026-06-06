@@ -168,11 +168,11 @@
       var cacheKey = 'pg-rsm-home';
       if (!DC[cacheKey]) {
         DC[cacheKey] = (async function(){
-          var team = await apiFetch('team', { period: (typeof PD !== 'undefined' ? PD : 'MTD') }).catch(function(e){ console.warn('[rsm] team:', e.message); return null; });
-          var dashParams = typeof vfApiParams === 'function'
+          var rsmParams = typeof vfApiParams === 'function'
             ? vfApiParams({ region: region || 'ALL' })
             : { period: (typeof PD !== 'undefined' ? PD : 'MTD'), region: region || 'ALL' };
-          var dashboard = await apiFetch('dashboard', dashParams).catch(function(e){ console.warn('[rsm] dashboard:', e.message); return null; });
+          var team = await apiFetch('team', rsmParams).catch(function(e){ console.warn('[rsm] team:', e.message); return null; });
+          var dashboard = await apiFetch('dashboard', rsmParams).catch(function(e){ console.warn('[rsm] dashboard:', e.message); return null; });
           var dsms = await loadDsmsForRsm(session.id);
           var patrol = await loadPatrolForRsm(session.id);
           // Count TSRs per DSM (parallel) — used for DSM meta line
