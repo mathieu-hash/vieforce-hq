@@ -2285,7 +2285,7 @@ body{
           <!-- Days block -->
           <div style="background:rgba(0,74,100,0.15);padding:16px 20px;border-right:1px solid var(--divider);display:flex;flex-direction:column;justify-content:center;gap:6px">
             <div style="display:flex;justify-content:space-between;gap:20px">
-              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Days In Month</div><div style="font-family:var(--mono);font-size:24px;font-weight:700">26</div></div>
+              <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Days In Month</div><div style="font-family:var(--mono);font-size:24px;font-weight:700" id="sp-daysmonth">26</div></div>
             </div>
             <div style="display:flex;gap:20px">
               <div><div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Shipping Days</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue)" id="sp-elapsed">10</div></div>
@@ -2308,6 +2308,20 @@ body{
             <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Projected (End of Month)</div>
             <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);letter-spacing:-1px" id="sp-avgspeed">13,104</div>
             <div style="font-size:11px;font-weight:700;color:var(--text3)">MT at current pace</div>
+          </div>
+          <!-- Month pace bar (fills the formerly-empty hero column) -->
+          <div style="padding:16px 28px;display:flex;flex-direction:column;justify-content:center;gap:9px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Month Pace</div>
+              <div style="font-size:11px;color:var(--text3)" id="sp-pace-days">—</div>
+            </div>
+            <div style="height:11px;border-radius:6px;background:rgba(255,255,255,0.06);overflow:hidden">
+              <div id="sp-pace-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .5s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px">
+              <span style="color:var(--text2)"><b id="sp-pace-mtd" style="font-family:var(--mono);color:var(--text)">—</b> MT to date</span>
+              <span style="color:var(--text3)">of <b id="sp-pace-proj" style="font-family:var(--mono)">—</b> proj</span>
+            </div>
           </div>
         </div>
 
@@ -5305,8 +5319,17 @@ async function loadSpeed(){
     var mtdActual   = d.mtd_actual!=null?d.mtd_actual:d.actual_mt;
     if(daysElapsed!=null) sett('sp-elapsed',daysElapsed.toString());
     if(daysRemain!=null)  sett('sp-remain',daysRemain.toString());
+    if(daysTotal!=null)   sett('sp-daysmonth',daysTotal.toString());
     if(dailyPull!=null)   sett('sp-pullout',fcn(Math.round(dailyPull)));
     if(projMtd!=null)     sett('sp-avgspeed',fcn(Math.round(projMtd)));     // now = Projected end-of-month
+    // Month-pace bar (fills the hero): share of projected month volume already shipped + day count
+    if(mtdActual!=null) sett('sp-pace-mtd', fcn(Math.round(mtdActual)));
+    if(projMtd!=null)   sett('sp-pace-proj', fcn(Math.round(projMtd)));
+    if(daysElapsed!=null && daysTotal!=null) sett('sp-pace-days', 'Day '+daysElapsed+' of '+daysTotal);
+    var spPaceBar = sel('sp-pace-bar');
+    if(spPaceBar && projMtd && mtdActual!=null){
+      spPaceBar.style.width = Math.max(2, Math.min(100, mtdActual/projMtd*100)).toFixed(0)+'%';
+    }
     // Update "Average Speed" label -> "Projected (End of Month)"
     var avgSpeedLabel = sel('sp-avgspeed') && sel('sp-avgspeed').parentElement && sel('sp-avgspeed').parentElement.querySelector('div:first-child');
     if(avgSpeedLabel && avgSpeedLabel.textContent.trim().toLowerCase()==='average speed') avgSpeedLabel.textContent='Projected (End of Month)';
