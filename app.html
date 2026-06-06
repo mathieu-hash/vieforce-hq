@@ -2327,24 +2327,13 @@ body{
             <div class="card-hdr"><div class="card-title" id="speed-daily-title">Daily Pullout · MTD</div></div>
             <div class="card-body"><div class="chart-wrap"><canvas id="speedChart"></canvas></div></div>
           </div>
-          <div>
-            <div class="card" style="margin-bottom:12px">
-              <div class="card-hdr"><div class="card-title">Weekly Matrix (MT) — Plants × Weeks</div></div>
-              <div class="card-body" style="padding-top:8px;overflow-x:auto">
-                <table class="matrix" id="speed-weekly-matrix">
-                  <thead id="speed-weekly-thead"><tr><th colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</th></tr></thead>
-                  <tbody id="speed-weekly-tbody"></tbody>
-                </table>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-hdr"><div class="card-title">Plant Breakdown (MTD)</div></div>
-              <div class="card-body" style="padding-top:8px;overflow-x:auto">
-                <table class="matrix">
-                  <thead><tr><th>Plant</th><th>MTD (MT)</th></tr></thead>
-                  <tbody id="speed-plantmatrix-tbody"><tr><td colspan="2" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-                </table>
-              </div>
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Plant Pullout Matrix (MT) — Weeks + MTD</div></div>
+            <div class="card-body" style="padding-top:8px;overflow-x:auto">
+              <table class="matrix" id="speed-weekly-matrix">
+                <thead id="speed-weekly-thead"><tr><th colspan="9" style="text-align:center;color:var(--text3);font-size:11px">Loading…</th></tr></thead>
+                <tbody id="speed-weekly-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -2360,9 +2349,9 @@ body{
             <div class="card-body" style="padding-top:8px">
               <style>
                 .speed-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-                .speed-tbl th{padding:10px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right;border-bottom:2px solid var(--divider);letter-spacing:0.3px}
+                .speed-tbl th{padding:6px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right;border-bottom:2px solid var(--divider);letter-spacing:0.3px}
                 .speed-tbl th:first-child{text-align:left}
-                .speed-tbl td{padding:9px 12px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.03)}
+                .speed-tbl td{padding:5px 12px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.03)}
                 .speed-tbl td:first-child{font-family:var(--font);font-weight:700;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.2px}
                 .speed-tbl .sv{font-family:var(--mono);font-weight:400;font-size:12px}
                 .speed-tbl .sd{font-family:var(--mono);font-weight:700;font-size:11px}
@@ -5430,54 +5419,41 @@ async function loadSpeed(){
       });
       var tgt3 = sel('speed-plant-tbody');
       if(tgt3) seth('speed-plant-tbody', phtml);
-      // Mirror plant breakdown to the new Plant Matrix card
-      var mxBody = sel('speed-plantmatrix-tbody');
-      if(mxBody){
-        var sorted = d.plant_breakdown.slice().sort(function(a,b){return (b.mtd||0)-(a.mtd||0)});
-        var tot = sorted.reduce(function(s,p){return s+(+p.mtd||0)},0);
-        var html = sorted.map(function(p){
-          var vol = Math.round(p.mtd||p.vol||0);
-          var heatCls = vol > 1500 ? 'heat-4' : vol > 800 ? 'heat-3' : vol > 400 ? 'heat-2' : vol > 100 ? 'heat-1' : 'heat-0';
-          return '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc(p.plant||'—')+'</td>'
-            + '<td class="'+heatCls+'">'+fcn(vol)+'</td></tr>';
-        }).join('');
-        html += '<tr><td style="text-align:left;font-size:10px;color:var(--blue);font-weight:800">TOTAL</td><td class="heat-4">'+fcn(Math.round(tot))+'</td></tr>';
-        mxBody.innerHTML = html;
-      }
     }
-    // Weekly Matrix (Plants × Weeks, from weekly_matrix.grid)
+    // Plant Pullout Matrix (Plants × Weeks + MTD column — consolidates the old standalone
+    // "Plant Breakdown (MTD)" card into one table to cut wasted vertical space).
     if(d.weekly_matrix && d.weekly_matrix.weeks && d.weekly_matrix.plants){
       var wm = d.weekly_matrix;
-      var thead = '<tr><th>Plant</th>' + wm.weeks.map(function(w){return '<th>'+esc(w)+'</th>'}).join('') + '</tr>';
+      var heatOf = function(v){ return v > 1500 ? 'heat-4' : v > 800 ? 'heat-3' : v > 400 ? 'heat-2' : v > 100 ? 'heat-1' : 'heat-0'; };
+      // per-plant MTD lookup from plant_breakdown
+      var mtdMap = {}; (d.plant_breakdown||[]).forEach(function(p){ mtdMap[p.plant] = Math.round(p.mtd||p.vol||0); });
+      var thead = '<tr><th style="text-align:left">Plant</th>' + wm.weeks.map(function(w){return '<th>'+esc(w)+'</th>'}).join('')
+        + '<th style="border-left:2px solid var(--divider);color:var(--gold)">MTD</th></tr>';
       seth('speed-weekly-thead', thead);
       var plantTotals = wm.plants.map(function(_,i){ return wm.grid[i].reduce(function(s,v){return s+v},0) });
-      // show top 12 plants by total, rest grouped as OTHER
       var plantIdx = plantTotals.map(function(v,i){return {i,v}}).sort(function(a,b){return b.v-a.v});
       var topPlants = plantIdx.slice(0, 12);
       var otherPlants = plantIdx.slice(12);
+      var mtdCell = function(v){ return '<td class="'+heatOf(v)+'" style="border-left:2px solid var(--divider);font-weight:700">'+(v>0?fcn(Math.round(v)):'—')+'</td>'; };
       var bodyRows = topPlants.map(function(idx){
-        var row = '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc(wm.plants[idx.i])+'</td>';
-        wm.grid[idx.i].forEach(function(v){
-          var heatCls = v > 1500 ? 'heat-4' : v > 800 ? 'heat-3' : v > 400 ? 'heat-2' : v > 100 ? 'heat-1' : 'heat-0';
-          row += '<td class="'+heatCls+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>';
-        });
-        return row + '</tr>';
+        var pname = wm.plants[idx.i];
+        var row = '<tr><td style="font-weight:700;text-align:left;font-size:10px">'+esc(pname)+'</td>';
+        wm.grid[idx.i].forEach(function(v){ row += '<td class="'+heatOf(v)+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>'; });
+        return row + mtdCell(mtdMap[pname]||0) + '</tr>';
       });
+      var otherMtd = 0;
       if(otherPlants.length){
         var otherRow = new Array(wm.weeks.length).fill(0);
-        otherPlants.forEach(function(idx){ wm.grid[idx.i].forEach(function(v,wi){ otherRow[wi]+=v }); });
+        otherPlants.forEach(function(idx){ wm.grid[idx.i].forEach(function(v,wi){ otherRow[wi]+=v }); otherMtd += (mtdMap[wm.plants[idx.i]]||0); });
         var r = '<tr><td style="font-weight:700;text-align:left;font-size:10px;color:var(--text3)">OTHER ('+otherPlants.length+')</td>';
-        otherRow.forEach(function(v){
-          var heatCls = v > 1500 ? 'heat-4' : v > 800 ? 'heat-3' : v > 400 ? 'heat-2' : v > 100 ? 'heat-1' : 'heat-0';
-          r += '<td class="'+heatCls+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>';
-        });
-        bodyRows.push(r + '</tr>');
+        otherRow.forEach(function(v){ r += '<td class="'+heatOf(v)+'">'+(v > 0 ? fcn(Math.round(v)) : '—')+'</td>'; });
+        bodyRows.push(r + mtdCell(otherMtd) + '</tr>');
       }
-      // Total row
       var weekTotals = wm.weeks.map(function(_,wi){ return wm.grid.reduce(function(s,row){return s+(row[wi]||0)},0) });
+      var mtdTotal = Object.keys(mtdMap).reduce(function(s,k){return s+mtdMap[k]},0);
       var totalRow = '<tr><td style="text-align:left;font-size:10px;color:var(--blue);font-weight:800">TOTAL</td>'
         + weekTotals.map(function(v){return '<td class="heat-4" style="font-weight:800">'+fcn(Math.round(v))+'</td>'}).join('')
-        + '</tr>';
+        + '<td class="heat-4" style="border-left:2px solid var(--divider);font-weight:800">'+fcn(Math.round(mtdTotal))+'</td></tr>';
       bodyRows.push(totalRow);
       seth('speed-weekly-tbody', bodyRows.join(''));
     }
