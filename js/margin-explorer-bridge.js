@@ -128,21 +128,28 @@
 
     // COGS split — render up to three cost segments. For costs, a NEGATIVE delta
     // means cost rose (hurts GP) -> red; POSITIVE means cost fell (helps GP) -> green.
-    var rm = +cost.rm || 0;
-    var pkg = +cost.packaging || 0;
-    var ft = +cost.feedtag || 0;
-    // If split not populated but a total exists, fall back to total as RM bucket.
-    if (rm === 0 && pkg === 0 && ft === 0 && cost.total != null) rm = +cost.total || 0;
+    // SSG (category) level bridge carries a SINGLE Cost bucket — the RM/Pkg/Feedtag
+    // split is not computable across the Jan-2026 consolidation, so render one
+    // honest "Cost" bar instead of faking the split.
+    if (bridge.level === 'ssg') {
+      steps.push({ label: 'Cost', delta: +cost.total || 0, kind: 'delta' });
+    } else {
+      var rm = +cost.rm || 0;
+      var pkg = +cost.packaging || 0;
+      var ft = +cost.feedtag || 0;
+      // If split not populated but a total exists, fall back to total as RM bucket.
+      if (rm === 0 && pkg === 0 && ft === 0 && cost.total != null) rm = +cost.total || 0;
 
-    var costSegs = [
-      { label: 'RM cost', delta: rm },
-      { label: 'Packaging', delta: pkg },
-      { label: 'Feedtag', delta: ft }
-    ];
-    costSegs.forEach(function (c) {
-      // always push so the bar is reserved; non-zero requirement honoured by rendering
-      if (c.delta !== 0 || true) steps.push({ label: c.label, delta: c.delta, kind: 'delta' });
-    });
+      var costSegs = [
+        { label: 'RM cost', delta: rm },
+        { label: 'Packaging', delta: pkg },
+        { label: 'Feedtag', delta: ft }
+      ];
+      costSegs.forEach(function (c) {
+        // always push so the bar is reserved; non-zero requirement honoured by rendering
+        if (c.delta !== 0 || true) steps.push({ label: c.label, delta: c.delta, kind: 'delta' });
+      });
+    }
 
     steps.push({ label: perTon ? 'Current GM/t' : 'Current GP', value: current, kind: 'anchor', color: p.blue });
 
