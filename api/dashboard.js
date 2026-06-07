@@ -190,27 +190,49 @@ module.exports = async (req, res) => {
 
     // --- DSO (active + total) — trailing 90-day formula calibrated to Finance Dashboard ---
     // Scope numerator (AR) and denominator (trailing-90 sales) identically so the ratio stays
-    // meaningful: region via EXISTS over INV1 (keyed on OINV alias O), segment off O. ALL = no-op.
-    const dsoRegionExists = region === 'ALL'
-      ? ''
-      : ` AND EXISTS (SELECT 1 FROM INV1 L WHERE L.DocEntry = O.DocEntry AND ${regionCaseSql('L')} = @region)`
+    // meaningful. region=ALL keeps the original national SQL byte-identical (segment off O).
+    // Under a region filter, DSO switches to the line-apportioned methodology used by
+    // /api/ar by_region (AR share + 90d sales via regionCaseSql on the INV1 line): the
+    // EXISTS whole-invoice scoping counts multi-region invoices fully on BOTH sides of
+    // the ratio and dilutes regional DSO toward the national value.
     const dsoSegment = segmentFilterSql(segment, 'O')
-    const dsoScope = dsoRegionExists + dsoSegment
-    const dsoRow = await query(`
+    const dsoLineRegion = ` AND ${regionCaseSql('L')} = @region`
+    const dsoDeclares = region === 'ALL' ? `
       DECLARE @ar_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE}${dsoScope});
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE}${dsoSegment});
       DECLARE @ar_total  DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
-        FROM OINV O WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate${dsoScope});
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate${dsoSegment});
       DECLARE @s90_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE}${dsoScope});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE}${dsoSegment});
       DECLARE @s90_total  DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
-        FROM OINV O WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE())${dsoScope});
+        FROM OINV O WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE())${dsoSegment});` : `
+      DECLARE @ar_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE_PREDICATE}${dsoLineRegion}${dsoSegment});
+      DECLARE @ar_total  DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)),0)
+        FROM OINV O
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate${dsoLineRegion}${dsoSegment});
+      DECLARE @s90_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE_PREDICATE}${dsoLineRegion}${dsoSegment});
+      DECLARE @s90_total  DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal),0)
+        FROM OINV O
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE())${dsoLineRegion}${dsoSegment});`
+    const dsoRow = await query(`${dsoDeclares}
       SELECT
         CASE WHEN @s90_active > 0 THEN @ar_active / (@s90_active/90.0) ELSE 0 END AS dso_active,
         CASE WHEN @s90_total  > 0 THEN @ar_total  / (@s90_total /90.0) ELSE 0 END AS dso_total
