@@ -86,7 +86,7 @@
     try { renderEvpPnl(dash, sales, margin); } catch(e){ console.error('[EVP] pnl:',e); }
     try { renderEvpRegions(dash); }       catch(e){ console.error('[EVP] regions:',e); }
     try { renderEvpRisks(dash, ar, margin); } catch(e){ console.error('[EVP] risks:',e); }
-    try { renderEvpOpps(dash, team); }    catch(e){ console.error('[EVP] opps:',e); }
+    try { renderEvpOpps(dash, team, margin); } catch(e){ console.error('[EVP] opps:',e); }
     try { renderEvpPerformers(team, dash); } catch(e){ console.error('[EVP] performers:',e); }
   }
 
@@ -169,38 +169,42 @@
   }
 
   function renderEvpRegions(dash){
-    // Prefer live region_performance; derive ach% vs monthly target when possible
+    // Live region_performance only — no regional targets exist in SAP, so show
+    // the REAL growth metric (vs PP / vs LY per the compare toggle), not a
+    // fixed-weight modeled "achievement %".
     var src = (dash && dash.region_performance) || [];
-    var ytdBudget = (dash && dash.budget && dash.budget.ytd_mt) || 100000;
-    // Approx monthly target per region ~ 30% Luzon, 25% Visayas, 25% Mindanao, 20% Other
-    var weights = { Luzon:0.35, Visayas:0.28, Mindanao:0.22, Other:0.15 };
+    var useLy = (typeof CMP === 'string' && CMP === 'vs_ly');
+    var sub = $('evp-regions-sub'); if(sub) sub.textContent = useLy ? 'Volume vs LY' : 'Volume vs PP';
 
-    var rows = src.length ? src.map(function(r){
-      var tgtShare = weights[r.region] != null ? weights[r.region] : 0.25;
-      var monthTarget = ((dash.budget && dash.budget.mtd_mt) || 15000) * tgtShare;
-      var ach = monthTarget>0 ? (r.vol/monthTarget)*100 : 0;
-      return { name:(r.region||'?').toUpperCase(), volume:r.vol||0, ach:ach };
-    }) : [
-      { name:'LUZON',    volume:0, ach:0 },
-      { name:'VISAYAS',  volume:0, ach:0 },
-      { name:'MINDANAO', volume:0, ach:0 },
-      { name:'OTHER',    volume:0, ach:0 }
-    ];
+    var el = $('evp-regions');
+    if(!src.length){
+      if(el) el.innerHTML = '<div style="padding:12px;text-align:center;color:#65676B;font-size:12px">No regional data for this period</div>';
+      return;
+    }
+
+    var rows = src.map(function(r){
+      var raw = useLy ? r.vs_ly : r.vs_pp;
+      if(useLy && (raw == null || raw === '')) raw = r.vs_pp;
+      return { name:(r.region||'?').toUpperCase(), volume:r.vol||0, pct:(raw==null||raw==='')?null:Number(raw) };
+    });
 
     var html = rows.map(function(r){
-      var pct = r.ach || 0;
-      var color = pct>=100 ? '#31A24C' :
-                  pct>=80  ? '#0084FF' :
-                  pct>=60  ? '#F7B928' : '#FA383E';
-      var emoji = pct>=100 ? '🔥 ' : pct<60 ? '🔻 ' : '';
+      var pct = r.pct;
+      var color = pct==null   ? '#65676B' :
+                  pct>=10     ? '#31A24C' :
+                  pct>=0      ? '#0084FF' :
+                  pct>=-10    ? '#F7B928' : '#FA383E';
+      var emoji = pct!=null && pct>=20 ? '🔥 ' : (pct!=null && pct<=-20 ? '🔻 ' : '');
+      var w = pct==null ? 0 : Math.min(Math.abs(pct),100);
+      var lbl = pct==null ? '—' : (pct>0?'+':'')+pct.toFixed(0)+'%';
       return '<div class="evp-region-row">' +
         '<div class="evp-region-name">'+emoji+r.name+'</div>' +
-        '<div class="evp-region-bar"><div class="evp-region-fill" style="width:'+Math.min(pct,100).toFixed(0)+'%;background:'+color+'"></div></div>' +
-        '<div class="evp-region-pct" style="color:'+color+'">'+pct.toFixed(0)+'%</div>' +
+        '<div class="evp-region-bar"><div class="evp-region-fill" style="width:'+w.toFixed(0)+'%;background:'+color+'"></div></div>' +
+        '<div class="evp-region-pct" style="color:'+color+'">'+lbl+'</div>' +
       '</div>';
     }).join('');
 
-    var el = $('evp-regions'); if(el) el.innerHTML = html;
+    if(el) el.innerHTML = html;
   }
 
   function renderEvpRisks(dash, ar, margin){
@@ -230,18 +234,17 @@
       });
     }
 
-    // 3 · Region underperforming (<60% of monthly target)
-    var weights = { Luzon:0.35, Visayas:0.28, Mindanao:0.22, Other:0.15 };
-    var mtdBudget = (dash && dash.budget && dash.budget.mtd_mt) || 15000;
+    // 3 · Region declining sharply (real vs-LY, fallback vs-PP — no modeled targets)
     var regions = (dash && dash.region_performance) || [];
     for(var i=0;i<regions.length;i++){
       var r = regions[i];
-      var tgt = mtdBudget * (weights[r.region]||0.25);
-      var ach = tgt>0 ? (r.vol/tgt)*100 : 0;
-      if(ach < 60 && risks.length < 3){
+      var hasLy = (r.vs_ly != null && r.vs_ly !== '');
+      var raw = hasLy ? Number(r.vs_ly) : ((r.vs_pp != null && r.vs_pp !== '') ? Number(r.vs_pp) : null);
+      var lbl = hasLy ? 'vs LY' : 'vs PP';
+      if(raw != null && raw < -10 && risks.length < 3){
         risks.push({
-          title: r.region+' at '+ach.toFixed(0)+'% of target',
-          detail: 'Intervention needed'
+          title: r.region+' down '+Math.abs(raw).toFixed(0)+'% '+lbl,
+          detail: 'Volume declining — intervention needed'
         });
       }
     }
@@ -269,27 +272,48 @@
     var el = $('evp-risks'); if(el) el.innerHTML = html;
   }
 
-  function renderEvpOpps(dash, team){
-    // Rule-based for Day 1 — future: /api/opportunities endpoint
-    var opps = [
-      { title: 'White-space: 18 towns in NL',         detail: '₱3.2M/mo potential' },
-      { title: 'Upsell 120 A-class customers',        detail: '₱8M upside at SOV <30%' },
-      { title: 'Replicate MM-East playbook',          detail: '+₱4M MoM uplift projected' }
-    ];
+  function renderEvpOpps(dash, team, margin){
+    // Real signals only — derived from live region/margin/customer data.
+    // (Old hardcoded "white-space / upsell / playbook" bets were fabricated.)
+    var opps = [];
 
-    // If Team data has "growing" accounts, surface the top one
-    if(team && team.growing_customers && team.growing_customers.length){
-      var g = team.growing_customers[0];
-      opps[0] = {
-        title: 'Growing: '+(g.name||g.CardName),
-        detail: '+'+(g.pct||g.growth_pct||30)+'% vs prior period'
-      };
+    // 1 · Fastest-growing region vs LY
+    var regions = (dash && dash.region_performance) || [];
+    if(regions.length){
+      var best = regions.slice().sort(function(a,b){ return Number(b.vs_ly||0) - Number(a.vs_ly||0); })[0];
+      if(best && best.vs_ly != null && Number(best.vs_ly) > 0){
+        opps.push({
+          title: 'Ride '+best.region+' momentum',
+          detail: '+'+Number(best.vs_ly).toFixed(0)+'% vs LY · '+fmtMT(best.vol)+' MT'
+        });
+      }
     }
+
+    // 2 · Best-GP region (margin KPIs)
+    var bestRg = margin && margin.kpis && margin.kpis.best_region;
+    if(bestRg && bestRg.name){
+      opps.push({
+        title: 'Best GP region: '+bestRg.name,
+        detail: (bestRg.gp_pct != null) ? Number(bestRg.gp_pct).toFixed(1)+'% GP — replicate mix' : ''
+      });
+    }
+
+    // 3 · Top customer this period
+    if(dash && dash.top_customers && dash.top_customers.length){
+      var t = dash.top_customers[0];
+      opps.push({
+        title: 'Top customer: '+(t.name||t.code),
+        detail: fmtMT(t.vol)+' MT · '+fmtPHP(t.revenue)+' — protect & upsell'
+      });
+    }
+
+    if(!opps.length) opps.push({ title:'— no opportunities computed —', detail:'' });
+    opps = opps.slice(0,3);
 
     var html = opps.map(function(o,i){
       return '<div class="evp-radar-item">' +
         '<div class="evp-radar-num">'+(i+1)+'</div>' +
-        '<div><b>'+o.title+'</b> — '+o.detail+'</div>' +
+        '<div><b>'+o.title+'</b>'+(o.detail?' — '+o.detail:'')+'</div>' +
       '</div>';
     }).join('');
     var el = $('evp-opps'); if(el) el.innerHTML = html;
@@ -305,12 +329,32 @@
     if(team && team.rsm_scorecard && team.rsm_scorecard.length){
       var rsmSorted = team.rsm_scorecard.slice().sort(function(a,b){return (b.ytd_vol||0)-(a.ytd_vol||0);});
       topRsm = rsmSorted[0];
+    } else if(team && team.rsms && team.rsms.length){
+      var rsmSorted2 = team.rsms.slice().sort(function(a,b){return (b.ytd_vol||0)-(a.ytd_vol||0);});
+      topRsm = rsmSorted2[0];
+    }
+
+    // Top district = best DSM territory across all RSMs (real /api/team rollup)
+    var topDsm = null;
+    if(team && team.rsms){
+      team.rsms.forEach(function(r){
+        (r.dsms||[]).forEach(function(d){
+          if(!topDsm || (d.ytd_vol||0) > (topDsm.ytd_vol||0)) topDsm = d;
+        });
+      });
+    }
+    var topDsmVal = '—';
+    if(topDsm){
+      topDsmVal = topDsm.name+' · '+fmtMT(topDsm.ytd_vol)+' MT';
+      if(topDsm.vs_pp_pct != null){
+        topDsmVal += ' ('+(topDsm.vs_pp_pct>0?'+':'')+Number(topDsm.vs_pp_pct).toFixed(0)+'% vs PP)';
+      }
     }
 
     var rows = [
       { label: '🥇 Region', value: topRegion ? (topRegion.region+' ('+fmtMT(topRegion.vol)+' MT)') : '—' },
       { label: '🥇 RSM',    value: topRsm    ? ((topRsm.rsm||topRsm.name)+' · '+fmtMT(topRsm.ytd_vol)+' MT YTD') : '—' },
-      { label: '🥇 District', value: 'MM-East +112% vs PP' }
+      { label: '🥇 District', value: topDsmVal }
     ];
     var html = rows.map(function(p){
       return '<div class="evp-performer-row">' +

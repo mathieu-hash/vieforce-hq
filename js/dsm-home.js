@@ -155,9 +155,17 @@
       trend.textContent = arrow + ' ' + Math.abs(vs).toFixed(1) + '% vs ' + cmpWord;
     }
     if (ach) ach.textContent = fmtPhpShort(s.mtd_revenue || 0);
-    if (tgt) tgt.textContent = s.target ? fmtPhpShort(s.target) + ' target' : 'no target set';
+    // Target is MODELED (110% of prior period — no DSM budgets in SAP). Label
+    // it "est." so it never presents as an official budget figure.
+    if (tgt) {
+      tgt.textContent = s.target ? fmtPhpShort(s.target) + ' est. target' : 'no target set';
+      tgt.title = 'Modeled stretch target = 110% of prior period (no DSM-level budgets in SAP yet)';
+    }
     var pctVal = Math.max(0, Math.min(150, Number(s.target_pct || 0)));
-    if (pct) pct.textContent = pctVal.toFixed(0) + '%';
+    if (pct) {
+      pct.textContent = pctVal.toFixed(0) + '%';
+      pct.title = 'vs modeled 110%-of-prior-period target (est.)';
+    }
     if (bar) bar.style.width = Math.min(100, pctVal) + '%';
   }
 
@@ -169,7 +177,9 @@
     if (dist) dist.textContent = fmtNum(k.distributors_count || 0);
     if (tsr)  tsr.textContent  = (k.active_tsrs || 0) + '/' + (k.total_tsrs || 0);
     if (ar)   ar.textContent   = fmtPhpShort(k.ar_overdue_amount || 0);
-    if (conv) conv.textContent = fmtNum(k.conversions_mtd || 0);
+    // Backend hardcodes conversions_mtd: 0 (Patrol doesn't track conversion
+    // events yet) — show "—" instead of a fake-live zero.
+    if (conv) { conv.textContent = '—'; conv.title = 'Not yet tracked — Patrol conversion events pending'; }
   }
 
   function renderDistributors(list){
