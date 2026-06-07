@@ -26,7 +26,8 @@ module.exports = async (req, res) => {
   const reqRegion = normalizeRegion(req.query.region)
   const reqSegment = normalizeSegment(req.query.segment)
 
-  const cacheKey = `dashboard_v2_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
+  // v3: pending-PO switched to OpenQty/open-line basis — bumped so stale full-Quantity payloads don't serve.
+  const cacheKey = `dashboard_v3_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -238,17 +239,20 @@ module.exports = async (req, res) => {
         CASE WHEN @s90_total  > 0 THEN @ar_total  / (@s90_total /90.0) ELSE 0 END AS dso_total
     `, { region })
 
-    // --- Pending PO (open sales orders) + oldest age ---
+    // --- Pending PO (open sales orders — OPEN lines only, residual qty/value) + oldest age ---
+    // OpenQty = undelivered remainder; full Quantity/LineTotal would overstate by the
+    // already-delivered portion. Must match /api/sales pending_po.summary exactly.
     const pendingPO = await query(`
       SELECT
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS total_mt,
-        ISNULL(SUM(T1.LineTotal), 0)                                   AS total_value,
+        ISNULL(SUM(T1.OpenQty * ISNULL(I.NumInSale, 1)) / 1000.0, 0)  AS total_mt,
+        ISNULL(SUM(T1.OpenQty * T1.Price), 0)                          AS total_value,
         COUNT(DISTINCT T0.DocEntry)                                    AS total_orders,
         ISNULL(MAX(DATEDIFF(DAY, T0.DocDate, GETDATE())), 0)           AS oldest_days
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${lineFilters}
+      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
+        AND T1.LineStatus = 'O' AND T1.OpenQty > 0${lineFilters}
     `, { region })
 
     // --- Region performance (current period + previous period for vs_pp delta)

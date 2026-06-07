@@ -4,6 +4,15 @@ const { scopeForUser, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = 
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, regionFilterSql, regionCaseSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
+// Canonical plant (WhsCode) → region map — aligned with api/lib/margin_cube.js.
+// BAC = BACOLOD (Visayas), ALAE/SOUTH/CAG = Mindanao, PFMIS/PFMCIS = Isabela (Luzon).
+const PO_PLANT_REGION = {
+  AC: 'Luzon', ACEXT: 'Luzon', PFMIS: 'Luzon', PFMCIS: 'Luzon',
+  HOREB: 'Visayas', HBEXT: 'Visayas', 'HBEXT-QA': 'Visayas', BAC: 'Visayas', ARGAO: 'Visayas',
+  BUKID: 'Mindanao', SOUTH: 'Mindanao', CAG: 'Mindanao', ALAE: 'Mindanao', CCPC: 'Mindanao'
+}
+function plantRegion(plant) { return PO_PLANT_REGION[plant] || 'Other' }
+
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -44,7 +53,8 @@ module.exports = async (req, res) => {
     : 'live'
   const reqRegion = normalizeRegion(req.query.region)
   const reqSegment = normalizeSegment(req.query.segment)
-  const cacheKey = `sales_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  // v2: pending-PO switched to OpenQty/open-line basis — bumped so stale full-Quantity payloads don't serve.
+  const cacheKey = `sales_v2_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -142,9 +152,12 @@ module.exports = async (req, res) => {
     }
     const monthly_trend = Object.values(trendByMonth).sort((a, b) => a.month.localeCompare(b.month))
 
-    // --- Pending PO detail (open sales orders) ---
+    // --- Pending PO detail (open sales orders — OPEN lines only, residual qty/value) ---
+    // OpenQty = undelivered remainder. Full T1.Quantity/LineTotal would overstate by the
+    // already-delivered portion, and the old TOP 200 truncated aggregates to the 200 oldest
+    // lines. TOP 5000 is a payload guard only (~1.6k open lines live as of 2026-06).
     const pendingPO = await query(`
-      SELECT TOP 200
+      SELECT TOP 5000
         T0.DocNum,
         T0.DocDate,
         T0.CardCode                                                     AS customer_code,
@@ -152,20 +165,21 @@ module.exports = async (req, res) => {
         T1.Dscription                                                   AS brand,
         T1.ItemCode                                                     AS sku,
         T1.WhsCode                                                      AS plant,
-        ISNULL(T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0, 0)        AS qty_mt,
-        ISNULL(T1.LineTotal, 0)                                         AS amount,
+        ISNULL(T1.OpenQty * ISNULL(I.NumInSale, 1) / 1000.0, 0)         AS qty_mt,
+        ISNULL(T1.OpenQty * T1.Price, 0)                                AS open_value,
         DATEDIFF(DAY, T0.DocDate, GETDATE())                            AS age_days
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'${scopeSql}${lineFilters}
+      WHERE T0.DocStatus = 'O' AND T0.CANCELED = 'N'
+        AND T1.LineStatus = 'O' AND T1.OpenQty > 0${scopeSql}${lineFilters}
       ORDER BY T0.DocDate ASC
     `, { region })
 
     const poOrderCount = new Set(pendingPO.map(p => p.DocNum)).size
     const po_total_mt = pendingPO.reduce((s, p) => s + p.qty_mt, 0)
-    // Use line value so region/segment filters stay consistent with the detail rows.
-    const po_total_value = pendingPO.reduce((s, p) => s + (p.amount || 0), 0)
+    // Use open line value (OpenQty * Price) so region/segment filters stay consistent with the detail rows.
+    const po_total_value = pendingPO.reduce((s, p) => s + (p.open_value || 0), 0)
     const po_by_brand = {}
     const po_by_region = {}
     const po_by_sku = {}
@@ -173,21 +187,18 @@ module.exports = async (req, res) => {
     const po_by_customer = {}        // { code: { name, orders:Set, mt, value, statuses:[] } }
     pendingPO.forEach(p => {
       po_by_brand[p.brand] = (po_by_brand[p.brand] || 0) + p.qty_mt
-      const region = ['AC','ACEXT','BAC'].includes(p.plant) ? 'Luzon'
-        : ['HOREB','ARGAO','ALAE'].includes(p.plant) ? 'Visayas'
-        : ['BUKID','CCPC'].includes(p.plant) ? 'Mindanao' : 'Other'
+      const region = plantRegion(p.plant)
       po_by_region[region] = (po_by_region[region] || 0) + p.qty_mt
       po_by_sku[p.sku] = po_by_sku[p.sku] || { sku: p.sku, name: p.brand, mt: 0 }
       po_by_sku[p.sku].mt += p.qty_mt
       if(!po_by_region_detail[region]) po_by_region_detail[region] = { region, orders: new Set(), mt: 0, value: 0 }
       po_by_region_detail[region].orders.add(p.DocNum)
       po_by_region_detail[region].mt += p.qty_mt
-      // approx line value from header allocation (per PO split by line mt share) — quick proxy:
-      po_by_region_detail[region].value += p.amount || 0
+      po_by_region_detail[region].value += p.open_value || 0
       if(!po_by_customer[p.customer_code]) po_by_customer[p.customer_code] = { customer: p.customer_name, code: p.customer_code, orders: new Set(), mt: 0, value: 0 }
       po_by_customer[p.customer_code].orders.add(p.DocNum)
       po_by_customer[p.customer_code].mt += p.qty_mt
-      po_by_customer[p.customer_code].value += p.amount || 0
+      po_by_customer[p.customer_code].value += p.open_value || 0
     })
 
     const top_po_customers = Object.values(po_by_customer)
@@ -223,7 +234,8 @@ module.exports = async (req, res) => {
         sku: p.sku,
         plant: p.plant,
         mt: Math.round(p.qty_mt * 10) / 10,
-        amount: p.amount,
+        amount: p.open_value,        // frontend reads `amount` — value is OpenQty * Price
+        open_value: p.open_value,
         age_days: p.age_days
       }))
     }
@@ -448,9 +460,10 @@ module.exports = async (req, res) => {
                          pending_po: 'ORDR/RDR1'
                        },
                        data_quality: {
-                         contains_proxy: true,
-                         proxy_fields: ['pending_po.by_region_detail.value'],
-                         notes: ['Sales page invoice volume uses OINV; shipped-speed cards come from /api/speed.']
+                         contains_proxy: false,
+                         proxy_fields: [],
+                         notes: ['Sales page invoice volume uses OINV; shipped-speed cards come from /api/speed.',
+                                 'Pending PO uses open-line residuals (RDR1.OpenQty × Price).']
                        }
                      },
                      kpis, by_brand, top_customers, monthly_trend, pending_po,
@@ -472,3 +485,6 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'Database error', detail: err.message })
   }
 }
+
+// Exposed for unit tests (tests/pending-po-openqty.test.js)
+module.exports.plantRegion = plantRegion
