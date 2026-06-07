@@ -1792,7 +1792,7 @@ body{
       <!-- ===== SALES ===== -->
       <div class="page" id="pg-sales">
         <!-- KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px" class="stagger" id="sales-kpi-row">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px" class="stagger" id="sales-kpi-row">
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-vol">14.2K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-vol-d">▲ 12.1%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">YTD Volume</div><div class="kpi-val" style="font-size:18px" id="sk-ytdvol">54.4K<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-delta up" id="sk-ytdvol-d">▲ 92.0%</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">MTD Sales</div><div class="kpi-val" style="font-size:18px" id="sk-sales">₱482M</div><div class="kpi-delta up" id="sk-sales-d">▲ 8.3%</div></div>
@@ -1802,53 +1802,62 @@ body{
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:18px;color:var(--gold)" id="sk-pending">7,432<span style="font-size:10px;color:var(--text3)"> MT</span></div><div class="kpi-src" id="sk-pending-sub">42 orders</div></div>
         </div>
 
-        <!-- TOP ROW: Customer Rankings + Trend Chart + BU Split -->
-        <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:16px;margin-bottom:16px">
+        <!-- Sales page-scoped density + share-bar styles -->
+        <style>
+          .sls-dense{font-size:11.5px}
+          .sls-dense th{padding:6px 8px;font-size:9.5px}
+          .sls-dense td{padding:5px 8px;font-size:11.5px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,0.04)}
+          .sls-dense .num{font-size:11.5px;font-variant-numeric:tabular-nums}
+          .sls-dense .rank{width:18px;height:18px;border-radius:5px;font-size:9px}
+          .sls-ell{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .sls-sub{font-size:10px;color:var(--text3);font-weight:500;margin-top:2px;text-transform:none;letter-spacing:0}
+          .sls-cell{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;width:100%;white-space:nowrap}
+          .sls-track{display:inline-block;width:30px;height:5px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex:none}
+          .sls-fill{display:block;height:100%;background:var(--blue);border-radius:2px}
+          .sls-fill.gold{background:var(--gold)}
+          .sls-prime{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:12px;margin-bottom:16px}
+          @media(max-width:1300px){.sls-prime{grid-template-columns:1fr}}
+          @media(max-width:1380px){.sls-ell{max-width:118px}.sls-track{width:24px}.sls-dense td,.sls-dense th{padding:5px 6px}}
+        </style>
+
+        <!-- PRIME ROW: Customer Rankings + GM/Ton Matrix (the two decision artifacts) -->
+        <div class="sls-prime">
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Customer Rankings · MTD</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <table class="tbl" id="sales-rankings-tbl">
-                <tr><th style="width:28px">#</th><th>Customer</th><th>Region</th><th class="num">Volume</th><th class="num">Net Sales</th><th class="num">GM/Ton</th></tr>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title" id="sls-rank-title">Customer Rankings · MTD</div>
+                <div class="sls-sub" id="sls-rank-sub">—</div>
+              </div>
+            </div>
+            <div class="card-body" style="padding:8px 14px 12px">
+              <table class="tbl sls-dense" id="sales-rankings-tbl">
+                <tr><th style="width:22px">#</th><th>Customer</th><th>Region</th><th class="num" style="white-space:nowrap">Volume</th><th class="num" style="white-space:nowrap">Net Sales</th><th class="num">%</th></tr>
                 <tbody id="sales-rankings-tbody">
-                <tr><td><div class="rank rank-1">1</div></td><td style="font-weight:600">Metro Feeds Corp.</td><td style="color:var(--text3);font-size:11px">Metro Manila</td><td class="num">420 MT</td><td class="num">₱18.2M</td><td class="num">₱6,240</td></tr>
-                <tr><td><div class="rank rank-2">2</div></td><td style="font-weight:600">Cebu Agri Partners</td><td style="color:var(--text3);font-size:11px">Cebu North</td><td class="num">380 MT</td><td class="num">₱14.8M</td><td class="num">₱5,680</td></tr>
-                <tr><td><div class="rank rank-3">3</div></td><td style="font-weight:600">Davao Livestock Inc.</td><td style="color:var(--text3);font-size:11px">Davao</td><td class="num">310 MT</td><td class="num">₱12.1M</td><td class="num">₱5,120</td></tr>
-                <tr><td><div class="rank rank-n">4</div></td><td style="font-weight:600">Laguna Premium Feeds</td><td style="color:var(--text3);font-size:11px">Laguna</td><td class="num">280 MT</td><td class="num">₱10.5M</td><td class="num">₱5,840</td></tr>
-                <tr><td><div class="rank rank-n">5</div></td><td style="font-weight:600">Pampanga Agri Supply</td><td style="color:var(--text3);font-size:11px">Pampanga</td><td class="num">260 MT</td><td class="num">₱9.8M</td><td class="num">₱5,560</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">BU Split · MTD</div></div>
-            <div class="card-body">
-              <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px">
-                <div style="display:flex;align-items:center;gap:6px"><div style="height:20px;flex:55;background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:3px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800">DIST</div><span style="font-family:var(--mono);font-size:11px;font-weight:700;min-width:42px;text-align:right">7,810</span></div>
-                <div style="display:flex;align-items:center;gap:6px"><div style="height:20px;flex:30;background:linear-gradient(135deg,var(--green),var(--green2));border-radius:3px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800;color:#000">KA</div><span style="font-family:var(--mono);font-size:11px;font-weight:700;min-width:42px;text-align:right">4,260</span></div>
-                <div style="display:flex;align-items:center;gap:6px"><div style="height:20px;flex:15;background:linear-gradient(135deg,var(--gold),#E0A800);border-radius:3px;display:flex;align-items:center;padding:0 8px;font-size:9px;font-weight:800;color:#000">PET</div><span style="font-family:var(--mono);font-size:11px;font-weight:700;min-width:42px;text-align:right">2,130</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- GM PER TON MATRIX (Image 1 style) -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-hdr">
-            <div class="card-title">GM per Ton by Group — Monthly Matrix</div>
-            <div class="card-badge b-blue">SAP · OINV</div>
-          </div>
-          <div class="card-body" style="padding-top:8px;overflow-x:auto">
+          <!-- GM PER TON MATRIX (promoted above the fold) -->
+          <div class="card">
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">GM per Ton by Group — Monthly</div>
+                <div class="sls-sub">₱/MT · monthly snapshot to Apr 2026</div>
+              </div>
+              <div class="card-badge b-blue">SAP · OINV</div>
+            </div>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
             <style>
-              .gm-matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-              .gm-matrix th{padding:10px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right;border-bottom:2px solid var(--divider);letter-spacing:0.3px}
+              .gm-matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
+              .gm-matrix th{padding:6px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right;border-bottom:2px solid var(--divider);letter-spacing:0.3px;white-space:nowrap}
               .gm-matrix th:first-child{text-align:left}
-              .gm-matrix td{padding:9px 12px;font-family:var(--mono);font-size:12px;font-weight:400;text-align:right;border-bottom:1px solid rgba(255,255,255,0.03)}
-              .gm-matrix td:first-child{font-family:var(--font);font-weight:700;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.3px}
+              .gm-matrix td{padding:5px 8px;font-family:var(--mono);font-size:11px;font-weight:400;text-align:right;border-bottom:1px solid rgba(255,255,255,0.03);font-variant-numeric:tabular-nums;white-space:nowrap}
+              .gm-matrix td:first-child{font-family:var(--font);font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.3px}
               .gm-matrix tr:last-child td{border-bottom:none;font-weight:700}
-              .gm-matrix .row-green td{background:rgba(151,215,0,0.06)}
-              .gm-matrix .row-green td:first-child{border-left:3px solid var(--green)}
-              .gm-matrix .row-blue td{background:rgba(0,174,239,0.04)}
-              .gm-matrix .row-blue td:first-child{border-left:3px solid var(--blue)}
+              .gm-matrix .row-green td:first-child{border-left:2px solid var(--green)}
+              .gm-matrix .row-blue td:first-child{border-left:2px solid var(--blue)}
               .gm-matrix .row-total td{background:rgba(0,174,239,0.08);font-weight:700;border-top:2px solid var(--divider)}
               .gm-neg{color:var(--red) !important;font-weight:700 !important}
             </style>
@@ -1865,98 +1874,45 @@ body{
               <tr class="row-blue"><td>OTHERS</td><td>4,825</td><td>3,415</td><td>3,715</td><td>10,988</td><td>10,990</td><td>4,349</td><td>5,474</td></tr>
               <tr class="row-total"><td>AVG GM/T</td><td>6,987</td><td>6,703</td><td>6,421</td><td>6,636</td><td>6,231</td><td>6,201</td><td>6,953</td></tr>
             </table>
+            </div>
           </div>
         </div>
 
-        <!-- 4-PANEL RANKINGS (Image 2 style) -->
-        <div class="sec-hdr"><div class="sec-title-lg">Volume Rankings — vs Y-1</div><div class="sec-line"></div><div class="sec-count">YTD · 54,446 MT · +92.0%</div></div>
-        <div style="display:grid;grid-template-columns:1fr 1.2fr 1.2fr 1fr;gap:12px;margin-bottom:16px">
-          <!-- BY BRAND -->
+        <!-- VOLUME RANKINGS — live from /api/sales (by_brand = product-level, top_customers).
+             Brand + District panels removed: payload carries no brand-family or district dimension (honest removal > stale mock).
+             Per-row vs Y-1 deltas removed: payload has no per-row LY figures; total vs-LY shown in section counter from kpis.delta_pct_ly. -->
+        <div class="sec-hdr"><div class="sec-title-lg">Volume Rankings</div><div class="sec-line"></div><div class="sec-count" id="sls-vr-count">—</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <!-- BY PRODUCT (live: by_brand, product-level) -->
           <div class="card">
-            <div class="card-hdr" style="padding:12px 14px 0"><div class="card-title" style="font-size:10px">Brand</div><div style="font-size:9px;color:var(--text3)">vs Y-1</div></div>
-            <div class="card-body" style="padding:8px 0 0;overflow-x:auto">
-              <style>
-                .rank-tbl{width:100%;border-collapse:collapse;font-size:11px}
-                .rank-tbl td{padding:6px 14px;border-bottom:1px solid rgba(255,255,255,0.03)}
-                .rank-tbl tr:last-child td{border-bottom:none}
-                .rank-tbl .rn{font-family:var(--font);font-weight:700;color:var(--text)}
-                .rank-tbl .rv{font-family:var(--mono);font-weight:400;text-align:right;font-size:11px}
-                .rank-tbl .rd{font-family:var(--mono);font-weight:700;text-align:right;font-size:10px}
-                .rank-tbl .rh{background:rgba(0,174,239,0.06);padding:8px 14px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--divider)}
-                .rank-tbl tr:hover td{background:rgba(255,255,255,0.015)}
-              </style>
-              <table class="rank-tbl">
-                <tr><td class="rh">Brand</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">% Δ</td></tr>
-                <tr><td class="rn">VIEPRO PREMIUM</td><td class="rv">25,564</td><td class="rd up">367.4% ↑</td></tr>
-                <tr><td class="rn">VIEPRO LAYER</td><td class="rv">8,638</td><td class="rd up">141.9% ↑</td></tr>
-                <tr><td class="rn">VIEPRO PRIME</td><td class="rv">6,369</td><td class="rd up">1,229.3% ↑</td></tr>
-                <tr><td class="rn">VIEPRO PROBOOST</td><td class="rv">5,022</td><td class="rd up">593.9% ↑</td></tr>
-                <tr><td class="rn">VIEPRO BROILER</td><td class="rv">3,602</td><td class="rd down">-19.6% ↓</td></tr>
-                <tr><td class="rn">VIEPROMO</td><td class="rv">2,271</td><td class="rd up">46.8% ↑</td></tr>
-                <tr><td class="rn">VIEPRO PDP</td><td class="rv">1,332</td><td class="rd up">448.5% ↑</td></tr>
-                <tr><td class="rn">PRIVATE LABEL</td><td class="rv">1,182</td><td class="rd" style="color:var(--text3)">—</td></tr>
-                <tr><td class="rn">VIEPRO POWERBOOST</td><td class="rv">185</td><td class="rd up">2,785.5% ↑</td></tr>
-                <tr style="background:rgba(0,174,239,0.05)"><td class="rn" style="font-weight:800">Grand total</td><td class="rv" style="font-weight:700">54,446</td><td class="rd up" style="font-weight:700">92.0% ↑</td></tr>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Top Products</div>
+                <div class="sls-sub" id="sls-vrprod-sub">—</div>
+              </div>
+              <div class="card-badge b-blue">SAP · OINV</div>
+            </div>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
+              <table class="tbl sls-dense">
+                <thead><tr><th>Product</th><th class="num" style="white-space:nowrap">Volume</th><th class="num">%</th></tr></thead>
+                <tbody id="sls-vrprod-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
 
-          <!-- BY PRODUCT -->
+          <!-- BY CUSTOMER (live: top_customers) -->
           <div class="card">
-            <div class="card-hdr" style="padding:12px 14px 0"><div class="card-title" style="font-size:10px">Products</div><div style="font-size:9px;color:var(--text3)">vs Y-1</div></div>
-            <div class="card-body" style="padding:8px 0 0">
-              <table class="rank-tbl">
-                <tr><td class="rh">Products</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">% Δ</td></tr>
-                <tr><td class="rn">VP MUSCLY PREM GROWER PELLET</td><td class="rv">9,390</td><td class="rd up">162.1% ↑</td></tr>
-                <tr><td class="rn">VP MUSCLY PREM STARTER PELLET</td><td class="rv">5,696</td><td class="rd up">131.4% ↑</td></tr>
-                <tr><td class="rn">VP PRIME GESTATING PELLET</td><td class="rv">4,921</td><td class="rd up">207.0% ↑</td></tr>
-                <tr><td class="rn">VP LAYER 1 CRUMBLE</td><td class="rv">2,049</td><td class="rd up">130.9% ↑</td></tr>
-                <tr><td class="rn">VP BROILER STARTER 2.5MM</td><td class="rv">1,622</td><td class="rd up">268.0% ↑</td></tr>
-                <tr><td class="rn">VP 3000 MAINTENANCE PELLET</td><td class="rv">1,597</td><td class="rd up">62.8% ↑</td></tr>
-                <tr><td class="rn">VP GESTATING PELLET</td><td class="rv">1,392</td><td class="rd up">45.6% ↑</td></tr>
-                <tr><td class="rn">VP 2000 STARTER BIG CRUMBLE</td><td class="rv">1,334</td><td class="rd up">65.0% ↑</td></tr>
-                <tr><td class="rn">VP PREM PRESTARTER 2.5M</td><td class="rv">1,246</td><td class="rd up">52.2% ↑</td></tr>
-                <tr style="background:rgba(0,174,239,0.05)"><td class="rn" style="font-weight:800">Grand total</td><td class="rv" style="font-weight:700">54,446</td><td class="rd up" style="font-weight:700">92.0% ↑</td></tr>
-              </table>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Top Customers</div>
+                <div class="sls-sub" id="sls-vrcust-sub">—</div>
+              </div>
+              <div class="card-badge b-blue">SAP · OINV</div>
             </div>
-          </div>
-
-          <!-- BY CUSTOMER -->
-          <div class="card">
-            <div class="card-hdr" style="padding:12px 14px 0"><div class="card-title" style="font-size:10px">Customer</div><div style="font-size:9px;color:var(--text3)">vs Y-1</div></div>
-            <div class="card-body" style="padding:8px 0 0">
-              <table class="rank-tbl">
-                <tr><td class="rh">Customer_Name</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">% Δ</td></tr>
-                <tr><td class="rn">PACIFICA AGRIVET SUPPLIES</td><td class="rv">8,063</td><td class="rd up">201.6% ↑</td></tr>
-                <tr><td class="rn">SAO FEEDS TRADING</td><td class="rv">2,292</td><td class="rd up">121.7% ↑</td></tr>
-                <tr><td class="rn">ST. RAPHAEL ARCHANGEL PARISH</td><td class="rv">2,087</td><td class="rd" style="color:var(--text3)">—</td></tr>
-                <tr><td class="rn">CATHAY FARMS DEVELOPMENT</td><td class="rv">2,052</td><td class="rd up">9,692.5% ↑</td></tr>
-                <tr><td class="rn">FALCOR MARKETING CORP.</td><td class="rv">2,016</td><td class="rd up">202.1% ↑</td></tr>
-                <tr><td class="rn">AGRILIFE AGRIVET SUPPLIES</td><td class="rv">1,936</td><td class="rd up">95.1% ↑</td></tr>
-                <tr><td class="rn">ROY TOPAZE OGIS LECHON</td><td class="rv">1,625</td><td class="rd down">-29.8% ↓</td></tr>
-                <tr><td class="rn">CAVALIER AGRIVET SUPPLY</td><td class="rv">1,538</td><td class="rd up">192.8% ↑</td></tr>
-                <tr><td class="rn">GREENHILLS FARM INC.</td><td class="rv">1,428</td><td class="rd down">-11.3% ↓</td></tr>
-                <tr style="background:rgba(0,174,239,0.05)"><td class="rn" style="font-weight:800">Grand total</td><td class="rv" style="font-weight:700">54,446</td><td class="rd up" style="font-weight:700">92.0% ↑</td></tr>
-              </table>
-            </div>
-          </div>
-
-          <!-- BY DISTRICT -->
-          <div class="card">
-            <div class="card-hdr" style="padding:12px 14px 0"><div class="card-title" style="font-size:10px">District</div><div style="font-size:9px;color:var(--text3)">vs Y-1</div></div>
-            <div class="card-body" style="padding:8px 0 0">
-              <table class="rank-tbl">
-                <tr><td class="rh">District</td><td class="rh" style="text-align:right">Vol, MT</td><td class="rh" style="text-align:right">% Δ</td></tr>
-                <tr><td class="rn">CENTRAL MINDANAO</td><td class="rv">5,074</td><td class="rd up">175.6% ↑</td></tr>
-                <tr><td class="rn">LUZON</td><td class="rv">3,794</td><td class="rd up">175.5% ↑</td></tr>
-                <tr><td class="rn">CEBU NORTH</td><td class="rv">3,657</td><td class="rd up">113.8% ↑</td></tr>
-                <tr><td class="rn">IN HOUSE LUZON</td><td class="rv">3,575</td><td class="rd up">158.8% ↑</td></tr>
-                <tr><td class="rn">EAST MINDANAO</td><td class="rv">3,098</td><td class="rd up">135.3% ↑</td></tr>
-                <tr><td class="rn">NEGROS ORIENTAL</td><td class="rv">2,991</td><td class="rd up">294.4% ↑</td></tr>
-                <tr><td class="rn">NEGROS OCCIDENTAL</td><td class="rv">2,704</td><td class="rd up">175.2% ↑</td></tr>
-                <tr><td class="rn">CENTRAL LUZON</td><td class="rv">2,475</td><td class="rd up">195.9% ↑</td></tr>
-                <tr><td class="rn">NORTH MINDANAO</td><td class="rv">2,368</td><td class="rd up">146.9% ↑</td></tr>
-                <tr style="background:rgba(0,174,239,0.05)"><td class="rn" style="font-weight:800">Grand total</td><td class="rv" style="font-weight:700">54,446</td><td class="rd up" style="font-weight:700">92.0% ↑</td></tr>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
+              <table class="tbl sls-dense">
+                <thead><tr><th>Customer</th><th>Region</th><th class="num" style="white-space:nowrap">Volume</th><th class="num">%</th></tr></thead>
+                <tbody id="sls-vrcust-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1966,7 +1922,7 @@ body{
         <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--gold)">📋 Pending Purchase Orders</div><div class="sec-line"></div><div class="sec-count" id="po-sec-count">—</div></div>
 
         <!-- Pending KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
           <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-label" style="color:var(--gold)">Total Pending</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="po-k-mt">—</div><div class="kpi-src">ORDR · Open</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending Value</div><div class="kpi-val" style="font-size:20px" id="po-k-value">—</div><div class="kpi-src">est. revenue</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Orders</div><div class="kpi-val" style="font-size:20px" id="po-k-orders">—</div><div class="kpi-src">open POs</div></div>
@@ -1974,60 +1930,51 @@ body{
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Oldest</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="po-k-oldest">—</div><div class="kpi-src">days pending</div></div>
         </div>
 
-        <!-- Pending: By Region + By Brand + By SKU -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
-          <!-- By Region (with detail) -->
+        <!-- Pending: Region (merged summary+detail) + Product + Top Customers -->
+        <div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.05fr) minmax(0,1.2fr);gap:12px;margin-bottom:16px">
+          <!-- By Region — one card, full detail (region · orders · MT · value · avg size · share) -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Pending by Region</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <table class="rank-tbl">
-                <thead><tr><td class="rh">Region</td><td class="rh" style="text-align:right">Orders</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">Value</td></tr></thead>
-                <tbody id="po-region-detail-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Pending by Region</div>
+                <div class="sls-sub" id="sls-poreg-sub">—</div>
+              </div>
+            </div>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
+              <table class="tbl sls-dense">
+                <thead><tr><th>Region</th><th class="num">Orders</th><th class="num">Vol MT</th><th class="num">Value</th><th class="num">Avg MT</th><th class="num">%</th></tr></thead>
+                <tbody id="po-region-detail-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
 
-          <!-- By Brand -->
+          <!-- By Product (brand list = product-level; top-8 + Others) -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Pending by Brand</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <table class="rank-tbl">
-                <thead><tr><td class="rh">Brand</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">%</td></tr></thead>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Pending by Product</div>
+                <div class="sls-sub" id="sls-pobrand-sub">—</div>
+              </div>
+            </div>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
+              <table class="tbl sls-dense">
+                <thead><tr><th>Product</th><th class="num">Vol MT</th><th class="num">%</th></tr></thead>
                 <tbody id="po-brand-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
 
-          <!-- By Major SKU -->
+          <!-- Top pending customers (top-8 + Others) -->
           <div class="card">
-            <div class="card-hdr"><div class="card-title">Pending by Major SKU</div></div>
-            <div class="card-body" style="padding-top:8px">
-              <table class="rank-tbl">
-                <thead><tr><td class="rh">Product</td><td class="rh" style="text-align:right">Vol MT</td><td class="rh" style="text-align:right">%</td></tr></thead>
-                <tbody id="po-sku-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-              </table>
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Top Pending Customers</div>
+                <div class="sls-sub" id="sls-pocust-sub">—</div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Pending: Region × Customer table + Top Customers -->
-        <div class="grid-2" style="margin-bottom:16px">
-          <!-- Region detail (4-col) -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Pending by Region — Detail</div></div>
-            <div class="card-body" style="padding-top:8px;overflow-x:auto">
-              <table class="tbl">
-                <thead><tr><th>Region</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th><th class="num">Avg Size</th></tr></thead>
-                <tbody id="po-region-big-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-          <!-- Top pending customers -->
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Top Pending Customers</div></div>
-            <div class="card-body" style="padding-top:8px;overflow-x:auto">
-              <table class="tbl">
-                <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Volume</th><th class="num">Value</th></tr></thead>
+            <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto">
+              <table class="tbl sls-dense">
+                <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Vol MT</th><th class="num">Value</th></tr></thead>
                 <tbody id="po-topcust-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
@@ -2037,8 +1984,8 @@ body{
         <!-- PO Detail table -->
         <div class="card">
           <div class="card-hdr"><div class="card-title">Recent PO Detail</div><div class="card-badge b-gold" id="po-detail-count">—</div></div>
-          <div class="card-body" style="padding-top:8px;overflow-x:auto;max-height:500px;overflow-y:auto">
-            <table class="tbl">
+          <div class="card-body" style="padding:8px 14px 12px;overflow-x:auto;max-height:500px;overflow-y:auto">
+            <table class="tbl sls-dense">
               <thead><tr><th>PO #</th><th>Customer</th><th>Brand</th><th>Plant</th><th class="num">Volume</th><th class="num">Amount</th><th>Date</th><th class="num">Aging</th></tr></thead>
               <tbody id="po-detail-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
             </table>
@@ -4594,6 +4541,12 @@ async function loadHome(){
 }
 
 /* ===== SALES — wired to /api/sales ===== */
+/* Sales page — inline share-of-total bar cell (track + fill + right-aligned value) */
+function slsBarCell(val, max, label, color){
+  var w = max>0 ? Math.max(2, Math.round(val/max*100)) : 0;
+  return '<span class="sls-cell"><span class="sls-track"><span class="sls-fill'+(color==='gold'?' gold':'')+'" style="width:'+w+'%"></span></span>'+label+'</span>';
+}
+
 async function loadSales(){
   clearError('pg-sales');
   try {
@@ -4655,59 +4608,70 @@ async function loadSales(){
       animateNumber(sel('po-k-orders'), ps.total_orders||0, function(v){return fcn(Math.round(v))});
       animateNumber(sel('po-k-avg'),    ps.avg_order_mt||0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> MT</span>'});
       animateNumber(sel('po-k-oldest'), ps.oldest_days||0, function(v){return fcn(Math.round(v))+'<span style="font-size:10px;color:var(--text3)"> d</span>'});
-      // By Region (compact)
-      if(pp.by_region && pp.by_region.length){
-        var totR = pp.by_region.reduce(function(s,r){return s+r.mt},0);
-        var rhtml = pp.by_region.map(function(r){
-          return '<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Filter Sales to this region"><td class="rn">'+esc((r.region||'').toUpperCase())+'</td>'
-            +'<td class="rv">—</td>'
-            +'<td class="rv">'+fcn(Math.round(r.mt||0))+'</td>'
-            +'<td class="rv">'+(totR>0?((r.mt/totR*100).toFixed(1)+'%'):'—')+'</td></tr>';
+      // By Region — single consolidated card (summary + detail merged).
+      // Prefers by_region_detail (orders/value/avg); falls back to by_region (mt only).
+      var rds = (pp.by_region_detail && pp.by_region_detail.length) ? pp.by_region_detail
+              : (pp.by_region || []).map(function(r){ return { region: r.region, mt: r.mt }; });
+      if(rds.length){
+        var totR = rds.reduce(function(s,r){return s+(r.mt||0)},0);
+        var maxR = rds.reduce(function(m,r){return Math.max(m,r.mt||0)},0);
+        var rhtml = rds.map(function(r){
+          var shr = totR>0 ? (r.mt||0)/totR*100 : 0;
+          return '<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Filter Sales to this region">'
+            +'<td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>'
+            +'<td class="num">'+(r.orders!=null?fcn(r.orders):'—')+'</td>'
+            +'<td class="num">'+slsBarCell(r.mt||0, maxR, fcn(Math.round(r.mt||0)), 'gold')+'</td>'
+            +'<td class="num">'+(r.value!=null?fc(r.value):'—')+'</td>'
+            +'<td class="num">'+(r.avg_size_mt!=null?fcn(Math.round(r.avg_size_mt)):'—')+'</td>'
+            +'<td class="num">'+shr.toFixed(0)+'%</td></tr>';
         }).join('');
         seth('po-region-detail-tbody', rhtml);
+        var leadR = rds.slice().sort(function(a,b){return (b.mt||0)-(a.mt||0)})[0];
+        if(leadR && totR>0) sett('sls-poreg-sub', (leadR.region||'').toUpperCase()+' leads with '+((leadR.mt||0)/totR*100).toFixed(0)+'% of pending MT');
       }
-      // Region detail (big, 5-col with orders + value + avg)
-      if(pp.by_region_detail && pp.by_region_detail.length){
-        var rdhtml = pp.by_region_detail.map(function(r){
-          return '<tr style="cursor:pointer" onclick="setRegionAndNav(\''+esc(r.region||'ALL')+'\',\'pg-sales\')" title="Filter Sales to this region"><td style="font-weight:700">'+esc((r.region||'').toUpperCase())+'</td>'
-            +'<td class="num">'+fcn(r.orders||0)+'</td>'
-            +'<td class="num">'+fcn(Math.round(r.mt||0))+' MT</td>'
-            +'<td class="num">'+fc(r.value||0)+'</td>'
-            +'<td class="num">'+fcn(Math.round(r.avg_size_mt||0))+' MT</td></tr>';
-        }).join('');
-        seth('po-region-big-tbody', rdhtml);
-      }
-      // By Brand (top 10)
+      // By Product (brand list is product-level) — top 8 + Others, share bars
       if(pp.by_brand && pp.by_brand.length){
-        var totB = pp.by_brand.reduce(function(s,b){return s+b.mt},0);
-        var bhtml = pp.by_brand.slice(0, 10).map(function(b){
-          return '<tr><td class="rn">'+esc(b.brand||'—').slice(0,40)+'</td>'
-            +'<td class="rv">'+fcn(Math.round(b.mt||0))+'</td>'
-            +'<td class="rv">'+(totB>0?((b.mt/totB*100).toFixed(1)+'%'):'—')+'</td></tr>';
+        var totB = pp.by_brand.reduce(function(s,b){return s+(b.mt||0)},0);
+        var topB = pp.by_brand.slice(0, 8);
+        var restB = pp.by_brand.slice(8);
+        var maxB = topB.reduce(function(m,b){return Math.max(m,b.mt||0)},0);
+        var bhtml = topB.map(function(b){
+          return '<tr><td class="sls-ell" style="font-weight:600" title="'+esc(b.brand||'')+'">'+esc(b.brand||'—')+'</td>'
+            +'<td class="num">'+slsBarCell(b.mt||0, maxB, fcn(Math.round(b.mt||0)), 'gold')+'</td>'
+            +'<td class="num">'+(totB>0?(((b.mt||0)/totB*100).toFixed(1)+'%'):'—')+'</td></tr>';
         }).join('');
-        bhtml += '<tr style="background:rgba(255,199,44,0.06)"><td class="rn" style="font-weight:800">Total (top 10)</td><td class="rv" style="font-weight:700;color:var(--gold)">'+fcn(Math.round(pp.by_brand.slice(0,10).reduce(function(s,b){return s+b.mt},0)))+'</td><td class="rv"></td></tr>';
+        if(restB.length){
+          var restMt = restB.reduce(function(s,b){return s+(b.mt||0)},0);
+          bhtml += '<tr><td style="color:var(--text3)">Others ('+restB.length+')</td>'
+            +'<td class="num" style="color:var(--text3)">'+fcn(Math.round(restMt))+'</td>'
+            +'<td class="num" style="color:var(--text3)">'+(totB>0?((restMt/totB*100).toFixed(1)+'%'):'—')+'</td></tr>';
+        }
+        bhtml += '<tr style="background:rgba(255,199,44,0.06)"><td style="font-weight:800">Total</td><td class="num" style="font-weight:700;color:var(--gold)">'+fcn(Math.round(totB))+'</td><td class="num" style="font-weight:700">100%</td></tr>';
         seth('po-brand-tbody', bhtml);
+        var top3B = topB.slice(0,3).reduce(function(s,b){return s+(b.mt||0)},0);
+        if(totB>0) sett('sls-pobrand-sub', 'Top 3 products = '+(top3B/totB*100).toFixed(0)+'% of pending MT');
       }
-      // By Major SKU (top 10)
-      if(pp.by_sku && pp.by_sku.length){
-        var totS = pp.by_sku.reduce(function(s,x){return s+x.mt},0);
-        var shtml = pp.by_sku.slice(0, 10).map(function(s){
-          return '<tr><td class="rn">'+esc(s.name || s.sku || '—').slice(0,38)+'</td>'
-            +'<td class="rv">'+fcn(Math.round(s.mt||0))+'</td>'
-            +'<td class="rv">'+(totS>0?((s.mt/totS*100).toFixed(1)+'%'):'—')+'</td></tr>';
-        }).join('');
-        seth('po-sku-tbody', shtml);
-      }
-      // Top pending customers
+      // Top pending customers — top 8 + Others
       if(pp.top_customers && pp.top_customers.length){
-        var cthtml = pp.top_customers.slice(0, 10).map(function(c){
+        var tc = pp.top_customers;
+        var topC = tc.slice(0, 8), restC = tc.slice(8);
+        var cthtml = topC.map(function(c){
           return '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.code||'')+'\')">'
-            +'<td style="font-weight:700">'+esc(c.customer||'—').slice(0,40)+'</td>'
+            +'<td class="sls-ell" style="font-weight:700" title="'+esc(c.customer||'')+'">'+esc(c.customer||'—')+'</td>'
             +'<td class="num">'+fcn(c.orders||0)+'</td>'
-            +'<td class="num">'+fcn(Math.round(c.mt||0))+' MT</td>'
+            +'<td class="num">'+fcn(Math.round(c.mt||0))+'</td>'
             +'<td class="num">'+fc(c.value||0)+'</td></tr>';
         }).join('');
+        if(restC.length){
+          cthtml += '<tr><td style="color:var(--text3)">Others ('+restC.length+')</td>'
+            +'<td class="num" style="color:var(--text3)">'+fcn(restC.reduce(function(s,c){return s+(c.orders||0)},0))+'</td>'
+            +'<td class="num" style="color:var(--text3)">'+fcn(Math.round(restC.reduce(function(s,c){return s+(c.mt||0)},0)))+'</td>'
+            +'<td class="num" style="color:var(--text3)">'+fc(restC.reduce(function(s,c){return s+(c.value||0)},0))+'</td></tr>';
+        }
         seth('po-topcust-tbody', cthtml);
+        var totCv = (ps.total_value!=null && ps.total_value>0) ? ps.total_value : tc.reduce(function(s,c){return s+(c.value||0)},0);
+        var top3C = tc.slice(0,3).reduce(function(s,c){return s+(c.value||0)},0);
+        if(totCv>0) sett('sls-pocust-sub', (ps.customers_count!=null?ps.customers_count+' customers · ':'')+'top 3 = '+(top3C/totCv*100).toFixed(0)+'% of pending value');
       }
       // PO Detail
       if(pp.detail && pp.detail.length){
@@ -4733,19 +4697,81 @@ async function loadSales(){
         seth('po-detail-tbody', pohtml);
       }
     }
-    // Customer rankings
+    // Customer rankings — top 10 with inline share-of-total bars + "so what" subtitle
     if(d.top_customers && d.top_customers.length){
+      var totV = (kp.volume_mt!=null && kp.volume_mt>0) ? kp.volume_mt : d.top_customers.reduce(function(s,c){return s+(c.volume_mt||0)},0);
+      var rkList = d.top_customers.slice(0,10);
+      var maxV = rkList.reduce(function(m,c){return Math.max(m,c.volume_mt||0)},0);
       var html='';
-      d.top_customers.slice(0,10).forEach(function(c,i){
+      rkList.forEach(function(c,i){
+        var shr = totV>0 ? (c.volume_mt||0)/totV*100 : 0;
         html+='<tr style="cursor:pointer" onclick="openCust(\''+esc(c.customer_code||'')+'\')">';
         html+='<td><div class="rank '+rc(i)+'">'+(i+1)+'</div></td>';
-        html+='<td style="font-weight:600">'+esc(c.customer_name||'')+'</td>';
-        html+='<td style="color:var(--text3);font-size:11px">'+esc(c.region||c.City||'')+'</td>';
-        html+='<td class="num">'+fv(c.volume_mt||0, c.volume_bags||0)+'</td>';
+        html+='<td class="sls-ell" style="font-weight:600" title="'+esc(c.customer_name||'')+'">'+esc(c.customer_name||'')+'</td>';
+        html+='<td style="color:var(--text3);font-size:10px">'+esc(c.region||c.City||'')+'</td>';
+        html+='<td class="num">'+slsBarCell(c.volume_mt||0, maxV, fv(c.volume_mt||0, c.volume_bags||0))+'</td>';
         html+='<td class="num">'+fc(c.revenue||0)+'</td>';
-        html+='<td class="num">'+(c.gmt?'₱'+fcn(Math.round(c.gmt)):'--')+'</td></tr>';
+        html+='<td class="num">'+shr.toFixed(1)+'%</td></tr>';
       });
       seth('sales-rankings-tbody',html);
+      sett('sls-rank-title', 'Customer Rankings · '+(PD||'MTD'));
+      var top5V = d.top_customers.slice(0,5).reduce(function(s,c){return s+(c.volume_mt||0)},0);
+      if(totV>0) sett('sls-rank-sub', 'Top 5 customers = '+(top5V/totV*100).toFixed(0)+'% of '+(PD||'MTD')+' volume');
+    }
+    // Volume Rankings — live 2-panel (Products from by_brand, Customers from top_customers).
+    // Section counter carries the only vs-LY claim we can back: kpis.delta_pct_ly.volume_mt (period total).
+    var vrTot = (kp.volume_mt!=null && kp.volume_mt>0) ? kp.volume_mt : 0;
+    var vrCount = (PD||'MTD')+' · '+fcn(Math.round(UT==='Bags'?(kp.volume_bags||0):vrTot))+' '+(UT==='Bags'?'bags':'MT');
+    if(kp.delta_pct_ly && kp.delta_pct_ly.volume_mt!=null) vrCount += ' · '+(kp.delta_pct_ly.volume_mt>=0?'+':'')+Number(kp.delta_pct_ly.volume_mt).toFixed(1)+'% vs LY';
+    sett('sls-vr-count', vrCount);
+    if(d.by_brand && d.by_brand.length){
+      var prods = d.by_brand.slice().sort(function(a,b){return (b.volume_mt||0)-(a.volume_mt||0)});
+      var prTot = prods.reduce(function(s,p){return s+(p.volume_mt||0)},0);
+      var prTotBags = prods.reduce(function(s,p){return s+(p.volume_bags||0)},0);
+      var prTop = prods.slice(0,10), prRest = prods.slice(10);
+      var prMax = prTop.reduce(function(m,p){return Math.max(m,p.volume_mt||0)},0);
+      var prHtml = prTop.map(function(p){
+        var shr = prTot>0 ? (p.volume_mt||0)/prTot*100 : 0;
+        return '<tr><td class="sls-ell" style="font-weight:600" title="'+esc(p.brand||'')+'">'+esc(p.brand||'—')+'</td>'
+          +'<td class="num">'+slsBarCell(p.volume_mt||0, prMax, fv(p.volume_mt||0, p.volume_bags||0))+'</td>'
+          +'<td class="num">'+shr.toFixed(1)+'%</td></tr>';
+      }).join('');
+      if(prRest.length){
+        var prRestMt = prRest.reduce(function(s,p){return s+(p.volume_mt||0)},0);
+        var prRestBags = prRest.reduce(function(s,p){return s+(p.volume_bags||0)},0);
+        prHtml += '<tr><td style="color:var(--text3)">Others ('+prRest.length+')</td>'
+          +'<td class="num" style="color:var(--text3)">'+fv(prRestMt, prRestBags)+'</td>'
+          +'<td class="num" style="color:var(--text3)">'+(prTot>0?((prRestMt/prTot*100).toFixed(1)+'%'):'—')+'</td></tr>';
+      }
+      prHtml += '<tr style="background:rgba(0,174,239,0.05)"><td style="font-weight:800">Grand total</td><td class="num" style="font-weight:700">'+fv(prTot, prTotBags)+'</td><td class="num" style="font-weight:700">100%</td></tr>';
+      seth('sls-vrprod-tbody', prHtml);
+      var prTop3 = prTop.slice(0,3).reduce(function(s,p){return s+(p.volume_mt||0)},0);
+      if(prTot>0) sett('sls-vrprod-sub', fcn(prods.length)+' items · top 3 = '+(prTop3/prTot*100).toFixed(0)+'% of '+(PD||'MTD')+' volume');
+    }
+    if(d.top_customers && d.top_customers.length){
+      var vrc = d.top_customers.slice(0,10);
+      var vrcTot = (kp.volume_mt!=null && kp.volume_mt>0) ? kp.volume_mt : d.top_customers.reduce(function(s,c){return s+(c.volume_mt||0)},0);
+      var vrcMax = vrc.reduce(function(m,c){return Math.max(m,c.volume_mt||0)},0);
+      var vrcHtml = vrc.map(function(c){
+        var shr = vrcTot>0 ? (c.volume_mt||0)/vrcTot*100 : 0;
+        return '<tr style="cursor:pointer" onclick="openCust(\''+esc(c.customer_code||'')+'\')">'
+          +'<td class="sls-ell" style="font-weight:600" title="'+esc(c.customer_name||'')+'">'+esc(c.customer_name||'—')+'</td>'
+          +'<td style="color:var(--text3);font-size:10px">'+esc(c.region||'')+'</td>'
+          +'<td class="num">'+slsBarCell(c.volume_mt||0, vrcMax, fv(c.volume_mt||0, c.volume_bags||0))+'</td>'
+          +'<td class="num">'+shr.toFixed(1)+'%</td></tr>';
+      }).join('');
+      var vrcTopMt = vrc.reduce(function(s,c){return s+(c.volume_mt||0)},0);
+      var vrcTopBags = vrc.reduce(function(s,c){return s+(c.volume_bags||0)},0);
+      if(kp.volume_mt!=null && kp.volume_mt>vrcTopMt){
+        var vrcRestMt = kp.volume_mt - vrcTopMt;
+        var vrcRestBags = (kp.volume_bags!=null ? kp.volume_bags : 0) - vrcTopBags;
+        vrcHtml += '<tr><td style="color:var(--text3)">All others</td><td></td>'
+          +'<td class="num" style="color:var(--text3)">'+fv(vrcRestMt, Math.max(vrcRestBags,0))+'</td>'
+          +'<td class="num" style="color:var(--text3)">'+(vrcRestMt/vrcTot*100).toFixed(1)+'%</td></tr>';
+        vrcHtml += '<tr style="background:rgba(0,174,239,0.05)"><td style="font-weight:800">Grand total</td><td></td><td class="num" style="font-weight:700">'+fv(kp.volume_mt, kp.volume_bags||0)+'</td><td class="num" style="font-weight:700">100%</td></tr>';
+      }
+      seth('sls-vrcust-tbody', vrcHtml);
+      if(vrcTot>0) sett('sls-vrcust-sub', 'Top 10 = '+(vrcTopMt/vrcTot*100).toFixed(0)+'% of '+(PD||'MTD')+' volume');
     }
     pulseRefresh('pg-sales');
   } catch(e) { console.error('Sales:', e); showError('pg-sales','Unable to load sales data'); }
