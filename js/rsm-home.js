@@ -39,12 +39,6 @@
     if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
     return (parts[0][0] || '—').toUpperCase();
   }
-  function starBar(score){
-    var s = Math.max(0, Math.min(5, Math.round((score || 0) * 2) / 2));
-    var full = Math.floor(s), half = (s - full) >= 0.5 ? 1 : 0, empty = 5 - full - half;
-    return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty) + ' ' + s.toFixed(1);
-  }
-
   // ===== UI controls (global exports) =====
   window.openRsmMore = function(){
     var b = document.getElementById('rsm-sheet-backdrop');
@@ -218,9 +212,26 @@
     // Match on exact region + name if available (best signal)
     var byName = rsms.find(function(r){ return r.name && session.name && r.name.toUpperCase() === session.name.toUpperCase(); });
     if (byName) return byName;
-    // Fallback to first RSM in the same region
-    var byRegion = session.region ? rsms.find(function(r){ return r.region === session.region; }) : null;
+    // Fallback to first RSM in the same region (case-insensitive — /api/team
+    // derives region from shipments as Luzon/Visayas/Mindanao/Other)
+    var sessRg = session.region ? String(session.region).toUpperCase().trim() : null;
+    var byRegion = sessRg ? rsms.find(function(r){ return r.region && String(r.region).toUpperCase().trim() === sessRg; }) : null;
     return byRegion || rsms[0] || {};
+  }
+
+  // Find the SAP /api/team DSM row matching a Supabase DSM user by name.
+  // Returns null when no match — callers must render "—" rather than a fake.
+  function teamDsmByName(bundle, name){
+    if (!name) return null;
+    var key = String(name).toUpperCase().trim();
+    var rsms = (bundle.team && bundle.team.rsms) || [];
+    for (var i = 0; i < rsms.length; i++) {
+      var ds = rsms[i].dsms || [];
+      for (var j = 0; j < ds.length; j++) {
+        if (String(ds[j].name || '').toUpperCase().trim() === key) return ds[j];
+      }
+    }
+    return null;
   }
 
   function renderHeader(session, bundle){
@@ -245,7 +256,7 @@
       regionRow = (dash.region_performance || []).find(function(r){ return r.region === rsm.region; });
     }
     if (regionRow) revMtd = Number(regionRow.sales || 0);
-    else if (rsm.ytd_vol) revMtd = Number(rsm.ytd_vol) * 1000 * 31.7;  // rough fallback: MT × PHP/kg estimate
+    else revMtd = Number(rsm.ytd_revenue || 0);  // real OINV revenue rollup from /api/team (no synthetic ₱/kg estimate)
     // Volume MT (DR)
     var volMt = regionRow ? Number(regionRow.vol || 0) : Number(rsm.ytd_vol || 0);
     // Target
@@ -272,13 +283,22 @@
     setTxt('rsm-revenue-trend', (vsTrend === 0 ? '—' : (vsTrend > 0 ? '↑' : '↓') + Math.abs(vsTrend).toFixed(1) + '%'));
     var cmpEl = document.getElementById('rsm-revenue-cmp-lbl');
     if (cmpEl) cmpEl.textContent = cmpLbl;
-    setTxt('rsm-revenue-pct', (achPct ? Math.round(achPct) : 0) + '%');
+    // No RSM-level targets exist in SAP yet (/api/team ytd_target=0) — show "—"
+    // instead of a misleading 0%.
+    if (target > 0) {
+      setTxt('rsm-revenue-pct', Math.round(achPct) + '%');
+      setTxt('rsm-target', fmtNum(target));
+    } else {
+      setTxt('rsm-revenue-pct', '—');
+      setTxt('rsm-target', '—');
+      var pctEl = document.getElementById('rsm-revenue-pct');
+      if (pctEl) pctEl.title = 'No RSM-level target in SAP yet';
+    }
 
     var fill = document.getElementById('rsm-progress-fill');
     if (fill) fill.style.width = Math.max(0, Math.min(100, Math.round(achPct))) + '%';
 
     setTxt('rsm-achieved', fmtNum(volMt));
-    setTxt('rsm-target',   fmtNum(target));
   }
 
   function renderKPIs(bundle){
@@ -298,10 +318,10 @@
     var ar = dash.ar_delinquent_balance || dash.ar_balance || 0;
     setTxt('rsm-ar', fmtPhpShort(ar));
 
-    // Conversions MTD — placeholder v1 (requires /api/intelligence or a new field)
-    // Use rsm.silent as inverse signal (fewer silent = more conversions) for a rough number
-    var conv = Math.max(0, (rsm.customers || 0) - (rsm.silent || 0));
-    setTxt('rsm-conversions', fmtNum(Math.round(conv * 0.1)));  // 10% proxy
+    // Conversions MTD — no live data source yet (Patrol doesn't track conversion
+    // events). Show "—" rather than a synthetic number.
+    var convEl = document.getElementById('rsm-conversions');
+    if (convEl) { convEl.textContent = '—'; convEl.title = 'Not yet tracked — Patrol conversion events pending'; }
   }
 
   function renderDistricts(bundle){
@@ -316,21 +336,30 @@
       return;
     }
 
-    if (countEl) countEl.textContent = dsms.length + ' district' + (dsms.length===1?'':'s');
+    if (countEl) countEl.textContent = dsms.length + ' district' + (dsms.length===1?'':'s') + ' · vs PP';
 
-    // For v1: district name = dsm.district or dsm.territory; synth % from a stable hash of name
-    // (Until /api/team returns per-DSM ach_pct, this is a visual placeholder.)
+    // Real per-district volume trend (vs prior period) from /api/team's per-DSM
+    // rollup, matched by DSM name. No SAP match → "—" (never a synthetic %).
     var html = dsms.map(function(d, i){
       var name = d.district || d.territory || d.name || ('District ' + (i+1));
-      // Deterministic pseudo-% per district for visual continuity (45-110%)
-      var seed = String(name).split('').reduce(function(s, c){ return s + c.charCodeAt(0); }, 0);
-      var pct = 45 + (seed % 66);
-      var cls = pct >= 90 ? 'ok' : pct >= 70 ? 'warn' : 'bad';
+      var sap = teamDsmByName(bundle, d.name);
+      var pct = (sap && sap.vs_pp_pct != null) ? Number(sap.vs_pp_pct) : null;
+      if (pct == null) {
+        return '' +
+          '<div class="rsm-district-row">' +
+            '<div class="rsm-district-name" title="' + escHtml(name) + '">' + escHtml(name) + '</div>' +
+            '<div class="rsm-district-bar"></div>' +
+            '<div class="rsm-district-pct" style="color:#65676B" title="No SAP sales mapping for this DSM yet">—</div>' +
+          '</div>';
+      }
+      var cls = pct >= 10 ? 'ok' : pct >= -10 ? 'warn' : 'bad';
+      var w = Math.min(Math.abs(pct), 100);
+      var lbl = (pct > 0 ? '+' : '') + pct.toFixed(0) + '%';
       return '' +
         '<div class="rsm-district-row">' +
           '<div class="rsm-district-name" title="' + escHtml(name) + '">' + escHtml(name) + '</div>' +
-          '<div class="rsm-district-bar"><div class="rsm-district-bar-fill ' + cls + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
-          '<div class="rsm-district-pct ' + cls + '">' + pct + '%</div>' +
+          '<div class="rsm-district-bar"><div class="rsm-district-bar-fill ' + cls + '" style="width:' + w + '%"></div></div>' +
+          '<div class="rsm-district-pct ' + cls + '" title="Volume vs prior period">' + lbl + '</div>' +
         '</div>';
     }).join('');
     list.innerHTML = html;
@@ -348,23 +377,29 @@
     var html = dsms.map(function(d, i){
       var ini = initialsOf(d.name);
       var avClass = 'rsm-dsm-av-' + ((i % 5) + 1);
-      // Placeholder star score + MTD — until /api/team returns per-DSM data
-      var score = 2.5 + ((d.name || '').length % 5) * 0.5;
-      var mtd   = 2000000 + ((d.name || '').length % 10) * 800000;
-      var trend = ((d.name || '').length % 3 === 0) ? 'up' : ((d.name||'').length % 3 === 1 ? 'flat' : 'down');
-      var trendStr = trend === 'up' ? '↑' + (8 + (ini.charCodeAt(0) % 9)) + '%' :
-                     trend === 'down' ? '↓' + (5 + (ini.charCodeAt(0) % 7)) + '%' : '—';
+      // Real per-DSM stats from /api/team (matched by name); "—" when unmatched.
+      var sap = teamDsmByName(bundle, d.name);
       var tsrs = (bundle.tsrCounts && bundle.tsrCounts[i]) || 0;
+      var statsLine = sap
+        ? fmtNum(sap.customers || 0) + ' customers · ' + fmtNum(sap.silent || 0) + ' silent ≥30d'
+        : 'No SAP sales mapping yet';
+      var mtdStr = sap ? fmtNum(sap.mtd_speed || 0) + ' MT MTD' : '— MTD';
+      var trend = 'flat', trendStr = '—';
+      if (sap && sap.vs_pp_pct != null) {
+        var v = Number(sap.vs_pp_pct);
+        trend = v > 0 ? 'up' : (v < 0 ? 'down' : 'flat');
+        trendStr = v === 0 ? '—' : (v > 0 ? '↑' : '↓') + Math.abs(v).toFixed(0) + '%';
+      }
 
       return '' +
         '<div class="rsm-dsm-row" onclick="window.drillDsm && window.drillDsm(\'' + escHtml(d.id) + '\')">' +
           '<div class="rsm-dsm-av ' + avClass + '">' + escHtml(ini) + '</div>' +
           '<div class="rsm-dsm-body">' +
             '<div class="rsm-dsm-name">' + escHtml(d.name || '—') + '</div>' +
-            '<div class="rsm-dsm-stars">' + starBar(score) + '</div>' +
-            '<div class="rsm-dsm-meta">' + escHtml(d.district || d.territory || '—') + ' · ' + tsrs + ' TSR' + (tsrs===1?'':'s') + ' · ' + fmtPhpShort(mtd) + ' MTD</div>' +
+            '<div class="rsm-dsm-stars">' + statsLine + '</div>' +
+            '<div class="rsm-dsm-meta">' + escHtml(d.district || d.territory || '—') + ' · ' + tsrs + ' TSR' + (tsrs===1?'':'s') + ' · ' + mtdStr + '</div>' +
           '</div>' +
-          '<div class="rsm-dsm-trend ' + trend + '">' + trendStr + '</div>' +
+          '<div class="rsm-dsm-trend ' + trend + '" title="Volume vs prior period">' + trendStr + '</div>' +
         '</div>';
     }).join('');
     list.innerHTML = html;
@@ -391,13 +426,10 @@
   }
 
   function renderWhitespace(bundle){
-    // Placeholder v1: synth whitespace count from dsms
-    var dsmCount = (bundle.dsms || []).length;
-    var whitespace = Math.max(0, 42 - dsmCount * 3);
-    var untapped = whitespace * 180000;  // ~₱180k/town/month estimate
-    setTxt('rsm-whitespace-count', fmtNum(whitespace));
+    // No POS-coverage data source yet — honest placeholder, no synthetic counts.
+    setTxt('rsm-whitespace-count', '—');
     var valEl = document.getElementById('rsm-whitespace-value');
-    if (valEl) valEl.innerHTML = 'Est. untapped revenue: <b style="color:#0084FF">' + fmtPhpShort(untapped) + '/month</b>';
+    if (valEl) valEl.textContent = 'Whitespace mapping pending — POS coverage data not yet wired';
   }
 
   function renderVetMission(bundle){
