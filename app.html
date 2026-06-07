@@ -1205,7 +1205,7 @@ body{
           <!-- 5. DSO (active) -->
           <div class="kpi kpi-sm kpi-enr" style="cursor:pointer" onclick="navTo('pg-ar')" title="Open Accounts Receivable">
             <div class="kpi-label">DSO</div>
-            <div class="kpi-val" style="font-size:20px" id="hk-dso">47<span style="font-size:13px;color:var(--text3)">d</span></div>
+            <div class="kpi-val" style="font-size:20px" id="hk-dso">—<span style="font-size:13px;color:var(--text3)">d</span></div>
             <div class="kpi-delta" style="color:var(--text2)" id="hk-dso-d">Active accounts</div>
             <div class="kpi-enr-div"></div>
             <div class="kpi-enr-ytd"><span class="kpi-enr-ytd-lbl">TARGET</span><span class="kpi-enr-ytd-val" id="hk-dso-tgt">≤45d</span></div>
@@ -1279,7 +1279,7 @@ body{
                   <td class="num" style="font-weight:800">₱482M</td>
                   <td class="num up" style="font-weight:800">+12.1%</td>
                   <td class="num" style="font-weight:800">₱5,493</td>
-                  <td class="num" style="font-weight:800"><span class="badge b-green">47d</span></td>
+                  <td class="num" style="font-weight:800"><span class="badge b-green">—</span></td>
                 </tr>
                 </tbody>
               </table>
@@ -1450,7 +1450,7 @@ body{
           <div class="evp-card" onclick="navTo('pg-home')">
             <div class="evp-card-hdr">
               <div class="evp-card-title">🌏 Regional Snapshot</div>
-              <div class="evp-card-sub">MTD vs target</div>
+              <div class="evp-card-sub" id="evp-regions-sub">vs PP</div>
             </div>
             <div class="evp-regions" id="evp-regions"></div>
           </div>
@@ -2151,7 +2151,7 @@ body{
           </div>
           <div>
             <!-- DSO gauge -->
-            <div class="dso-wrap"><div class="dso-gauge"><div class="dso-ring" id="ar-dso-ring"></div><div class="val" style="color:var(--green)" id="ar-dso-val">47</div><div class="lbl">DAYS DSO</div><div class="status" style="color:var(--green)" id="ar-dso-status">HEALTHY</div></div></div>
+            <div class="dso-wrap"><div class="dso-gauge"><div class="dso-ring" id="ar-dso-ring"></div><div class="val" style="color:var(--green)" id="ar-dso-val">—</div><div class="lbl">DAYS DSO</div><div class="status" style="color:var(--green)" id="ar-dso-status">HEALTHY</div></div></div>
             <div style="text-align:center;font-size:10px;color:var(--text3);margin-bottom:16px" id="ar-dso-sub">Target: &lt;45 days</div>
             <!-- DSO Variation -->
             <div class="card" style="margin-bottom:12px">
@@ -2204,9 +2204,9 @@ body{
         <!-- KPIs -->
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" class="stagger">
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Floor</div><div class="kpi-val" style="font-size:20px" id="inv-k-floor">—</div><div class="kpi-src" id="inv-k-floor-sub">bags</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="inv-k-po">—</div><div class="kpi-src">bags</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Pending PO</div><div class="kpi-val" style="font-size:20px;color:var(--gold)" id="inv-k-po">—</div><div class="kpi-src" id="inv-k-po-sub">bags</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">On Production</div><div class="kpi-val" style="font-size:20px;color:var(--blue)" id="inv-k-prod">—</div><div class="kpi-src" id="inv-k-prod-src">bags · OWOR</div><div id="inv-k-prod-stale" style="display:none;margin-top:6px;padding:3px 6px;border-radius:4px;background:rgba(241,177,29,0.12);border:1px solid rgba(241,177,29,0.25);color:var(--gold);font-size:9px;font-weight:600;letter-spacing:0.3px;cursor:help" title=""></div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src">bags (on-hand − committed)</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Available</div><div class="kpi-val" style="font-size:20px;color:var(--green)" id="inv-k-avail">—</div><div class="kpi-src" id="inv-k-avail-sub">bags (on-hand − committed)</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Cover Days</div><div class="kpi-val" style="font-size:20px"><span id="inv-k-cover">—</span><span style="font-size:10px;color:var(--text3)"> d</span></div><div class="kpi-src">at current speed</div></div>
           <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Negative Avail.</div><div class="kpi-val" style="font-size:20px;color:var(--red)" id="inv-k-neg">—</div><div class="kpi-src">plants short</div></div>
         </div>
@@ -2230,7 +2230,7 @@ body{
                   .inv-neg{color:var(--red) !important;font-weight:700 !important}
                 </style>
                 <table class="inv-tbl">
-                  <thead><tr><th>Region</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <thead><tr><th>Region</th><th class="inv-thu" data-l="On Floor">On Floor</th><th class="inv-thu" data-l="PO">PO</th><th class="inv-thu" data-l="Committed">Committed</th><th class="inv-thu" data-l="Available">Available</th></tr></thead>
                   <tbody id="inv-region-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
@@ -2241,7 +2241,7 @@ body{
               <div class="card-hdr"><div class="card-title">By Plant</div><span style="font-size:9px;color:var(--text4)" id="inv-plant-count">—</span></div>
               <div class="card-body" style="padding-top:8px;max-height:460px;overflow-y:auto">
                 <table class="inv-tbl">
-                  <thead><tr><th>Plant ▲</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <thead><tr><th>Plant ▲</th><th class="inv-thu" data-l="On Floor">On Floor</th><th class="inv-thu" data-l="PO">PO</th><th class="inv-thu" data-l="Committed">Committed</th><th class="inv-thu" data-l="Available">Available</th></tr></thead>
                   <tbody id="inv-plant-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
@@ -2252,7 +2252,7 @@ body{
               <div class="card-hdr"><div class="card-title">By Sales Group</div></div>
               <div class="card-body" style="padding-top:8px">
                 <table class="inv-tbl">
-                  <thead><tr><th>Item Sales Group</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                  <thead><tr><th>Item Sales Group</th><th class="inv-thu" data-l="On Floor">On Floor</th><th class="inv-thu" data-l="PO">PO</th><th class="inv-thu" data-l="Committed">Committed</th><th class="inv-thu" data-l="Available">Available</th></tr></thead>
                   <tbody id="inv-group-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
                 </table>
               </div>
@@ -2270,7 +2270,7 @@ body{
             </div>
             <div class="card-body" style="padding-top:8px;max-height:680px;overflow-y:auto">
               <table class="inv-tbl">
-                <thead><tr><th style="min-width:260px">Product ▲</th><th>Plant</th><th>On Floor</th><th>PO</th><th>Committed</th><th>Available</th></tr></thead>
+                <thead><tr><th style="min-width:260px">Product ▲</th><th>Plant</th><th class="inv-thu" data-l="On Floor">On Floor</th><th class="inv-thu" data-l="PO">PO</th><th class="inv-thu" data-l="Committed">Committed</th><th class="inv-thu" data-l="Available">Available</th></tr></thead>
                 <tbody id="inv-product-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
               </table>
             </div>
@@ -2614,7 +2614,7 @@ body{
       </div>
 
       <!-- ===== MARGIN ALERTS ===== -->
-      <!-- WIRED: /api/margin endpoint — data fetched, logged to console. Prototype layout retained for rendering. -->
+      <!-- WIRED: /api/margin endpoint — hero, KPIs, critical cards and all tables render live; static prototype data removed. -->
       <div class="page" id="pg-margin">
 
         <!-- HERO ALERT BANNER -->
@@ -2625,23 +2625,21 @@ body{
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
                 <span style="font-size:20px">⚠️</span>
                 <span style="font-size:20px;font-weight:800;letter-spacing:-0.5px">Margin Alerts</span>
-                <span class="badge b-red" style="font-size:10px;padding:4px 12px">3 CRITICAL</span>
-                <span class="badge b-gold" style="font-size:10px;padding:4px 12px">7 WARNING</span>
+                <span class="badge b-red" id="margin-hero-crit-badge" style="font-size:10px;padding:4px 12px">— CRITICAL</span>
+                <span class="badge b-gold" id="margin-hero-warn-badge" style="font-size:10px;padding:4px 12px">— WARNING</span>
               </div>
-              <div style="font-size:12px;color:var(--text2);line-height:1.7;max-width:600px">
-                <b style="color:var(--red)">₱337K</b> negative gross profit from 3 critical accounts — all in <b style="color:var(--text)">Mindanao</b>.
-                <b style="color:var(--gold)">7 warning accounts</b> at 0-10% GP with combined revenue <b style="color:var(--text)">₱38.4M YTD</b>.
-                Weighted avg GP% across flagged: <b style="color:var(--gold)">3.2%</b> vs national <b style="color:var(--green)">16.1%</b>.
+              <div id="margin-hero-desc" style="font-size:12px;color:var(--text2);line-height:1.7;max-width:600px">
+                Loading…
               </div>
             </div>
             <div style="display:flex;gap:16px;flex-shrink:0">
               <div style="text-align:center;padding:0 12px">
-                <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--red)">-₱337K</div>
+                <div id="margin-hero-neg" style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--red)">—</div>
                 <div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Negative GP Exposure</div>
               </div>
               <div style="width:1px;background:rgba(255,255,255,0.06)"></div>
               <div style="text-align:center;padding:0 12px">
-                <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--gold)">₱50.7M</div>
+                <div id="margin-hero-risk" style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--gold)">—</div>
                 <div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Revenue at Risk</div>
               </div>
             </div>
@@ -2650,70 +2648,20 @@ body{
 
         <!-- KPI ROW -->
         <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:16px" class="stagger">
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--red)"><div class="kpi-val" style="font-size:20px;color:var(--red)">3</div><div class="kpi-label" style="color:var(--red)">Critical</div><div class="kpi-src">&lt; 0% GP</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-val" style="font-size:20px;color:var(--gold)">7</div><div class="kpi-label" style="color:var(--gold)">Warning</div><div class="kpi-src">0-10% GP</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--blue)"><div class="kpi-val" style="font-size:20px;color:var(--blue)">12</div><div class="kpi-label" style="color:var(--blue)">Watch</div><div class="kpi-src">10-15% GP</div></div>
-          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--green)"><div class="kpi-val" style="font-size:20px;color:var(--green)">688</div><div class="kpi-label" style="color:var(--green)">Healthy</div><div class="kpi-src">&gt; 15% GP</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Nat'l GM/Ton</div><div class="kpi-val" style="font-size:18px">₱5,493</div><div class="kpi-delta down">▼ 1.2%</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Nat'l GP%</div><div class="kpi-val" style="font-size:18px">16.1%</div><div class="kpi-delta down">▼ 0.4pp</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Best Region</div><div class="kpi-val" style="font-size:15px;color:var(--green)">Luzon</div><div class="kpi-src">17.8% GP</div></div>
-          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Worst Region</div><div class="kpi-val" style="font-size:15px;color:var(--red)">Mindanao</div><div class="kpi-src">11.4% GP</div></div>
-        </div>
-
-        <!-- FILTER -->
-        <div class="filter-bar">
-          <button class="filter-chip active" onclick="setF(this)">All Accounts</button>
-          <button class="filter-chip" onclick="setF(this)">Critical Only</button>
-          <button class="filter-chip" onclick="setF(this)">Warning Only</button>
-          <button class="filter-chip" onclick="setF(this)">Watch Only</button>
-          <div style="flex:1"></div>
-          <button class="filter-chip" onclick="setF(this)">Luzon</button>
-          <button class="filter-chip" onclick="setF(this)">Visayas</button>
-          <button class="filter-chip" onclick="setF(this)">Mindanao</button>
+          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--red)"><div class="kpi-val" style="font-size:20px;color:var(--red)">—</div><div class="kpi-label" style="color:var(--red)">Critical</div><div class="kpi-src">&lt; 0% GP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--gold)"><div class="kpi-val" style="font-size:20px;color:var(--gold)">—</div><div class="kpi-label" style="color:var(--gold)">Warning</div><div class="kpi-src">0-10% GP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--blue)"><div class="kpi-val" style="font-size:20px;color:var(--blue)">—</div><div class="kpi-label" style="color:var(--blue)">Watch</div><div class="kpi-src">10-15% GP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center;border-left:3px solid var(--green)"><div class="kpi-val" style="font-size:20px;color:var(--green)">—</div><div class="kpi-label" style="color:var(--green)">Healthy</div><div class="kpi-src">&gt; 15% GP</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Nat'l GM/Ton</div><div class="kpi-val" style="font-size:18px">—</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Nat'l GP%</div><div class="kpi-val" style="font-size:18px">—</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Best Region</div><div class="kpi-val" style="font-size:15px;color:var(--green)">—</div><div class="kpi-src" id="margin-best-src">—</div></div>
+          <div class="kpi kpi-sm" style="text-align:center"><div class="kpi-label">Worst Region</div><div class="kpi-val" style="font-size:15px;color:var(--red)">—</div><div class="kpi-src" id="margin-worst-src">—</div></div>
         </div>
 
         <!-- CRITICAL ACCOUNTS -->
-        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--red)">🔴 Critical — Negative Gross Profit</div><div class="sec-line"></div><div class="sec-count">3 accounts · -₱337K total GP</div></div>
-        <div class="grid-3 gap-sm" style="margin-bottom:20px">
-          <div class="margin-card critical">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:800">Bukidnon Farms Trading</div><div style="font-size:10px;color:var(--text3);margin-top:2px">CA-031 · Mindanao · Bukidnon · E. Ramos</div></div><span class="badge b-red">GP% -3.1%</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">SALES</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">₱6.8M</div></div>
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">VOLUME</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">180 MT</div></div>
-              <div><div style="font-size:9px;color:var(--red);font-weight:600">GROSS PROFIT</div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">-₱210K</div></div>
-            </div>
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider)">
-              <div style="font-size:9px;color:var(--text3);font-weight:700;margin-bottom:6px">NEGATIVE SKUs</div>
-              <div style="display:flex;flex-direction:column;gap:4px;font-size:11px"><div style="display:flex;justify-content:space-between"><span>VP Hog Finisher</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-8.2%</span></div><div style="display:flex;justify-content:space-between"><span>VP Broiler Starter</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-2.4%</span></div><div style="display:flex;justify-content:space-between"><span>VP Hog Pre-Starter</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-1.1%</span></div></div>
-            </div>
-            <div style="margin-top:8px;font-size:10px;color:var(--text3)">BU: Key Accounts · Plant: BUKID · Group: HOGS</div>
-          </div>
-          <div class="margin-card critical">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:800">Zamboanga Feeds Corp.</div><div style="font-size:10px;color:var(--text3);margin-top:2px">CA-038 · Mindanao · Zamboanga · R. Gonzales</div></div><span class="badge b-red">GP% -2.5%</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">SALES</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">₱3.4M</div></div>
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">VOLUME</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">88 MT</div></div>
-              <div><div style="font-size:9px;color:var(--red);font-weight:600">GROSS PROFIT</div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">-₱85K</div></div>
-            </div>
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider)">
-              <div style="font-size:9px;color:var(--text3);font-weight:700;margin-bottom:6px">NEGATIVE SKUs</div>
-              <div style="display:flex;flex-direction:column;gap:4px;font-size:11px"><div style="display:flex;justify-content:space-between"><span>VP Hog Grower</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-4.8%</span></div><div style="display:flex;justify-content:space-between"><span>VP Hog Finisher</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-3.2%</span></div></div>
-            </div>
-            <div style="margin-top:8px;font-size:10px;color:var(--text3)">BU: Distribution · Plant: CCPC · Group: HOGS</div>
-          </div>
-          <div class="margin-card critical">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:800">GenSan Livestock Hub</div><div style="font-size:10px;color:var(--text3);margin-top:2px">CA-042 · Mindanao · General Santos · A. Torres</div></div><span class="badge b-red">GP% -2.0%</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">SALES</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">₱2.1M</div></div>
-              <div><div style="font-size:9px;color:var(--text3);font-weight:600">VOLUME</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">56 MT</div></div>
-              <div><div style="font-size:9px;color:var(--red);font-weight:600">GROSS PROFIT</div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">-₱42K</div></div>
-            </div>
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider)">
-              <div style="font-size:9px;color:var(--text3);font-weight:700;margin-bottom:6px">NEGATIVE SKUs</div>
-              <div style="display:flex;flex-direction:column;gap:4px;font-size:11px"><div style="display:flex;justify-content:space-between"><span>VP Hog Finisher</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-5.1%</span></div><div style="display:flex;justify-content:space-between"><span>VP Broiler Pre-Starter</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">-0.8%</span></div></div>
-            </div>
-            <div style="margin-top:8px;font-size:10px;color:var(--text3)">BU: Distribution · Plant: CCPC · Group: HOGS</div>
-          </div>
+        <div class="sec-hdr"><div class="sec-title-lg" style="color:var(--red)">🔴 Critical — Negative Gross Profit</div><div class="sec-line"></div><div class="sec-count" id="margin-crit-count">Loading…</div></div>
+        <div class="grid-3 gap-sm" id="margin-crit-cards" style="margin-bottom:20px">
+          <div style="grid-column:1/-1;text-align:center;color:var(--text3);font-size:11px;padding:14px">Loading…</div>
         </div>
 
         <!-- WARNING TABLE -->
@@ -2757,25 +2705,6 @@ body{
             <thead><tr><th>SKU</th><th class="num">Vol</th><th class="num">GP%</th><th class="num">GM/Ton</th></tr></thead>
             <tbody id="margin-worst-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr></tbody>
           </table></div></div>
-        </div>
-
-        <!-- GP% HEATMAP -->
-        <div>
-          <div class="card"><div class="card-hdr"><div class="card-title">GP% Heatmap — Region × Group</div></div><div class="card-body" style="padding-top:8px">
-            <table class="matrix">
-              <tr><th></th><th>Hogs</th><th>Poultry</th><th>Gamefowl</th><th>Specialties</th><th>Pet</th></tr>
-              <tr><td style="font-weight:700;text-align:left;font-size:10px">LUZON</td><td class="heat-1" style="color:var(--gold)">11.2%</td><td class="heat-3">18.4%</td><td class="heat-4">26.1%</td><td class="heat-3">17.8%</td><td class="heat-4">28.4%</td></tr>
-              <tr><td style="font-weight:700;text-align:left;font-size:10px">VISAYAS</td><td class="heat-0" style="color:var(--gold)">8.6%</td><td class="heat-2">16.2%</td><td class="heat-4">24.8%</td><td class="heat-2">15.4%</td><td class="heat-4">27.1%</td></tr>
-              <tr><td style="font-weight:700;text-align:left;font-size:10px">MINDANAO</td><td class="heat-0" style="color:var(--red)">4.1%</td><td class="heat-1" style="color:var(--gold)">12.8%</td><td class="heat-3">21.4%</td><td class="heat-2">14.2%</td><td class="heat-3">—</td></tr>
-            </table>
-            <div style="display:flex;gap:12px;margin-top:12px;font-size:9px;color:var(--text4)">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,0.3)"></span>&lt;5%</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(255,199,44,0.2)"></span>5-12%</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(151,215,0,0.12)"></span>12-18%</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(0,174,239,0.15)"></span>18-25%</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(0,212,255,0.2)"></span>&gt;25%</span>
-            </div>
-          </div></div>
         </div>
 
         <!-- SILENCED ITEMS DRAWER (margin page) -->
@@ -3501,7 +3430,7 @@ body{
           <button class="filter-chip" onclick="setF(this)">By BU</button>
           <button class="filter-chip" onclick="setF(this)">Rankings</button>
           <div style="flex:1"></div>
-          <span style="font-size:10px;color:var(--text4)">Targets are placeholder — update with actual RSM/DSM budgets</span>
+          <span style="font-size:10px;color:var(--text4)">RSM/DSM targets pending official budgets — shown as “—” until they land</span>
         </div>
 
         <!-- RSM SCORECARD TABLE -->
@@ -3529,44 +3458,7 @@ body{
             </style>
             <table class="team-tbl" id="team-tbl">
               <thead><tr><th style="min-width:180px">Name</th><th>Region</th><th>BU</th><th>YTD Vol</th><th>YTD Target</th><th>Ach %</th><th style="min-width:80px">Budget Bar</th><th><span id="team-score-cmp-label">vs PP</span></th><th>MTD ODLN</th><th>GM/Ton</th><th>DSO</th><th>Customers</th><th>Silent</th><th>Neg. Margin</th></tr></thead>
-              <tbody id="team-tbody">
-
-              <!-- MART ESPLIGUEZ — Visayas RSM -->
-              <tr class="rsm-row"><td>MART ESPLIGUEZ</td><td>Visayas</td><td>Dist + KA</td><td>14,820</td><td>16,089</td><td style="color:var(--green);font-weight:700">92%</td><td><div class="ach-bar"><div class="ach-fill" style="width:60px;background:var(--green)"></div></div></td><td class="up">+42.1%</td><td>6,365</td><td class="up">+40.6%</td><td>₱5,210</td><td><span class="badge b-gold">51d</span></td><td>186</td><td style="color:var(--red);font-weight:700">3</td><td style="color:var(--red);font-weight:700">4</td></tr>
-              <tr class="dsm-row"><td>A. Dizon</td><td style="color:var(--text3)">Negros</td><td>Distribution</td><td>4,280</td><td>4,800</td><td style="color:var(--gold)">89%</td><td><div class="ach-bar"><div class="ach-fill" style="width:54px;background:var(--gold)"></div></div></td><td class="up">+28%</td><td>1,840</td><td class="down">-4%</td><td>₱4,980</td><td>48d</td><td>52</td><td style="color:var(--red)">1</td><td style="color:var(--red)">2</td></tr>
-              <tr class="dsm-row"><td>R. Santos</td><td style="color:var(--text3)">Cebu North</td><td>Distribution</td><td>3,960</td><td>4,200</td><td style="color:var(--green)">94%</td><td><div class="ach-bar"><div class="ach-fill" style="width:58px;background:var(--green)"></div></div></td><td class="up">+51%</td><td>1,680</td><td class="up">+12%</td><td>₱5,420</td><td>44d</td><td>48</td><td>0</td><td>0</td></tr>
-              <tr class="dsm-row"><td>M. Garcia</td><td style="color:var(--text3)">Cebu South</td><td>Key Accounts</td><td>3,420</td><td>3,571</td><td style="color:var(--green)">96%</td><td><div class="ach-bar"><div class="ach-fill" style="width:62px;background:var(--green)"></div></div></td><td class="up">+38%</td><td>1,480</td><td class="up">+8%</td><td>₱5,680</td><td>39d</td><td>32</td><td>0</td><td>0</td></tr>
-              <tr class="dsm-row"><td>P. Villanueva</td><td style="color:var(--text3)">Leyte/Tacloban</td><td>Distribution</td><td>3,160</td><td>3,518</td><td style="color:var(--gold)">90%</td><td><div class="ach-bar"><div class="ach-fill" style="width:55px;background:var(--gold)"></div></div></td><td class="up">+32%</td><td>1,365</td><td class="up">+6%</td><td>₱4,840</td><td>56d</td><td>54</td><td style="color:var(--red)">2</td><td style="color:var(--red)">2</td></tr>
-
-              <!-- JOE EYOY — Mindanao RSM -->
-              <tr class="rsm-row"><td>JOE EYOY</td><td>Mindanao</td><td>Dist + KA</td><td>12,640</td><td>14,313</td><td style="color:var(--gold);font-weight:700">88%</td><td><div class="ach-bar"><div class="ach-fill" style="width:55px;background:var(--gold)"></div></div></td><td class="up">+35.4%</td><td>3,756</td><td class="up">+10.2%</td><td>₱3,500</td><td><span class="badge b-red">58d</span></td><td>164</td><td style="color:var(--red);font-weight:700">4</td><td style="color:var(--red);font-weight:700">6</td></tr>
-              <tr class="dsm-row"><td>E. Ramos</td><td style="color:var(--text3)">Davao</td><td>Dist + KA</td><td>5,180</td><td>5,400</td><td style="color:var(--green)">96%</td><td><div class="ach-bar"><div class="ach-fill" style="width:62px;background:var(--green)"></div></div></td><td class="up">+22%</td><td>1,540</td><td class="down">-2%</td><td>₱3,820</td><td>54d</td><td>48</td><td style="color:var(--red)">1</td><td style="color:var(--red)">2</td></tr>
-              <tr class="dsm-row"><td>A. Torres</td><td style="color:var(--text3)">CDO / Bukidnon</td><td>Distribution</td><td>3,840</td><td>4,600</td><td style="color:var(--red)">83%</td><td><div class="ach-bar"><div class="ach-fill" style="width:48px;background:var(--red)"></div></div></td><td class="up">+18%</td><td>720</td><td class="up">+6%</td><td>₱3,280</td><td>62d</td><td>52</td><td style="color:var(--red)">2</td><td style="color:var(--red)">3</td></tr>
-              <tr class="dsm-row"><td>R. Gonzales</td><td style="color:var(--text3)">Zamboanga/GenSan</td><td>Distribution</td><td>3,620</td><td>4,313</td><td style="color:var(--red)">84%</td><td><div class="ach-bar"><div class="ach-fill" style="width:50px;background:var(--red)"></div></div></td><td class="up">+24%</td><td>1,496</td><td class="down">-8%</td><td>₱2,940</td><td>65d</td><td>64</td><td style="color:var(--red)">1</td><td style="color:var(--red)">1</td></tr>
-
-              <!-- ERIC SALAZAR — Luzon RSM -->
-              <tr class="rsm-row"><td>ERIC SALAZAR</td><td>Luzon</td><td>Dist + KA</td><td>8,420</td><td>11,259</td><td style="color:var(--red);font-weight:700">75%</td><td><div class="ach-bar"><div class="ach-fill" style="width:44px;background:var(--red)"></div></div></td><td class="up">+28.6%</td><td>2,265</td><td class="down">-2.6%</td><td>₱5,890</td><td><span class="badge b-green">42d</span></td><td>148</td><td style="color:var(--red);font-weight:700">1</td><td style="color:var(--red);font-weight:700">0</td></tr>
-              <tr class="dsm-row"><td>J. Santos</td><td style="color:var(--text3)">Metro Manila</td><td>Distribution</td><td>2,840</td><td>3,200</td><td style="color:var(--gold)">89%</td><td><div class="ach-bar"><div class="ach-fill" style="width:54px;background:var(--gold)"></div></div></td><td class="up">+14%</td><td>920</td><td class="up">+8%</td><td>₱6,320</td><td>36d</td><td>38</td><td>0</td><td>0</td></tr>
-              <tr class="dsm-row"><td>R. Lim</td><td style="color:var(--text3)">Laguna/Calabarzon</td><td>Distribution</td><td>1,680</td><td>2,400</td><td style="color:var(--red)">70%</td><td><div class="ach-bar"><div class="ach-fill" style="width:40px;background:var(--red)"></div></div></td><td class="up">+8%</td><td>540</td><td class="down">-6%</td><td>₱5,840</td><td>44d</td><td>34</td><td style="color:var(--red)">1</td><td>0</td></tr>
-              <tr class="dsm-row"><td>M. Perez</td><td style="color:var(--text3)">Pampanga/C. Luzon</td><td>Distribution</td><td>1,420</td><td>1,800</td><td style="color:var(--red)">79%</td><td><div class="ach-bar"><div class="ach-fill" style="width:46px;background:var(--red)"></div></div></td><td class="up">+11%</td><td>480</td><td class="up">+4%</td><td>₱5,560</td><td>46d</td><td>42</td><td>0</td><td>0</td></tr>
-              <tr class="dsm-row"><td>L. Reyes</td><td style="color:var(--text3)">In-House Luzon</td><td>Key Accounts</td><td>2,480</td><td>3,859</td><td style="color:var(--red)">64%</td><td><div class="ach-bar"><div class="ach-fill" style="width:36px;background:var(--red)"></div></div></td><td class="up">+42%</td><td>325</td><td class="down">-12%</td><td>₱6,210</td><td>38d</td><td>34</td><td>0</td><td>0</td></tr>
-
-              <!-- EDFREY BUENAVENTURA -->
-              <tr class="rsm-row"><td>EDFREY BUENAVENTURA</td><td>Mindanao</td><td>Distribution</td><td>4,280</td><td>5,200</td><td style="color:var(--red);font-weight:700">82%</td><td><div class="ach-bar"><div class="ach-fill" style="width:49px;background:var(--red)"></div></div></td><td class="up">+18.2%</td><td>1,627</td><td class="down">-6.5%</td><td>₱3,640</td><td><span class="badge b-gold">55d</span></td><td>72</td><td style="color:var(--red);font-weight:700">2</td><td style="color:var(--red);font-weight:700">1</td></tr>
-
-              <!-- MATHIEU GUILLAUME (Direct) -->
-              <tr class="rsm-row"><td>MATHIEU GUILLAUME</td><td>National</td><td>Direct / KA</td><td>6,840</td><td>7,200</td><td style="color:var(--green);font-weight:700">95%</td><td><div class="ach-bar"><div class="ach-fill" style="width:61px;background:var(--green)"></div></div></td><td class="up">+124%</td><td>1,319</td><td class="up">+20.8%</td><td>₱6,840</td><td><span class="badge b-green">28d</span></td><td>18</td><td>0</td><td>0</td></tr>
-
-              <!-- CARMINDA CALDERON -->
-              <tr class="rsm-row"><td>CARMINDA CALDERON</td><td>Visayas</td><td>Distribution</td><td>3,680</td><td>4,800</td><td style="color:var(--red);font-weight:700">77%</td><td><div class="ach-bar"><div class="ach-fill" style="width:44px;background:var(--red)"></div></div></td><td class="up">+8.4%</td><td>1,266</td><td class="down">-16.2%</td><td>₱4,920</td><td><span class="badge b-gold">52d</span></td><td>68</td><td style="color:var(--red);font-weight:700">2</td><td style="color:var(--red);font-weight:700">1</td></tr>
-
-              <!-- RICHARD LAGDAAN -->
-              <tr class="rsm-row"><td>RICHARD LAGDAAN</td><td>Mindanao</td><td>Distribution</td><td>3,420</td><td>3,600</td><td style="color:var(--green);font-weight:700">95%</td><td><div class="ach-bar"><div class="ach-fill" style="width:61px;background:var(--green)"></div></div></td><td class="up">+44.2%</td><td>1,234</td><td class="up">+15.2%</td><td>₱3,980</td><td><span class="badge b-gold">49d</span></td><td>56</td><td>0</td><td style="color:var(--red);font-weight:700">1</td></tr>
-
-              <!-- MA LYNIE GASINGAN -->
-              <tr class="rsm-row"><td>MA LYNIE GASINGAN</td><td>Visayas</td><td>Pet Care</td><td>160</td><td>139</td><td style="color:var(--green);font-weight:700">115%</td><td><div class="ach-bar"><div class="ach-fill" style="width:65px;background:var(--green)"></div></div></td><td class="up">+82%</td><td>6</td><td class="down">-21.5%</td><td>₱12,640</td><td><span class="badge b-green">22d</span></td><td>24</td><td>0</td><td>0</td></tr>
-
-              </tbody>
+              <tbody id="team-tbody"><tr><td colspan="14" style="text-align:center;color:var(--text3);font-size:11px;padding:20px">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -5127,6 +5019,11 @@ async function loadInv(){
     if(!d){showError('pg-inv','Unable to load inventory data');return}
     INV_STATE.data = d;
     console.log('[INV] Rendering:', Object.keys(d), '|', (d.plants||[]).length, 'plants,', (d.items||[]).length, 'items');
+    // Topbar unit toggle (UT 'MT'|'Bags') drives this page; local toggle mirrors it
+    INV_STATE.unit = (typeof UT !== 'undefined' && String(UT).toUpperCase() === 'BAGS') ? 'BAGS' : 'MT';
+    document.querySelectorAll('#inv-unit-toggle .tb-toggle-btn').forEach(function(b){
+      b.classList.toggle('active', b.textContent.trim().toUpperCase() === INV_STATE.unit);
+    });
     renderInv();
     // Timestamp
     if(d.last_updated){
@@ -5143,20 +5040,28 @@ function renderInv(){
 
   // --- KPI strip ---
   var s = d.summary || {};
+  var uLbl = isBags ? 'bags' : 'MT';
   if(isBags){
     animateNumber(sel('inv-k-floor'), s.on_floor || 0,    function(v){return fcn(Math.round(v))});
     animateNumber(sel('inv-k-po'),    s.pending_po || 0,  function(v){return fcn(Math.round(v))});
     animateNumber(sel('inv-k-avail'), s.available || 0,   function(v){return fcn(Math.round(v))});
   } else {
-    animateNumber(sel('inv-k-floor'), s.on_floor_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
-    animateNumber(sel('inv-k-po'),    s.pending_po_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
-    animateNumber(sel('inv-k-avail'), s.available_mt || 0, function(v){return fcn(Math.round(v))+' MT'});
+    animateNumber(sel('inv-k-floor'), s.on_floor_mt || 0, function(v){return fcn(Math.round(v))});
+    animateNumber(sel('inv-k-po'),    s.pending_po_mt || 0, function(v){return fcn(Math.round(v))});
+    animateNumber(sel('inv-k-avail'), s.available_mt || 0, function(v){return fcn(Math.round(v))});
   }
+  // Unit labels follow the active unit (KPI subs + table column headers)
+  sett('inv-k-floor-sub', uLbl);
+  sett('inv-k-po-sub', uLbl);
+  sett('inv-k-avail-sub', uLbl + ' (on-hand − committed)');
+  document.querySelectorAll('#pg-inv th.inv-thu').forEach(function(h){
+    h.textContent = h.getAttribute('data-l') + ' (' + uLbl + ')';
+  });
   // ON PRODUCTION — shows REAL (DueDate within 30d). Stale WOs surface as a gold badge.
   var prod = d.production || {};
   var prodVal = isBags ? (prod.on_production_bags != null ? prod.on_production_bags : s.on_production)
                        : (prod.on_production_mt != null ? prod.on_production_mt : s.on_production_mt);
-  sett('inv-k-prod', prodVal != null ? (fcn(Math.round(prodVal)) + (isBags ? '' : ' MT')) : '—');
+  sett('inv-k-prod', prodVal != null ? fcn(Math.round(prodVal)) : '—');
   var prodSrc = sel('inv-k-prod-src');
   if(prodSrc) prodSrc.textContent = (isBags ? 'bags' : 'MT') + ' · OWOR';
   var staleEl = sel('inv-k-prod-stale');
@@ -5878,17 +5783,19 @@ async function loadMargin(){
     if(!d){showError('pg-margin','Unable to load margin data');return}
     console.log('[MARGIN] Rendering:', d.hero);
     var pg=sel('pg-margin');
-    // Hero
+    // Hero (ids — no fragile attribute selectors)
     if(d.hero){
-      var heroNeg=pg.querySelector('.detail-hero .val, [style*="font-size:28px"]');
-      // Update the hero numbers directly
-      var heroNums=pg.querySelectorAll('[style*="font-size:28px"]');
-      if(heroNums[0] && d.hero.negative_gp_total!=null) heroNums[0].textContent='-₱'+fcn(Math.abs(Math.round(d.hero.negative_gp_total/1000)))+'K';
-      if(heroNums[1] && d.hero.revenue_at_risk!=null) heroNums[1].textContent=fc(d.hero.revenue_at_risk);
-      // Hero badges
-      var badges=pg.querySelectorAll('.badge.b-red, .badge.b-gold');
-      if(badges[0] && d.hero.critical_count!=null) badges[0].textContent=d.hero.critical_count+' CRITICAL';
-      if(badges[1] && d.hero.warning_count!=null) badges[1].textContent=d.hero.warning_count+' WARNING';
+      var negStr=(d.hero.negative_gp_total<0?'-':'')+'₱'+fcn(Math.abs(Math.round((d.hero.negative_gp_total||0)/1000)))+'K';
+      if(d.hero.negative_gp_total!=null) sett('margin-hero-neg',negStr);
+      if(d.hero.revenue_at_risk!=null) sett('margin-hero-risk',fc(d.hero.revenue_at_risk));
+      if(d.hero.critical_count!=null) sett('margin-hero-crit-badge',d.hero.critical_count+' CRITICAL');
+      if(d.hero.warning_count!=null) sett('margin-hero-warn-badge',d.hero.warning_count+' WARNING');
+      // Narrative — built from live fields only
+      var warnRev=(d.warning||[]).reduce(function(s,w){return s+(w.sales||0)},0);
+      var desc='<b style="color:var(--red)">'+negStr+'</b> negative gross profit from '+(d.hero.critical_count||0)+' critical accounts. ';
+      desc+='<b style="color:var(--gold)">'+(d.hero.warning_count||0)+' warning accounts</b> at 0-10% GP with combined revenue <b style="color:var(--text)">'+fc(warnRev)+'</b>.';
+      if(d.kpis && d.kpis.natl_gp_pct!=null) desc+=' National GP%: <b style="color:var(--green)">'+d.kpis.natl_gp_pct.toFixed(1)+'%</b>.';
+      seth('margin-hero-desc',desc);
     }
     // KPI row (8 KPIs)
     if(d.kpis){
@@ -5901,25 +5808,35 @@ async function loadMargin(){
       if(kpis[5] && d.kpis.natl_gp_pct!=null) kpis[5].textContent=d.kpis.natl_gp_pct.toFixed(1)+'%';
       if(kpis[6] && d.kpis.best_region) kpis[6].textContent=d.kpis.best_region.name||d.kpis.best_region;
       if(kpis[7] && d.kpis.worst_region) kpis[7].textContent=d.kpis.worst_region.name||d.kpis.worst_region;
+      if(d.kpis.best_region && d.kpis.best_region.gp_pct!=null) sett('margin-best-src',d.kpis.best_region.gp_pct.toFixed(1)+'% GP');
+      if(d.kpis.worst_region && d.kpis.worst_region.gp_pct!=null) sett('margin-worst-src',d.kpis.worst_region.gp_pct.toFixed(1)+'% GP');
     }
-    // Critical accounts cards
+    // Critical accounts cards — built from live payload (incl. sku_breakdown)
+    var fmtVol=function(v){v=+v||0;return (Math.abs(v)>=10?fcn(Math.round(v)):v.toFixed(2))+' MT'};
     if(d.critical && d.critical.length){
-      var cards=pg.querySelectorAll('.margin-card.critical');
-      d.critical.slice(0,3).forEach(function(c,i){
-        if(!cards[i])return;
-        cards[i].style.cursor = 'pointer';
-        cards[i].onclick = function(){ openCust(c.code || ''); };
-        var nameEl=cards[i].querySelector('[style*="font-size:15px"]');
-        if(nameEl)nameEl.textContent=c.customer||'';
-        var codeEl=cards[i].querySelector('[style*="font-size:10px"]');
-        if(codeEl)codeEl.textContent=(c.code||'')+' · '+(c.rep||'');
-        var badge=cards[i].querySelector('.badge');
-        if(badge && c.gp_pct!=null) badge.textContent='GP% '+c.gp_pct.toFixed(1)+'%';
-        var nums=cards[i].querySelectorAll('[style*="font-size:14px"]');
-        if(nums[0] && c.sales!=null) nums[0].textContent=fc(c.sales);
-        if(nums[1] && c.vol!=null) nums[1].textContent=Math.round(c.vol)+' MT';
-        if(nums[2] && c.gp!=null) nums[2].textContent=(c.gp<0?'-':'')+'₱'+fcn(Math.abs(Math.round(c.gp/1000)))+'K';
+      var critCap=6, chtml='';
+      d.critical.slice(0,critCap).forEach(function(c){
+        chtml+='<div class="margin-card critical" style="cursor:pointer" onclick="openCust(\''+esc(c.code||'')+'\')">';
+        chtml+='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:800">'+esc(c.customer||'')+'</div><div style="font-size:10px;color:var(--text3);margin-top:2px">'+esc(c.code||'')+' · '+esc(c.rep||'--')+'</div></div><span class="badge b-red">GP% '+(c.gp_pct!=null?c.gp_pct.toFixed(1)+'%':'--')+'</span></div>';
+        chtml+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">';
+        chtml+='<div><div style="font-size:9px;color:var(--text3);font-weight:600">SALES</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">'+fc(c.sales||0)+'</div></div>';
+        chtml+='<div><div style="font-size:9px;color:var(--text3);font-weight:600">VOLUME</div><div style="font-family:var(--mono);font-size:14px;font-weight:700">'+fmtVol(c.vol)+'</div></div>';
+        chtml+='<div><div style="font-size:9px;color:var(--red);font-weight:600">GROSS PROFIT</div><div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">'+(c.gp<0?'-':'')+'₱'+fcn(Math.abs(Math.round((c.gp||0)/1000)))+'K</div></div></div>';
+        if(c.sku_breakdown && c.sku_breakdown.length){
+          chtml+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider)"><div style="font-size:9px;color:var(--text3);font-weight:700;margin-bottom:6px">NEGATIVE SKUs</div><div style="display:flex;flex-direction:column;gap:4px;font-size:11px">';
+          c.sku_breakdown.slice(0,3).forEach(function(s){
+            chtml+='<div style="display:flex;justify-content:space-between"><span>'+esc(s.sku_name||s.sku||'')+'</span><span style="font-family:var(--mono);color:var(--red);font-weight:700">'+(s.gp_pct!=null?s.gp_pct.toFixed(1)+'%':'--')+'</span></div>';
+          });
+          chtml+='</div></div>';
+        }
+        chtml+='</div>';
       });
+      seth('margin-crit-cards',chtml);
+      var critGp=d.critical.reduce(function(s,c){return s+(c.gp||0)},0);
+      sett('margin-crit-count',d.critical.length+' accounts · '+(critGp<0?'-':'')+'₱'+fcn(Math.abs(Math.round(critGp/1000)))+'K total GP'+(d.critical.length>critCap?' · showing top '+critCap:''));
+    } else {
+      seth('margin-crit-cards','<div style="grid-column:1/-1;text-align:center;color:var(--text3);font-size:11px;padding:14px">No critical accounts for this period</div>');
+      sett('margin-crit-count','0 accounts');
     }
     // Margin sidebar badge count
     var sidebarBadge=document.querySelector('.nav-item [class*="b-red"]');
@@ -5963,6 +5880,8 @@ async function loadMargin(){
         rhtml+='<td class="num" style="color:'+col+'">'+(r.gm_ton!=null?'₱'+fcn(Math.round(r.gm_ton)):'--')+'</td></tr>';
       });
       seth('margin-region-tbody',rhtml);
+    } else {
+      seth('margin-region-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
 
     // By BRAND table
@@ -5977,6 +5896,8 @@ async function loadMargin(){
         bhtml+='<td class="num" style="color:'+col+'">'+(b.gm_ton!=null?'₱'+fcn(Math.round(b.gm_ton)):'--')+'</td></tr>';
       });
       seth('margin-brand-tbody',bhtml);
+    } else {
+      seth('margin-brand-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
 
     // By PLANT table
@@ -5990,6 +5911,8 @@ async function loadMargin(){
         phtml+='<td class="num" style="color:'+col+'">'+(p.gm_ton!=null?'₱'+fcn(Math.round(p.gm_ton)):'--')+'</td></tr>';
       });
       seth('margin-plant-tbody',phtml);
+    } else {
+      seth('margin-plant-tbody','<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
 
     // By SALES GROUP table
@@ -6004,6 +5927,8 @@ async function loadMargin(){
         ghtml+='<td class="num" style="color:'+col+'">'+(g.gm_ton!=null?'₱'+fcn(Math.round(g.gm_ton)):'--')+'</td></tr>';
       });
       seth('margin-group-tbody',ghtml);
+    } else {
+      seth('margin-group-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
 
     // By BU table
@@ -6018,6 +5943,8 @@ async function loadMargin(){
         bhtml+='<td class="num" style="color:'+col+'">'+(b.gm_ton!=null?'₱'+fcn(Math.round(b.gm_ton)):'--')+'</td></tr>';
       });
       seth('margin-bu-tbody',bhtml);
+    } else {
+      seth('margin-bu-tbody','<tr><td colspan="5" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
 
     // Worst SKUs
@@ -6031,6 +5958,8 @@ async function loadMargin(){
         shtml+='<td class="num" style="color:'+col+'">'+(s.gm_ton!=null?(s.gm_ton<0?'-':'')+'₱'+fcn(Math.abs(Math.round(s.gm_ton))):'--')+'</td></tr>';
       });
       seth('margin-worst-tbody',shtml);
+    } else {
+      seth('margin-worst-tbody','<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:11px">No data for this period</td></tr>');
     }
     pulseRefresh('pg-margin');
   } catch(e) { console.error('Margin:', e); showError('pg-margin','Unable to load margin data'); }
@@ -6878,6 +6807,8 @@ async function loadTeam(){
       function teamScoreRowHtml(row, cls, nameHtml, extraTrAttrs){
         extraTrAttrs = extraTrAttrs || '';
         var ach = row.ach_pct!=null ? row.ach_pct : 0;
+        // Official RSM/DSM budgets pending — API sends ytd_target=0. Show honest "—", never fake 0%.
+        var hasTgt = (row.ytd_target||0) > 0;
         var achCol = ach>=95?'var(--green)' : ach>=80?'var(--gold)' : 'var(--red)';
         var dsoCol = row.dso!=null ? (row.dso<=45?'b-green' : row.dso<=60?'b-gold' : 'b-red') : 'b-gold';
         var h = '<tr class="'+cls+'"'+extraTrAttrs+'>';
@@ -6885,9 +6816,12 @@ async function loadTeam(){
         h += '<td>'+esc(row.region||'--')+'</td>';
         h += '<td>'+esc(row.bu||'--')+'</td>';
         h += '<td>'+fcn(Math.round(row.ytd_vol||0))+'</td>';
-        h += '<td>'+fcn(Math.round(row.ytd_target||0))+'</td>';
-        h += '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>';
-        h += '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>';
+        h += hasTgt ? '<td>'+fcn(Math.round(row.ytd_target))+'</td>'
+                    : '<td style="color:var(--text4)" title="Pending official budgets">—</td>';
+        h += hasTgt ? '<td style="color:'+achCol+';font-weight:700">'+ach.toFixed(0)+'%</td>'
+                    : '<td style="color:var(--text4)" title="Pending official budgets">—</td>';
+        h += hasTgt ? '<td><div class="ach-bar"><div class="ach-fill" style="width:'+Math.min(ach*0.7,100)+'px;background:'+achCol+'"></div></div></td>'
+                    : '<td style="color:var(--text4)">—</td>';
         var vsPct = (CMP === 'vs_ly') ? row.vs_ly : row.vs_pp_pct;
         var vsTdCls = (vsPct == null || !isFinite(Number(vsPct))) ? '' : (((vsPct||0)>=0) ? 'up' : 'down');
         h += '<td class="'+vsTdCls+'">'+(vsPct!=null&&isFinite(Number(vsPct))?(vsPct>=0?'+':'')+Number(vsPct).toFixed(1)+'%':'--')+'</td>';
@@ -6941,8 +6875,10 @@ async function loadTeam(){
       var totAch = totals.tgt>0 ? totals.vol/totals.tgt*100 : 0;
       thtml += '<tr class="total-row"><td style="font-weight:800">NATIONAL TOTAL</td><td></td><td></td>';
       thtml += '<td style="font-weight:800">'+fcn(Math.round(totals.vol))+'</td>';
-      thtml += '<td style="font-weight:800">'+fcn(Math.round(totals.tgt))+'</td>';
-      thtml += '<td style="font-weight:800">'+totAch.toFixed(0)+'%</td>';
+      thtml += totals.tgt>0 ? '<td style="font-weight:800">'+fcn(Math.round(totals.tgt))+'</td>'
+                            : '<td style="color:var(--text4)" title="Pending official budgets">—</td>';
+      thtml += totals.tgt>0 ? '<td style="font-weight:800">'+totAch.toFixed(0)+'%</td>'
+                            : '<td style="color:var(--text4)" title="Pending official budgets">—</td>';
       thtml += '<td></td><td></td><td></td><td></td><td></td>';
       thtml += '<td style="font-weight:800">'+fcn(totals.cust)+'</td>';
       thtml += '<td style="font-weight:800;color:var(--red)">'+totals.sil+'</td>';
@@ -6953,7 +6889,9 @@ async function loadTeam(){
       var ranked = d.rsms.slice().sort(function(a,b){return (b.ytd_vol||0)-(a.ytd_vol||0)});
       var rhtml='';
       ranked.slice(0,8).forEach(function(r,i){
-        var achCol = (r.ach_pct||0)>=95?'var(--green)' : (r.ach_pct||0)>=80?'var(--gold)' : 'var(--red)';
+        // No official target yet → neutral color, not red
+        var achCol = (r.ytd_target||0)<=0 ? 'var(--blue)'
+                   : (r.ach_pct||0)>=95?'var(--green)' : (r.ach_pct||0)>=80?'var(--gold)' : 'var(--red)';
         rhtml += '<div class="list-row" style="padding:10px 16px"><div class="rank '+rc(i)+'">'+(i+1)+'</div>';
         rhtml += '<div style="flex:1;font-size:12px"><b>'+esc((r.name||'').toUpperCase())+'</b><br><span style="color:var(--text3);font-size:10px">'+esc(r.bu||'')+(r.region?' · '+esc(r.region):'')+'</span></div>';
         rhtml += '<div style="font-family:var(--mono);font-size:14px;font-weight:700;color:'+achCol+'">'+fcn(Math.round(r.ytd_vol||0))+' MT</div></div>';
