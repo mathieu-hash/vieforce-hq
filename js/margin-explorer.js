@@ -531,6 +531,25 @@
     } else {
       placeholderCanvas(c, 'Bridge renderer unavailable');
     }
+    // Level note — visible when the bridge falls back to category (SSG) level.
+    // Full-contrast DOM text (never 40%-opacity on canvas — fce2afc lesson).
+    var wrap = c.parentElement;
+    var n = $('mexp-bridge-note');
+    if (!n && wrap && wrap.parentElement) {
+      n = document.createElement('div');
+      n.id = 'mexp-bridge-note';
+      n.style.cssText = 'font-size:10px;font-weight:700;color:var(--text);margin-top:8px;line-height:1.5;display:none';
+      wrap.parentElement.insertBefore(n, wrap.nextSibling);
+    }
+    if (n) {
+      if (bridge && bridge.available && bridge.level === 'ssg') {
+        n.textContent = 'ⓘ ' + (bridge.note || 'Category-level bridge — SKU detail not comparable across Jan-2026 consolidation.') +
+          (bridge.basis ? ' (' + bridge.basis + ')' : '');
+        n.style.display = 'block';
+      } else {
+        n.style.display = 'none';
+      }
+    }
   }
 
   function renderTrend(trend) {
@@ -625,10 +644,10 @@
       // Seed the INITIAL default from the global topbar only on first build.
       // After that the tab owns its own Period / As-of controls and no longer
       // tracks the global topbar (so it works without the user setting it).
-      // The GM bridge + ingredient decomposition need a like-for-like prior period
-      // WITHIN 2026; YTD/7D priors cross the Jan-2026 consolidation (no bridge). So land
-      // on QTD (fully populated: bridge + ingredients + trend) rather than inherit a YTD
-      // topbar that would open with two empty panels. The user can still switch period.
+      // Land on QTD: it is the most fully populated view (SKU-level bridge +
+      // ingredient decomposition + trend). YTD now renders a category (SSG) level
+      // bridge across the Jan-2026 consolidation, but its ingredient panel is still
+      // unavailable (RM purchase history starts Jan-2026). The user can switch period.
       var seedP = (typeof window.PD === 'string' && window.PD) ? window.PD : 'QTD';
       STATE.period = (seedP === 'YTD' || seedP === '7D') ? 'QTD' : seedP;
       if (typeof window.VF_REF_MONTH === 'string' && /^\d{4}-\d{2}$/.test(window.VF_REF_MONTH)) {

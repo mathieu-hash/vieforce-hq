@@ -9,7 +9,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { bridgeGP, bridgeGMperKg, ingredientContribution } =
+const { bridgeGP, bridgeGMperKg, bridgeGMperKgBySsg, ingredientContribution } =
   require('../api/lib/margin_bridge.js')
 
 const TOL = 1e-9
@@ -260,6 +260,144 @@ test('both_empty_yields_all_zero', () => {
   assert.equal(b.price, 0)
   assert.equal(b.cost_total, 0)
   assert.equal(b.delta_gp, 0)
+})
+
+// ── SSG-level fallback bridge (cross-consolidation: YTD / vs-LY) ─────────────
+// rows: { ssg, kg, revenue, gp }. Single Cost bucket (revenue − gp); the
+// RM/Pkg/Feedtag split is not computable across the Jan-2026 cutoff.
+
+// Build an SSG row from per-kg primitives (price, margin per kg).
+function srow(ssg, kg, price, margin) {
+  return { ssg, kg, revenue: price * kg, gp: margin * kg }
+}
+
+test('bridgeGMperKgBySsg_reconciles_price_mix_cost_to_delta_gm_perkg', () => {
+  // Every driver moving at once across the cutoff: prices up, costs up, mix
+  // shifting toward HOG, BROILER shrinking, LAYER entering.
+  const p0 = [
+    srow('HOG', 1_000_000, 30, 8),     // 1000 t
+    srow('BROILER', 600_000, 26, 6.5), // 600 t
+  ]
+  const p1 = [
+    srow('HOG', 1_300_000, 31.5, 8.4),
+    srow('BROILER', 400_000, 26.8, 6.1),
+    srow('LAYER', 200_000, 24, 7.0),   // enters post-cutoff
+  ]
+
+  const k = bridgeGMperKgBySsg(p0, p1)
+
+  // THE invariant: components sum EXACTLY to ΔGM/kg (no hidden residual).
+  const sum = k.mix + k.price + k.cost_total
+  assert.ok(
+    Math.abs(sum - k.delta_gm_perkg) < TOL,
+    `mix+price+cost (${sum}) must equal delta_gm_perkg (${k.delta_gm_perkg})`
+  )
+
+  // ΔGM/kg equals the blended GP/kg difference of the raw rows.
+  const gp = (rows) => rows.reduce((s, r) => s + r.gp, 0)
+  const kg = (rows) => rows.reduce((s, r) => s + r.kg, 0)
+  const gm0 = gp(p0) / kg(p0)
+  const gm1 = gp(p1) / kg(p1)
+  assert.ok(Math.abs(k.delta_gm_perkg - (gm1 - gm0)) < TOL)
+  assert.ok(Math.abs(k.gm0_perkg - gm0) < TOL)
+  assert.ok(Math.abs(k.gm1_perkg - gm1) < TOL)
+})
+
+test('bridgeGMperKgBySsg_pure_price_change_lands_in_price_term', () => {
+  // Same volumes, same mix, same cost/kg — only price moves (+1/kg on HOG).
+  const p0 = [srow('HOG', 100, 30, 8), srow('BROILER', 200, 26, 6.5)]
+  const p1 = [srow('HOG', 100, 31, 9), srow('BROILER', 200, 26, 6.5)]
+
+  const k = bridgeGMperKgBySsg(p0, p1)
+  // Price effect per kg = (1 × 100) / 300.
+  assert.ok(Math.abs(k.price - 100 / 300) < TOL, `price = 1/3, got ${k.price}`)
+  assert.ok(Math.abs(k.mix) < TOL, 'no mix effect')
+  assert.ok(Math.abs(k.cost_total) < TOL, 'no cost effect')
+  assert.ok(Math.abs(k.mix + k.price + k.cost_total - k.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_pure_mix_shift_lands_in_mix_term', () => {
+  // Constant total kg and constant per-kg rates per SSG; share shifts toward
+  // the higher-margin HOG. Mirrors the SKU pure-mix fixture: ₱ mix = 25, so
+  // per-kg mix = 25 / 300.
+  const p0 = [srow('HOG', 100, 30, 8), srow('BROILER', 200, 26, 7.5)]
+  const p1 = [srow('HOG', 150, 30, 8), srow('BROILER', 150, 26, 7.5)]
+
+  const k = bridgeGMperKgBySsg(p0, p1)
+  assert.ok(Math.abs(k.mix - 25 / 300) < TOL, `mix = 25/300, got ${k.mix}`)
+  assert.ok(Math.abs(k.price) < TOL, 'no price effect')
+  assert.ok(Math.abs(k.cost_total) < TOL, 'no cost effect')
+  assert.ok(Math.abs(k.mix + k.price + k.cost_total - k.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_pure_cost_change_lands_in_single_cost_bucket', () => {
+  // Price held, mix held; cost/kg rises 0.5 on HOG (margin 8 → 7.5).
+  const p0 = [srow('HOG', 100, 30, 8), srow('BROILER', 200, 26, 6.5)]
+  const p1 = [srow('HOG', 100, 30, 7.5), srow('BROILER', 200, 26, 6.5)]
+
+  const k = bridgeGMperKgBySsg(p0, p1)
+  // Cost effect per kg = −(0.5 × 100) / 300 (cost rose ⇒ GM down).
+  assert.ok(Math.abs(k.cost_total + 50 / 300) < TOL, `cost = -50/300, got ${k.cost_total}`)
+  assert.ok(Math.abs(k.price) < TOL, 'no price effect')
+  assert.ok(Math.abs(k.mix) < TOL, 'no mix effect')
+  assert.ok(Math.abs(k.mix + k.price + k.cost_total - k.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_handles_entering_and_exiting_ssgs', () => {
+  // TRADING exists only pre-cutoff; PET only post-cutoff. Invariant must hold
+  // (finite, exact) across the category-set change.
+  const p0 = [srow('HOG', 100, 30, 8), srow('TRADING', 80, 40, 10)]
+  const p1 = [srow('HOG', 120, 31, 8.2), srow('PET', 60, 55, 20)]
+
+  const k = bridgeGMperKgBySsg(p0, p1)
+  assert.ok(Number.isFinite(k.mix))
+  assert.ok(Number.isFinite(k.price))
+  assert.ok(Number.isFinite(k.cost_total))
+  assert.ok(Math.abs(k.mix + k.price + k.cost_total - k.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_matches_item_keyed_engine_with_single_cost_bucket', () => {
+  // The SSG bridge is the same decomposition with SSG as the key and COGS in
+  // one bucket — must equal bridgeGMperKg on equivalently keyed rows.
+  const p0 = [srow('HOG', 1000, 30, 8), srow('BROILER', 600, 26, 6.5)]
+  const p1 = [srow('HOG', 1300, 31.5, 8.4), srow('BROILER', 400, 26.8, 6.1)]
+  const asItems = (rows) => rows.map((r) => ({
+    item: r.ssg, kg: r.kg, revenue: r.revenue, gp: r.gp,
+    cost_rm: r.revenue - r.gp, cost_pkg: 0, cost_feedtag: 0,
+  }))
+
+  const a = bridgeGMperKgBySsg(p0, p1)
+  const b = bridgeGMperKg(asItems(p0), asItems(p1))
+  assert.ok(Math.abs(a.mix - b.mix) < TOL)
+  assert.ok(Math.abs(a.price - b.price) < TOL)
+  assert.ok(Math.abs(a.cost_total - b.cost_total) < TOL)
+  assert.ok(Math.abs(a.delta_gm_perkg - b.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_null_or_blank_ssg_buckets_to_UNSPEC_and_aggregates', () => {
+  // Old-book rows with missing SSG and a blank-string SSG must merge into one
+  // UNSPEC bucket, identical to a pre-aggregated UNSPEC row.
+  const messy0 = [
+    { ssg: null, kg: 40, revenue: 1200, gp: 320 },
+    { ssg: '  ', kg: 60, revenue: 1800, gp: 480 },
+  ]
+  const clean0 = [{ ssg: 'UNSPEC', kg: 100, revenue: 3000, gp: 800 }]
+  const p1 = [{ ssg: 'UNSPEC', kg: 120, revenue: 3720, gp: 960 }]
+
+  const a = bridgeGMperKgBySsg(messy0, p1)
+  const b = bridgeGMperKgBySsg(clean0, p1)
+  assert.ok(Math.abs(a.price - b.price) < TOL)
+  assert.ok(Math.abs(a.mix - b.mix) < TOL)
+  assert.ok(Math.abs(a.cost_total - b.cost_total) < TOL)
+  assert.ok(Math.abs(a.delta_gm_perkg - b.delta_gm_perkg) < TOL)
+})
+
+test('bridgeGMperKgBySsg_both_empty_yields_all_zero', () => {
+  const k = bridgeGMperKgBySsg([], [])
+  assert.equal(k.mix, 0)
+  assert.equal(k.price, 0)
+  assert.equal(k.cost_total, 0)
+  assert.equal(k.delta_gm_perkg, 0)
 })
 
 test('duplicate_item_rows_are_aggregated', () => {

@@ -246,8 +246,46 @@ function ingredientContribution(comp0, comp1) {
   return out
 }
 
+// SSG-level GM-per-kg bridge — fallback when SKU codes are NOT comparable
+// across the Jan-2026 consolidation (customer/SKU codes were ~fully recoded,
+// but SSG names ([@OITMSSG]) are stable across both books).
+//
+// rows: { ssg, kg, revenue, gp }. COGS is carried as a SINGLE bucket
+// (revenue − gp) because the RM/Pkg/Feedtag production-ratio split is not
+// computable across the cutoff — never fake the split.
+//
+// Same exact-reconciliation invariant as bridgeGMperKg (unit-tested):
+//   mix + price + cost_total === delta_gm_perkg   (within float tolerance)
+function bridgeGMperKgBySsg(rows0, rows1) {
+  const adapt = (rows) =>
+    (rows || []).map((r) => {
+      const revenue = num(r.revenue)
+      const gp = num(r.gp)
+      const ssg = r.ssg == null || String(r.ssg).trim() === '' ? 'UNSPEC' : String(r.ssg).trim()
+      return {
+        item: ssg,
+        kg: num(r.kg),
+        revenue,
+        gp,
+        cost_rm: revenue - gp, // single Cost bucket — no split across the cutoff
+        cost_pkg: 0,
+        cost_feedtag: 0,
+      }
+    })
+  const k = bridgeGMperKg(adapt(rows0), adapt(rows1))
+  return {
+    mix: k.mix,
+    price: k.price,
+    cost_total: k.cost_total,
+    delta_gm_perkg: k.delta_gm_perkg,
+    gm0_perkg: k.gm0_perkg,
+    gm1_perkg: k.gm1_perkg,
+  }
+}
+
 module.exports = {
   bridgeGP,
   bridgeGMperKg,
+  bridgeGMperKgBySsg,
   ingredientContribution,
 }

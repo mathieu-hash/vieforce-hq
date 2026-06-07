@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v1', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v2', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -164,12 +164,60 @@ module.exports = async (req, res) => {
         : null
     }
 
-    // ---- bridge: current vs prior-period at SKU level (item-comparable within 2026) ----
-    // Phase 1 = single COGS bucket (all in cost_rm); Phase 2 splits RM/Pkg/Feedtag via OWOR/WOR1.
+    // ---- bridge: GM/ton waterfall. Follows the selected compare basis (pp/ly). ----
+    // Level dispatch:
+    //   sku — prior window fully post-cutoff → item codes comparable (existing path).
+    //   ssg — comparison crosses the Jan-2026 consolidation (YTD pp, or vs-LY):
+    //         SSG names ([@OITMSSG]) are stable across both books, so the bridge
+    //         falls back to category (SSG) level. National only — a region/BU/
+    //         customer slice is NOT comparable across the cutoff (stays unavailable).
     let bridgeOut = null
-    if (include.has('bridge') && ppFrom < MIGRATION_CUTOFF) {
-      // Prior same-length window predates the Jan-2026 consolidation → item codes not comparable.
-      bridgeOut = { available: false, reason: 'Prior period predates the Jan-2026 consolidation (item codes not comparable). Select MTD or QTD for a like-for-like bridge.' }
+    const [bFrom, bTo] = compare === 'ly' ? [lyFrom, lyTo] : [ppFrom, ppTo]
+    const bridgeCrossesCutoff = bFrom < MIGRATION_CUTOFF
+    const bridgeBasisLabel = compare === 'ly' ? 'vs last year' : 'vs prior period'
+    if (include.has('bridge') && bridgeCrossesCutoff && sliceFilterActive) {
+      bridgeOut = {
+        available: false, level: null,
+        reason: 'Bridge unavailable for a region/BU/customer slice across the Jan-2026 consolidation — 2025 used a different customer/SKU/region coding. Clear filters for the national category-level bridge.'
+      }
+    } else if (include.has('bridge') && bridgeCrossesCutoff) {
+      // ---- SSG (category) level fallback — national, single Cost bucket ----
+      // Prior window pre-cutoff lives in Vienovo_Old at OLD_LY_SCOPE (same DB-aware
+      // scope as the vs-LY hero, commit a13861e). If it spans the cutoff, split:
+      // Old part at Old scope + Live part at Live scope, merged by SSG name
+      // (margin_bridge aggregates duplicate keys).
+      const ssgSql = (scope) => `SELECT ISNULL(S.Name,'UNSPEC') AS ssg,
+          ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.LineTotal),0) AS revenue, ISNULL(SUM(T1.GrssProfit),0) AS gp
+        FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry=T1.DocEntry INNER JOIN OITM I ON T1.ItemCode=I.ItemCode
+        LEFT JOIN [@OITMSSG] S ON I.U_SSG=S.Code
+        ${applyRoleFilter(session, `WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'`)}
+        AND I.ItmsGrpCod IN ${scope} AND T1.OcrCode2 IS NOT NULL
+        GROUP BY S.Name HAVING SUM(T1.InvQty) <> 0`
+      const curSsg = await query(ssgSql('(103,105,102)'), { dateFrom, dateTo })
+      let prevSsg
+      if (bTo < MIGRATION_CUTOFF) {
+        prevSsg = await queryH(ssgSql(OLD_LY_SCOPE), { dateFrom: bFrom, dateTo: bTo })
+      } else {
+        const histTo = new Date(MIGRATION_CUTOFF.getTime() - 1)
+        const [h, c] = await Promise.all([
+          queryH(ssgSql(OLD_LY_SCOPE), { dateFrom: bFrom, dateTo: histTo }),
+          query(ssgSql('(103,105,102)'), { dateFrom: new Date(MIGRATION_CUTOFF), dateTo: bTo })
+        ])
+        prevSsg = [...h, ...c]
+      }
+      const bk = bridge.bridgeGMperKgBySsg(prevSsg, curSsg)
+      const T = 1000
+      bridgeOut = {
+        available: true, level: 'ssg',
+        basis: `${bridgeBasisLabel} · ₱/ton · category (SSG) level`, unit: 'php_per_ton',
+        prior_gp: Math.round((bk.gm0_perkg || 0) * T), current_gp: Math.round((bk.gm1_perkg || 0) * T),
+        price: Math.round((bk.price || 0) * T), mix: Math.round((bk.mix || 0) * T),
+        cost: { total: Math.round((bk.cost_total || 0) * T) },   // single Cost bar — no RM/Pkg/Feedtag split across the cutoff
+        delta_gp: Math.round((bk.delta_gm_perkg || 0) * T),
+        reconciles: Math.abs(((bk.price || 0) + (bk.mix || 0) + (bk.cost_total || 0)) - (bk.delta_gm_perkg || 0)) < 0.01,
+        cogs_split: false, ingredients: [], ingredients_meta: null,
+        note: 'Category-level bridge — SKU detail not comparable across Jan-2026 consolidation. COGS shown as a single Cost bar; prior window at 2025 (Vienovo_Old) feed scope 103+104. National aggregate only.'
+      }
     } else if (include.has('bridge')) {
       const itemSql = `SELECT T1.ItemCode AS item, ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.LineTotal),0) AS revenue, ISNULL(SUM(T1.GrssProfit),0) AS gp
         ${baseFrom} ${scopeWhere} GROUP BY T1.ItemCode HAVING SUM(T1.InvQty) <> 0`
@@ -200,7 +248,7 @@ module.exports = async (req, res) => {
         return { item: r.item, kg: Number(r.kg), revenue: rev, gp, cost_pkg: cp, cost_feedtag: cf, cost_rm: cogs - cp - cf }
       })
       const cur1 = splitRows(await query(itemSql, params))
-      const prev0 = splitRows(await query(itemSql, { ...params, dateFrom: ppFrom, dateTo: ppTo }))
+      const prev0 = splitRows(await query(itemSql, { ...params, dateFrom: bFrom, dateTo: bTo }))
 
       // GM/ton bridge: per-unit decomposition × 1000. No volume effect (per-unit).
       const bk = bridge.bridgeGMperKg(prev0, cur1)
@@ -244,9 +292,9 @@ module.exports = async (req, res) => {
           FROM OWOR W INNER JOIN OITM FI ON W.ItemCode=FI.ItemCode AND FI.ItmsGrpCod=103
           WHERE W.PostDate BETWEEN @f AND @t`, { f, t })
 
-        const [curRows, priRows] = await Promise.all([ingSql(dateFrom, dateTo), ingSql(ppFrom, ppTo)])
-        const [curFeed, priFeed] = await Promise.all([feedSql(dateFrom, dateTo), feedSql(ppFrom, ppTo)])
-        const [curPx, priPx] = await Promise.all([priceSql(dateFrom, dateTo), priceSql(ppFrom, ppTo)])
+        const [curRows, priRows] = await Promise.all([ingSql(dateFrom, dateTo), ingSql(bFrom, bTo)])
+        const [curFeed, priFeed] = await Promise.all([feedSql(dateFrom, dateTo), feedSql(bFrom, bTo)])
+        const [curPx, priPx] = await Promise.all([priceSql(dateFrom, dateTo), priceSql(bFrom, bTo)])
         const pxMap = rows => { const m = {}; rows.forEach(r => { const q = Number(r.qty) || 0; if (q > 0) m[r.code] = Number(r.spend) / q }); return m }
         const curPxMap = pxMap(curPx), priPxMap = pxMap(priPx)
 
@@ -345,7 +393,7 @@ module.exports = async (req, res) => {
       } catch (e) { console.warn('[margin-explorer] ingredient per-ton query failed:', e.message); ingredients = [] }
 
       bridgeOut = {
-        available: true, basis: 'vs prior period · ₱/ton', unit: 'php_per_ton',
+        available: true, level: 'sku', basis: `${bridgeBasisLabel} · ₱/ton`, unit: 'php_per_ton',
         prior_gp: Math.round((bk.gm0_perkg || 0) * T), current_gp: Math.round((bk.gm1_perkg || 0) * T),
         price: Math.round((bk.price || 0) * T), mix: Math.round((bk.mix || 0) * T),
         cost: { total: Math.round((bk.cost_total || 0) * T), rm: Math.round((bk.cost_rm || 0) * T), packaging: Math.round((bk.cost_pkg || 0) * T), feedtag: Math.round((bk.cost_feedtag || 0) * T) },
@@ -425,7 +473,7 @@ module.exports = async (req, res) => {
         endpoint: 'margin-explorer', sap_validated: true, data_source: 'sap_b1',
         window: { from: dateFrom.toISOString().slice(0, 10), to: dateTo.toISOString().slice(0, 10) },
         applied_filters: { period, ref_month: refMonthKey, region, bu, customer, group_by: groupBy, compare, include: [...include] },
-        data_quality: { volume_basis: 'INV1.InvQty (kg)', region_basis: 'OcrCode2 (sales dim-2)', bu_basis: 'OCRD.GroupCode->OCRG (real)', notes: ['Pre-rebate gross profit.', 'vs-LY at customer/SKU not comparable across Jan-2026 consolidation; bridge uses prior period.'] }
+        data_quality: { volume_basis: 'INV1.InvQty (kg)', region_basis: 'OcrCode2 (sales dim-2)', bu_basis: 'OCRD.GroupCode->OCRG (real)', notes: ['Pre-rebate gross profit.', 'vs-LY at customer/SKU not comparable across Jan-2026 consolidation; bridge falls back to category (SSG) level when the comparison crosses the cutoff (national only).'] }
       },
       hero,
       matrix: { group_by: groupBy, rows: matrixRows, total_gp: Math.round(totGp) },
