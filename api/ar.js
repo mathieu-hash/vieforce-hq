@@ -109,6 +109,41 @@ module.exports = async (req, res) => {
 
     // -------------------- 2. AR + DSO --------------------
     // Trailing-90d formula (calibrated to Finance Dashboard: 32d)
+    //
+    // Under a region filter the hero DSO must use the by_region table methodology:
+    // line-apportioned AR share / line-level 90d sales (regionCaseSql on the INV1 line).
+    // The EXISTS whole-invoice scoping (kept for the balance numbers) counts multi-region
+    // invoices fully on BOTH sides of the ratio and dilutes regional DSO toward the
+    // national value (Visayas read 30 = national instead of its true ~32).
+    // region=ALL keeps the original national SQL byte-identical.
+    const dsoLineRegion = ` AND ${regionCaseSql('L')} = @region`
+    const dsoApportionDeclares = region === 'ALL' ? '' : `
+      DECLARE @dso_ar_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE}${dsoLineRegion} ${filterFor('O')}${segmentFilterSql(segment, 'O')});
+      DECLARE @dso_ar_total DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate${dsoLineRegion} ${filterFor('O')}${segmentFilterSql(segment, 'O')});
+      DECLARE @dso_s90_active DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE}${dsoLineRegion} ${filterFor('O')}${segmentFilterSql(segment, 'O')});
+      DECLARE @dso_s90_total DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal),0)
+        FROM OINV O
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE())${dsoLineRegion} ${filterFor('O')}${segmentFilterSql(segment, 'O')});`
+    const dsoActiveExpr = region === 'ALL'
+      ? `CASE WHEN @sales_90d_active > 0 THEN @ar_active / (@sales_90d_active/90.0) ELSE 0 END`
+      : `CASE WHEN @dso_s90_active > 0 THEN @dso_ar_active / (@dso_s90_active/90.0) ELSE 0 END`
+    const dsoTotalExpr = region === 'ALL'
+      ? `CASE WHEN @sales_90d_total  > 0 THEN @ar_total  / (@sales_90d_total /90.0) ELSE 0 END`
+      : `CASE WHEN @dso_s90_total > 0 THEN @dso_ar_total / (@dso_s90_total/90.0) ELSE 0 END`
     const arDso = await query(`
       DECLARE @ar_active DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
@@ -126,14 +161,14 @@ module.exports = async (req, res) => {
       DECLARE @sales_90d_total DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O
-        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) ${filterFor('O')} ${bizFilterFor('O')});
+        WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) ${filterFor('O')} ${bizFilterFor('O')});${dsoApportionDeclares}
 
       SELECT
         @ar_active  AS active_balance,
         @ar_total   AS total_balance,
         @ar_delinq  AS delinquent_balance,
-        CASE WHEN @sales_90d_active > 0 THEN @ar_active / (@sales_90d_active/90.0) ELSE 0 END AS dso_active,
-        CASE WHEN @sales_90d_total  > 0 THEN @ar_total  / (@sales_90d_total /90.0) ELSE 0 END AS dso_total
+        ${dsoActiveExpr} AS dso_active,
+        ${dsoTotalExpr} AS dso_total
     `, { region })
 
     // -------------------- 3. 7-BUCKET AGING (active only) --------------------
@@ -239,6 +274,31 @@ module.exports = async (req, res) => {
     // -------------------- 6. 7-DAY COMPARISON (as of 7 days ago) --------------------
     // Current-period comparison — scoped so a DSM's "DSO 7 days ago" reflects
     // their own book, not national. LY snapshot (queryH below) stays unscoped.
+    // Region/segment scoping mirrors the hero numbers it is compared against:
+    // ar_7d_ago uses the EXISTS scoping (like active_balance), dso_7d_ago uses the
+    // line-apportioned methodology (like dso_active) so dso_variation compares
+    // like-for-like. ALL/ALL stays byte-identical (helpers return '').
+    const cmpApportionDeclares = region === 'ALL' ? '' : `
+      DECLARE @dso_ar_7d DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N'
+          AND O.DocDate <= DATEADD(DAY,-7,GETDATE())
+          AND O.DocTotal > O.PaidToDate
+          AND ${ACTIVE}${dsoLineRegion}
+          ${filterFor('O')}${segmentFilterSql(segment, 'O')});
+      DECLARE @dso_s90_7d DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(L.LineTotal),0)
+        FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
+        INNER JOIN INV1 L ON L.DocEntry = O.DocEntry
+        WHERE O.CANCELED='N'
+          AND O.DocDate BETWEEN DATEADD(DAY,-97,GETDATE()) AND DATEADD(DAY,-7,GETDATE())
+          AND ${ACTIVE}${dsoLineRegion}
+          ${filterFor('O')}${segmentFilterSql(segment, 'O')});`
+    const cmpDsoExpr = region === 'ALL'
+      ? `CASE WHEN @sales_90d_7ago > 0 THEN @ar_7d_ago / (@sales_90d_7ago/90.0) ELSE 0 END`
+      : `CASE WHEN @dso_s90_7d > 0 THEN @dso_ar_7d / (@dso_s90_7d/90.0) ELSE 0 END`
     const comparison = await query(`
       DECLARE @ar_7d_ago DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal - O.PaidToDate),0)
@@ -247,18 +307,18 @@ module.exports = async (req, res) => {
           AND O.DocDate <= DATEADD(DAY,-7,GETDATE())
           AND O.DocTotal > O.PaidToDate
           AND ${ACTIVE}
-          ${filterFor('O')});
+          ${filterFor('O')}${bizFilterFor('O')});
       DECLARE @sales_90d_7ago DECIMAL(18,2) = (
         SELECT ISNULL(SUM(O.DocTotal),0)
         FROM OINV O INNER JOIN OCRD C ON O.CardCode=C.CardCode
         WHERE O.CANCELED='N'
           AND O.DocDate BETWEEN DATEADD(DAY,-97,GETDATE()) AND DATEADD(DAY,-7,GETDATE())
           AND ${ACTIVE}
-          ${filterFor('O')});
+          ${filterFor('O')}${bizFilterFor('O')});${cmpApportionDeclares}
       SELECT
         @ar_7d_ago AS ar_7d_ago,
-        CASE WHEN @sales_90d_7ago > 0 THEN @ar_7d_ago / (@sales_90d_7ago/90.0) ELSE 0 END AS dso_7d_ago
-    `)
+        ${cmpDsoExpr} AS dso_7d_ago
+    `, { region })
 
     // -------------------- 7. AR SNAPSHOT 1 YEAR AGO (historical DB) --------------------
     // Rebuild the same "as-of-date" calculation against Vienovo_Old: open AR as of LY-today.
