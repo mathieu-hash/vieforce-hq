@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v4', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v5', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -533,7 +533,8 @@ module.exports = async (req, res) => {
             bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
             ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth),
-            price_drill: priceDrillOut
+            price_drill: priceDrillOut,
+            category_trend: cube.categoryTrend(C.rows, C.months)
           }
         } else {
           dissection = { available: false, reason: 'No finished-feed rows for this selection.' }

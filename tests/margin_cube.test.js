@@ -9,7 +9,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill, region2025 } =
+const { trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill, categoryTrend, region2025 } =
   require('../api/lib/margin_cube.js')
 
 // rows: {month, ssg, rev, gp, kg}
@@ -105,6 +105,35 @@ test('ingredientContribution carried price still shows recipe-shift effect', () 
   // carried price 10 ⇒ contribution = (0.18-0.1)*10*1000 = +800 (recipe effect only)
   assert.equal(bakery.contribution, 800)
   assert.equal(bakery.carried, true)
+})
+
+test('categoryTrend pivots SSG x month with volume-weighted AVG row', () => {
+  const rows = [
+    { month: '2026-05', ssg: 'PIG', rev: 1000000, gp: 200000, kg: 100000 },  // 100t, GM/t=2000, GM%=20
+    { month: '2026-05', ssg: 'LAYER', rev: 1000000, gp: 100000, kg: 100000 },// 100t, GM/t=1000, GM%=10
+    { month: '2026-06', ssg: 'PIG', rev: 500000, gp: 150000, kg: 50000 }     // 50t, GM/t=3000
+  ]
+  const ct = categoryTrend(rows, ['2026-05', '2026-06'])
+  assert.equal(ct.available, true)
+  assert.deepEqual(ct.months, ['2026-05', '2026-06'])
+  const pig = ct.categories.find(c => c.ssg === 'PIG')
+  assert.equal(pig.cells[0].gm_ton, 2000)
+  assert.equal(pig.cells[0].gm_pct, 20)
+  assert.equal(pig.cells[1].gm_ton, 3000)
+  // PIG ordered before LAYER (more total volume: 150t vs 100t)
+  assert.equal(ct.categories[0].ssg, 'PIG')
+  // AVG May = (200+100)gp / (200t) = 1500/t  (volume-weighted, NOT mean of 2000 & 1000)
+  assert.equal(ct.avg[0].gm_ton, 1500)
+  // last month flagged partial when it is the cube's latest month
+  assert.equal(ct.partial_month, '2026-06')
+})
+
+test('categoryTrend maps UNSPEC to Untagged and keeps last 12 months', () => {
+  const months = Array.from({ length: 14 }, (_, i) => '2025-' + String(i + 1).padStart(2, '0')).slice(0, 14)
+  const rows = months.map(m => ({ month: m, ssg: 'UNSPEC', rev: 100, gp: 10, kg: 10000 }))
+  const ct = categoryTrend(rows, months)
+  assert.equal(ct.months.length, 12)               // trailing 12 only
+  assert.equal(ct.categories[0].ssg, 'Untagged')   // UNSPEC display-mapped
 })
 
 test('region2025 maps shipping warehouses correctly', () => {
