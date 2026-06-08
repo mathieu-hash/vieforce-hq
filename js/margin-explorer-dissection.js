@@ -56,7 +56,7 @@
       '</div>' +
       '<div class="dgrid2">' +
       '<div class="dp"><h4>Product-mix bridge (by SSG)</h4><div class="cw"><canvas id="diss-mix"></canvas></div></div>' +
-      '<div class="dp"><h4>Ingredient cost contribution (recipe-weighted)</h4><div class="cw"><canvas id="diss-ing"></canvas></div></div>' +
+      '<div class="dp"><h4>Ingredient cost contribution (recipe-weighted) <span style="font-weight:400;font-size:9px;opacity:.75">* = no purchase in one month — price carried, recipe effect only</span></h4><div class="cw"><canvas id="diss-ing"></canvas></div></div>' +
       '</div>' +
       '<div class="aiout" id="diss-aiout"></div>';
     host.appendChild(sec);
@@ -74,10 +74,11 @@
       ['diss-traj', 'diss-bridge', 'diss-mix', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
       return;
     }
+    var cmpLbl = d.compare_month + (d.compare_partial ? ' (' + (d.compare_days || '') + 'd partial — early read, noisy)' : '');
     document.getElementById('diss-sub').textContent =
-      'Finished feed (Live 103 / Old 103+104) · bridge ' + d.base_month + ' → ' + d.compare_month;
+      'Finished feed (Live 103 / Old 103+104) · bridge ' + d.base_month + ' → ' + cmpLbl;
     var bh = document.getElementById('diss-bridge-h');
-    if (bh) bh.textContent = 'GM/ton bridge · ' + d.base_month + ' → ' + d.compare_month;
+    if (bh) bh.textContent = 'GM/ton bridge · ' + d.base_month + ' → ' + cmpLbl;
     renderTraj(d.trajectory || []);
     renderBridge(d.bridge || {});
     renderDiverging('diss-mix', (d.mix_bridge && d.mix_bridge.items) || [], 'ssg', true);
@@ -151,7 +152,7 @@
     var c = document.getElementById(id); if (!c || !window.Chart) return; kill(c);
     var p = P();
     if (!items.length) return;
-    var labels = items.map(function (i) { return (i[key] || '').slice(0, 18); });
+    var labels = items.map(function (i) { return (i[key] || '').slice(0, 18) + (i.carried ? ' *' : ''); });
     var vals = items.map(function (i) { return i.contribution; });
     // mix: +contribution = richer mix (good) → green ; ingredient: +contribution = costlier → red
     var colors = vals.map(function (v) { return mixMode ? (v >= 0 ? p.green : p.red) : (v > 0 ? p.red : p.green); });

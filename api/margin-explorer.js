@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v2', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v3', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -454,9 +454,11 @@ module.exports = async (req, res) => {
           if (baseMonth === cmpMonth) { const i = C.months.indexOf(cmpMonth); if (i > 0) baseMonth = C.months[i - 1] }  // single-month → MoM
           const traj = cube.trajectory(C.rows, C.months)
           if (traj.length && traj[traj.length - 1].month === nowYM) traj[traj.length - 1].partial = true
+          const cmpPartial = cmpMonth === nowYM
           dissection = {
             available: true, scope: 'finished_feed', basis: 'Live 103 / Old 103+104 · ₱/ton',
-            base_month: baseMonth, compare_month: cmpMonth, months: C.months,
+            base_month: baseMonth, compare_month: cmpMonth, compare_partial: cmpPartial,
+            compare_days: cmpPartial ? new Date().getDate() - 1 : null, months: C.months,
             trajectory: traj,
             bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
