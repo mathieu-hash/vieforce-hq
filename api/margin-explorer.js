@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v3', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v4', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -455,6 +455,76 @@ module.exports = async (req, res) => {
           const traj = cube.trajectory(C.rows, C.months)
           if (traj.length && traj[traj.length - 1].month === nowYM) traj[traj.length - 1].partial = true
           const cmpPartial = cmpMonth === nowYM
+
+          // ---- price_drill: decompose the bridge's Price bar into TRUE price moves
+          // (same customer + same SKU) vs customer-mix vs SKU-mix composition.
+          // Live (2026) anchors only — 2025 (Old DB) customer/SKU codes were fully
+          // re-coded at the Jan-2026 consolidation, so a cross-DB drill is meaningless.
+          let priceDrillOut
+          if (baseMonth < '2026-01' || cmpMonth < '2026-01') {
+            priceDrillOut = { available: false, reason: 'pre-2026 anchor' }
+          } else {
+            try {
+              const mb = (ym) => { const [y, m] = ym.split('-').map(Number); return [new Date(y, m - 1, 1), new Date(y, m, 1)] }
+              const [b0, b1] = mb(baseMonth), [c0, c1] = mb(cmpMonth)
+              const dp = { b0, b1, c0, c1 }
+              // same region/bu/customer predicates the cube applies (Live branch)
+              let dw = ''
+              if (region !== 'ALL') {
+                if (region === 'Other') dw += ` AND T1.OcrCode2 NOT LIKE 'L-%' AND T1.OcrCode2 NOT LIKE 'V-%' AND T1.OcrCode2 NOT LIKE 'M-%'`
+                else { dw += ` AND T1.OcrCode2 LIKE @rpref`; dp.rpref = REGION_PREFIX[region] }
+              }
+              if (bu !== 'ALL') { dw += ` AND G.GroupName=@bu`; dp.bu = bu }
+              if (customer) { dw += ` AND (T0.CardCode=@cust OR T0.CardName LIKE @custl)`; dp.cust = customer; dp.custl = '%' + customer + '%' }
+              const DRILL_SQL = `
+                SELECT ym, ssg, sku, name, cust, SUM(rev) rev, SUM(kg) kg FROM (
+                  SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
+                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
+                    T1.LineTotal rev, T1.InvQty kg
+                  FROM OINV T0 JOIN INV1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
+                  LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
+                  LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
+                  WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
+                    AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
+                  UNION ALL
+                  SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
+                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
+                    -T1.LineTotal rev, -T1.InvQty kg
+                  FROM ORIN T0 JOIN RIN1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
+                  LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
+                  LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
+                  WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
+                    AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
+                ) X GROUP BY ym, ssg, sku, name, cust`
+              const drillRaw = await query(DRILL_SQL, dp)
+              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, rev: Number(r.rev) || 0, kg: Number(r.kg) || 0 })
+              const pd = cube.priceDrill(
+                drillRaw.filter(r => r.ym === baseMonth).map(toRow),
+                drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
+              )
+              priceDrillOut = pd.available === false ? pd : {
+                available: true, unit: 'php_per_ton',
+                total: Math.round(pd.total),
+                true_price: Math.round(pd.true_price),
+                customer_mix: Math.round(pd.customer_mix),
+                sku_mix: Math.round(pd.sku_mix),
+                residual: Math.round(pd.residual),
+                price_held_pct: pd.price_held_pct == null ? null : Math.round(pd.price_held_pct * 10) / 10,
+                top_rows: pd.top_rows.map(r => ({
+                  ssg: r.ssg, sku: r.sku, name: r.name,
+                  tons_b: Math.round(r.tons_b), tons_c: Math.round(r.tons_c),
+                  rev_ton_b: Math.round(r.rev_ton_b), rev_ton_c: Math.round(r.rev_ton_c),
+                  true_price: Math.round(r.true_price), customer_mix: Math.round(r.customer_mix),
+                  held_pct: r.held_pct == null ? null : Math.round(r.held_pct)
+                })),
+                note: 'Price bar split at base-month weights: true price = same customer + same SKU; customer mix & SKU mix = composition shifts, not price action. price_held = compare-month kg (both-month cust×SKU pairs) within ±0.5% of base price.'
+              }
+            } catch (e) {
+              console.warn('[margin-explorer] price drill failed:', e.message)
+              priceDrillOut = { available: false, reason: e.message }
+            }
+          }
+
           dissection = {
             available: true, scope: 'finished_feed', basis: 'Live 103 / Old 103+104 · ₱/ton',
             base_month: baseMonth, compare_month: cmpMonth, compare_partial: cmpPartial,
@@ -462,7 +532,8 @@ module.exports = async (req, res) => {
             trajectory: traj,
             bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
-            ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth)
+            ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth),
+            price_drill: priceDrillOut
           }
         } else {
           dissection = { available: false, reason: 'No finished-feed rows for this selection.' }

@@ -175,6 +175,95 @@ function ingredientContribution(rows, intensity, basket, baseMonth, cmpMonth, to
   }
 }
 
+// Price-bar decomposition — real price moves vs composition.
+// rowsB / rowsC = anchor-month line aggregates [{ssg, sku, name, cust, rev, kg}].
+// SSG-level price contribution mirrors ssgBridge's Price bar exactly:
+//   ssg_price_contrib(s) = w_b(s)·(P_c(s)−P_b(s)),  w_b = base kg share, P = rev/ton.
+// Within each SSG it splits into same-SKU price vs SKU mix; within each SKU into
+// same-customer ("true") price vs customer mix — all valued at BASE weights:
+//   true_total     = Σ_s w_b(s)·Σ_{k both} v_b(k|s)·true_price(k)
+//   cust_mix_total = Σ_s w_b(s)·Σ_{k both} v_b(k|s)·cust_mix(k)
+//   sku_mix_total  = Σ_s w_b(s)·[(P_c(s)−P_b(s)) − same_sku_price(s)]
+//   residual       = total − true − cust_mix − sku_mix  (≈0 by construction;
+//                    new/exited SKUs land in sku_mix, new/exited customers in cust_mix)
+// price_held_pct = share of compare-month kg (over cust×SKU pairs present in BOTH
+// months) whose ₱/ton moved < 0.5% vs base. Returns RAW (unrounded) numbers.
+function priceDrill(rowsB, rowsC, topN = 10) {
+  const index = (rows) => {
+    const S = {}
+    for (const r of rows) {
+      const kg = +r.kg || 0, rev = +r.rev || 0
+      const s = S[r.ssg || 'UNSPEC'] || (S[r.ssg || 'UNSPEC'] = { kg: 0, rev: 0, skus: {} })
+      s.kg += kg; s.rev += rev
+      const k = s.skus[r.sku] || (s.skus[r.sku] = { kg: 0, rev: 0, name: r.name, custs: {} })
+      k.kg += kg; k.rev += rev
+      if (!k.name && r.name) k.name = r.name
+      const c = k.custs[r.cust] || (k.custs[r.cust] = { kg: 0, rev: 0 })
+      c.kg += kg; c.rev += rev
+    }
+    return S
+  }
+  const B = index(rowsB), C = index(rowsC)
+  const kgB = Object.values(B).reduce((a, s) => a + s.kg, 0)
+  const kgC = Object.values(C).reduce((a, s) => a + s.kg, 0)
+  if (kgB <= 0 || kgC <= 0) return { available: false, reason: 'No volume in base or compare month.' }
+  const pton = (rev, kg) => kg > 0 ? rev / (kg / 1000) : 0
+
+  let total = 0, trueTotal = 0, custMixTotal = 0, skuMixTotal = 0
+  let heldKg = 0, matchedKg = 0
+  const skuRows = []
+  for (const sName of Object.keys(B)) {
+    const sb = B[sName]; if (sb.kg <= 0) continue
+    const sc = C[sName]
+    const wb = sb.kg / kgB
+    const Pb = pton(sb.rev, sb.kg)
+    const Pc = sc ? pton(sc.rev, sc.kg) : 0
+    total += wb * (Pc - Pb)                                   // = ssgBridge Price bar term
+    let sameSkuPrice = 0
+    for (const kKey of Object.keys(sb.skus)) {
+      const kb = sb.skus[kKey]; if (kb.kg <= 0) continue
+      const kc = sc && sc.skus[kKey]
+      if (!kc || kc.kg <= 0) continue                         // entries/exits → sku_mix
+      const vb = kb.kg / sb.kg
+      const pb = pton(kb.rev, kb.kg), pc = pton(kc.rev, kc.kg)
+      sameSkuPrice += vb * (pc - pb)
+      let truek = 0, skuHeld = 0, skuMatched = 0
+      for (const cu of Object.keys(kb.custs)) {
+        const cb = kb.custs[cu]; if (cb.kg <= 0) continue
+        const cc = kc.custs[cu]
+        if (!cc || cc.kg <= 0) continue                       // entries/exits → cust_mix
+        const ub = cb.kg / kb.kg
+        const pcb = pton(cb.rev, cb.kg), pcc = pton(cc.rev, cc.kg)
+        truek += ub * (pcc - pcb)
+        skuMatched += cc.kg
+        if (pcb > 0 && Math.abs(pcc - pcb) / pcb < 0.005) skuHeld += cc.kg
+      }
+      const custMixK = (pc - pb) - truek
+      trueTotal += wb * vb * truek
+      custMixTotal += wb * vb * custMixK
+      heldKg += skuHeld; matchedKg += skuMatched
+      skuRows.push({
+        ssg: sName, sku: kKey, name: kb.name || kc.name || kKey,
+        impact: wb * vb * (pc - pb),                          // SKU's pull on the Price bar
+        tons_b: kb.kg / 1000, tons_c: kc.kg / 1000,
+        rev_ton_b: pb, rev_ton_c: pc,
+        true_price: truek, customer_mix: custMixK,
+        held_pct: skuMatched > 0 ? skuHeld / skuMatched * 100 : null
+      })
+    }
+    skuMixTotal += wb * ((Pc - Pb) - sameSkuPrice)
+  }
+  const residual = total - trueTotal - custMixTotal - skuMixTotal
+  skuRows.sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+  return {
+    available: true,
+    total, true_price: trueTotal, customer_mix: custMixTotal, sku_mix: skuMixTotal, residual,
+    price_held_pct: matchedKg > 0 ? heldKg / matchedKg * 100 : null,
+    matched_kg: matchedKg, held_kg: heldKg,
+    top_rows: skuRows.slice(0, topN)
+  }
+}
+
 // ============================================================================
 // LIVE CROSS-DB CUBE BUILDER  (deps = { query (Live), queryH (Old) })
 // ============================================================================
@@ -306,7 +395,7 @@ async function buildCube({ query, queryH }, opts = {}) {
 
 module.exports = {
   region2025, OLD_REGION, buildCube,
-  trajectory, ssgBridge, mixBridge, ingredientContribution,
+  trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill,
   // internals exported for tests
   _aggByMonth: aggByMonth, _bySsg: bySsg
 }
