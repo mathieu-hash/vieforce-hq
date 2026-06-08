@@ -121,6 +121,56 @@ function mixBridge(rows, baseMonth, cmpMonth, topN = 10) {
   }
 }
 
+// Panel 6 — Category × month unit-margin matrix (the "GM/ton by Group monthly" view).
+// Rows = SSG categories, cols = trailing `maxMonths` calendar months, cell = GM/ton + GM%.
+// Bottom AVG row is VOLUME-WEIGHTED (Σgp / Σtons), not a simple mean of the cells.
+// Reuses the same cube rows as the bridge, so it inherits the region/bu/customer filter.
+function categoryTrend(rows, months, maxMonths = 12) {
+  const cols = months.slice(-maxMonths)
+  const colSet = new Set(cols)
+  // {ssg: {month: {rev,gp,kg}}} + per-ssg total kg for row ordering
+  const cat = {}, totKg = {}
+  for (const r of rows) {
+    if (!colSet.has(r.month)) continue
+    const s = r.ssg || 'UNSPEC'
+    const c = cat[s] || (cat[s] = {})
+    const o = c[r.month] || (c[r.month] = { rev: 0, gp: 0, kg: 0 })
+    o.rev += +r.rev || 0; o.gp += +r.gp || 0; o.kg += +r.kg || 0
+    totKg[s] = (totKg[s] || 0) + (+r.kg || 0)
+  }
+  const cell = (o) => {
+    const t = (o ? o.kg : 0) / 1000
+    return {
+      gm_ton: t > 0 ? Math.round(o.gp / t) : null,
+      gm_pct: o && o.rev > 0 ? Math.round(o.gp / o.rev * 1000) / 10 : null,
+      tons: Math.round(t)
+    }
+  }
+  const display = (s) => (s === 'UNSPEC' ? 'Untagged' : s)
+  const categories = Object.keys(cat)
+    .sort((a, b) => (totKg[b] || 0) - (totKg[a] || 0))
+    .map(s => ({
+      ssg: display(s),
+      total_tons: Math.round((totKg[s] || 0) / 1000),
+      cells: cols.map(m => Object.assign({ month: m }, cell(cat[s][m])))
+    }))
+  // volume-weighted AVG row across all categories, per month
+  const avg = cols.map(m => {
+    let rev = 0, gp = 0, kg = 0
+    for (const s of Object.keys(cat)) { const o = cat[s][m]; if (o) { rev += o.rev; gp += o.gp; kg += o.kg } }
+    return Object.assign({ month: m }, cell({ rev, gp, kg }))
+  })
+  const nowYM = months.length ? months[months.length - 1] : null
+  return {
+    available: categories.length > 0,
+    months: cols,
+    partial_month: cols.length && cols[cols.length - 1] === nowYM ? nowYM : null,
+    categories,
+    avg,
+    note: 'Finished feed (Live 103 / Old 103+104) · GM/ton volume-weighted · inherits the region/BU/customer filter.'
+  }
+}
+
 // Panel 4 — recipe-weighted ingredient cost contribution (METHODOLOGY §4).
 // intensity = {ssg: {ing: kg_per_kg_feed}} ; basket = {month: {ing: price_per_kg}}.
 // A price MOVE is only attributed when a real purchase price exists in BOTH months;
@@ -395,7 +445,7 @@ async function buildCube({ query, queryH }, opts = {}) {
 
 module.exports = {
   region2025, OLD_REGION, buildCube,
-  trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill,
+  trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill, categoryTrend,
   // internals exported for tests
   _aggByMonth: aggByMonth, _bySsg: bySsg
 }
