@@ -9,7 +9,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { trajectory, ssgBridge, mixBridge, ingredientContribution, region2025 } =
+const { trajectory, ssgBridge, mixBridge, ingredientContribution, priceDrill, region2025 } =
   require('../api/lib/margin_cube.js')
 
 // rows: {month, ssg, rev, gp, kg}
@@ -113,4 +113,90 @@ test('region2025 maps shipping warehouses correctly', () => {
   assert.equal(region2025(104, 'HOREB'), 'Visayas')
   assert.equal(region2025(104, 'AC'), 'Luzon')
   assert.equal(region2025(104, 'UNKNOWN'), 'Visayas')  // default
+})
+
+// ---------------------------------------------------------------------------
+// priceDrill — decompose the Price bar into true price vs customer/SKU mix.
+// drill row helper: tons at ₱/ton → {ssg, sku, name, cust, rev, kg}
+const dr = (ssg, sku, cust, tons, pricePerTon) =>
+  ({ ssg, sku, name: sku, cust, rev: tons * pricePerTon, kg: tons * 1000 })
+
+test('priceDrill: pure customer composition shows zero true price, full customer mix, 100% held', () => {
+  // 1 SKU, 2 customers, prices UNCHANGED, volume shifts toward the higher-price account.
+  const rowsB = [dr('PIG', 'K1', 'A', 600, 10000), dr('PIG', 'K1', 'B', 400, 12000)]
+  const rowsC = [dr('PIG', 'K1', 'A', 300, 10000), dr('PIG', 'K1', 'B', 700, 12000)]
+  const pd = priceDrill(rowsB, rowsC)
+  assert.equal(pd.available, true)
+  // SKU-level p: base 10,800 → compare 11,400 ⇒ bar +600 entirely composition
+  assert.ok(Math.abs(pd.total - 600) < 1e-9)
+  assert.ok(Math.abs(pd.true_price) < 1e-9, `true_price must be ~0, got ${pd.true_price}`)
+  assert.ok(Math.abs(pd.customer_mix - 600) < 1e-9, `customer_mix must carry the bar, got ${pd.customer_mix}`)
+  assert.ok(Math.abs(pd.sku_mix) < 1e-9)
+  assert.equal(pd.price_held_pct, 100)
+  const row = pd.top_rows[0]
+  assert.equal(row.sku, 'K1')
+  assert.ok(Math.abs(row.true_price) < 1e-9)
+  assert.equal(row.held_pct, 100)
+})
+
+test('priceDrill: pure price cut lands fully in true_price with zero customer mix', () => {
+  // Same customers + volumes both months; customer A's price drops ₱1,000/t.
+  const rowsB = [dr('PIG', 'K1', 'A', 500, 10000), dr('PIG', 'K1', 'B', 500, 12000)]
+  const rowsC = [dr('PIG', 'K1', 'A', 500, 9000), dr('PIG', 'K1', 'B', 500, 12000)]
+  const pd = priceDrill(rowsB, rowsC)
+  assert.ok(Math.abs(pd.total - (-500)) < 1e-9)
+  assert.ok(Math.abs(pd.true_price - (-500)) < 1e-9, `true_price must carry the cut, got ${pd.true_price}`)
+  assert.ok(Math.abs(pd.customer_mix) < 1e-9, `customer_mix must be ~0, got ${pd.customer_mix}`)
+  assert.ok(Math.abs(pd.sku_mix) < 1e-9)
+  // B (500t of 1,000t matched) held its price; A moved -10%
+  assert.ok(Math.abs(pd.price_held_pct - 50) < 1e-9)
+})
+
+test('priceDrill: total reconciles to Σ ssg contributions and to component sum (1e-9)', () => {
+  // Mixed fixture: price moves + customer shifts + a new SKU + exited/new customers.
+  const rowsB = [
+    dr('PIG', 'K1', 'A', 600, 10000), dr('PIG', 'K1', 'B', 400, 12000),
+    dr('PIG', 'K2', 'A', 200, 15000),
+    dr('BROILER', 'K3', 'D', 300, 9000), dr('BROILER', 'K3', 'E', 100, 9500)   // E exits
+  ]
+  const rowsC = [
+    dr('PIG', 'K1', 'A', 300, 10100), dr('PIG', 'K1', 'B', 700, 12000),
+    dr('PIG', 'K2', 'A', 250, 14500),
+    dr('PIG', 'K4', 'C', 100, 20000),                                          // new SKU
+    dr('BROILER', 'K3', 'D', 350, 9000), dr('BROILER', 'K3', 'F', 50, 8000)    // F new
+  ]
+  const pd = priceDrill(rowsB, rowsC)
+  // independent Σ_s w_b(s)·(P_c(s)−P_b(s))
+  const agg = rows => rows.reduce((m, r) => {
+    const o = m[r.ssg] || (m[r.ssg] = { rev: 0, kg: 0 }); o.rev += r.rev; o.kg += r.kg; return m
+  }, {})
+  const B = agg(rowsB), C = agg(rowsC)
+  const kgB = Object.values(B).reduce((a, o) => a + o.kg, 0)
+  let expected = 0
+  for (const s of Object.keys(B)) {
+    const Pb = B[s].rev / (B[s].kg / 1000)
+    const Pc = C[s] ? C[s].rev / (C[s].kg / 1000) : 0
+    expected += (B[s].kg / kgB) * (Pc - Pb)
+  }
+  assert.ok(Math.abs(pd.total - expected) < 1e-9, `total ${pd.total} vs Σ ssg ${expected}`)
+  const parts = pd.true_price + pd.customer_mix + pd.sku_mix + pd.residual
+  assert.ok(Math.abs(pd.total - parts) < 1e-9, `components must sum to total: ${parts} vs ${pd.total}`)
+  // and ≈ the ssgBridge Price bar (rounded ₱/ton) on the same data
+  const month = (rows, mo) => Object.entries(agg(rows)).map(([ssg, o]) =>
+    ({ month: mo, ssg, rev: o.rev, gp: o.rev * 0.2, kg: o.kg }))
+  const b = ssgBridge([...month(rowsB, 'b'), ...month(rowsC, 'c')], 'b', 'c')
+  assert.ok(Math.abs(pd.total - b.price) <= 1, `drill total ${pd.total} vs bridge Price bar ${b.price}`)
+})
+
+test('priceDrill: SKU-mix shift (same SKU prices) lands in sku_mix', () => {
+  // Volume migrates from cheap SKU to expensive SKU; every SKU price unchanged.
+  const rowsB = [dr('PIG', 'CHEAP', 'A', 800, 10000), dr('PIG', 'EXP', 'A', 200, 14000)]
+  const rowsC = [dr('PIG', 'CHEAP', 'A', 200, 10000), dr('PIG', 'EXP', 'A', 800, 14000)]
+  const pd = priceDrill(rowsB, rowsC)
+  // P_b = 10,800 → P_c = 13,200 ⇒ +2,400 all composition between SKUs
+  assert.ok(Math.abs(pd.total - 2400) < 1e-9)
+  assert.ok(Math.abs(pd.sku_mix - 2400) < 1e-9, `sku_mix must carry the bar, got ${pd.sku_mix}`)
+  assert.ok(Math.abs(pd.true_price) < 1e-9)
+  assert.ok(Math.abs(pd.customer_mix) < 1e-9)
+  assert.equal(pd.price_held_pct, 100)
 })

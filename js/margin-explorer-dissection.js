@@ -6,6 +6,7 @@
  *   2. SSG GM/ton bridge (Price / Mix / Cost / Interaction waterfall)
  *   3. Product-mix bridge (top SSG contributions to the Mix bar)
  *   4. Ingredient cost contribution (recipe-weighted, top movers)
+ *   5. Price bar decomposition (true price vs customer/SKU mix, from `price_drill`)
  * + a server-proxied "AI read" button (POST /api/margin-ai).
  *
  * Self-contained: injects its own <section> into #pg-margin-explorer on first render.
@@ -47,6 +48,12 @@
       '#mexp-diss .aibtn{border:1px solid var(--gold);background:rgba(255,199,44,.12);color:var(--gold);font-size:11px;font-weight:800;padding:6px 12px;border-radius:8px;cursor:pointer}' +
       '#mexp-diss .aibtn:disabled{opacity:.5;cursor:default}' +
       '#mexp-diss .aiout{font-size:12px;line-height:1.55;color:var(--text2);margin-top:10px;white-space:pre-wrap}' +
+      '#mexp-diss .dpfull{margin-top:16px}' +
+      '#mexp-diss .phead{font-size:11.5px;font-weight:700;color:var(--text2);line-height:1.5;margin:2px 0 8px}' +
+      '#mexp-diss .ptbl{width:100%;border-collapse:collapse;font-size:10.5px}' +
+      '#mexp-diss .ptbl th{text-align:right;font-weight:700;color:var(--text3);padding:3px 10px 4px 0;border-bottom:1px solid var(--glass-border);text-transform:uppercase;font-size:9px;letter-spacing:.3px}' +
+      '#mexp-diss .ptbl th:first-child,#mexp-diss .ptbl td:first-child{text-align:left}' +
+      '#mexp-diss .ptbl td{text-align:right;padding:3px 10px 3px 0;border-bottom:1px solid rgba(255,255,255,0.05);color:var(--text2);white-space:nowrap}' +
       '</style>' +
       '<div class="dh"><div><div class="dt">Finished-Feed Dissection <span style="font-size:10px;color:var(--gold)">GM/ton</span></div>' +
       '<div class="dsub" id="diss-sub">—</div></div><button class="aibtn" id="diss-ai">✦ AI read</button></div>' +
@@ -58,6 +65,7 @@
       '<div class="dp"><h4>Product-mix bridge (by SSG)</h4><div class="cw"><canvas id="diss-mix"></canvas></div></div>' +
       '<div class="dp"><h4>Ingredient cost contribution (recipe-weighted) <span style="font-weight:400;font-size:9px;opacity:.75">* = no purchase in one month — price carried, recipe effect only</span></h4><div class="cw"><canvas id="diss-ing"></canvas></div></div>' +
       '</div>' +
+      '<div class="dp dpfull"><h4>Price bar decomposition — real price moves vs composition</h4><div id="diss-price"></div></div>' +
       '<div class="aiout" id="diss-aiout"></div>';
     host.appendChild(sec);
     document.getElementById('diss-ai').addEventListener('click', runAi);
@@ -72,6 +80,7 @@
     if (!d || d.available === false) {
       document.getElementById('diss-sub').textContent = (d && d.reason) || 'No finished-feed data for this selection.';
       ['diss-traj', 'diss-bridge', 'diss-mix', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
+      renderPriceDrill(null);
       return;
     }
     var cmpLbl = d.compare_month + (d.compare_partial ? ' (' + (d.compare_days || '') + 'd partial — early read, noisy)' : '');
@@ -83,6 +92,7 @@
     renderBridge(d.bridge || {});
     renderDiverging('diss-mix', (d.mix_bridge && d.mix_bridge.items) || [], 'ssg', true);
     renderDiverging('diss-ing', (d.ingredients && d.ingredients.items) || [], 'name', false);
+    renderPriceDrill(d.price_drill || null);
   };
 
   function baseOpts() {
@@ -167,6 +177,60 @@
     });
   }
 
+  // Panel 5 — price_drill: headline + top-SKU table. All values via textContent (no HTML injection).
+  // true price colored red/green (real moves); mix columns muted blue (composition, not price action).
+  function renderPriceDrill(pd) {
+    var el = document.getElementById('diss-price'); if (!el) return;
+    el.textContent = '';
+    var p = P();
+    if (!pd || pd.available === false) {
+      var m = document.createElement('div'); m.className = 'phead'; m.style.color = p.text3; m.style.fontWeight = '400';
+      m.textContent = 'Price decomposition unavailable' + (pd && pd.reason ? ' — ' + pd.reason : '.');
+      el.appendChild(m);
+      return;
+    }
+    var head = document.createElement('div'); head.className = 'phead';
+    head.textContent = 'Price ' + ptS(pd.total) + '/t = true price ' + ptS(pd.true_price) +
+      ' + customer mix ' + ptS(pd.customer_mix) + ' + SKU mix ' + ptS(pd.sku_mix) +
+      (pd.residual ? ' (+ residual ' + ptS(pd.residual) + ')' : '') +
+      (pd.price_held_pct == null ? '' : ' · ' + Math.round(pd.price_held_pct) + '% of volume at unchanged price');
+    el.appendChild(head);
+    var rows = pd.top_rows || [];
+    if (!rows.length) return;
+    var tbl = document.createElement('table'); tbl.className = 'ptbl';
+    var thead = document.createElement('thead'); var hr = document.createElement('tr');
+    ['SKU', '₱/t was → now', 'true price', 'cust-mix', '% price held'].forEach(function (h) {
+      var th = document.createElement('th'); th.textContent = h; hr.appendChild(th);
+    });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var td0 = document.createElement('td');
+      td0.textContent = (r.name || r.sku || '') + (r.ssg ? ' · ' + r.ssg : '');
+      tr.appendChild(td0);
+      var td1 = document.createElement('td');
+      td1.textContent = pt(r.rev_ton_b) + ' → ' + pt(r.rev_ton_c);
+      tr.appendChild(td1);
+      var td2 = document.createElement('td');
+      td2.textContent = ptS(r.true_price) + '/t';
+      td2.style.color = r.true_price < 0 ? p.red : (r.true_price > 0 ? p.green : p.text3);
+      td2.style.fontWeight = '700';
+      tr.appendChild(td2);
+      var td3 = document.createElement('td');
+      td3.textContent = ptS(r.customer_mix) + '/t';
+      td3.style.color = p.navy;
+      tr.appendChild(td3);
+      var td4 = document.createElement('td');
+      td4.textContent = r.held_pct == null ? '—' : r.held_pct + '%';
+      td4.style.color = p.text3;
+      tr.appendChild(td4);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    el.appendChild(tbl);
+  }
+
   // ---- AI read (server-proxied) ----
   async function runAi() {
     if (!LAST || LAST.available === false) return;
@@ -177,7 +241,8 @@
       var base = window.API_BASE || '';
       var digest = {
         scope: LAST.scope, base_month: LAST.base_month, compare_month: LAST.compare_month,
-        trajectory: LAST.trajectory, bridge: LAST.bridge, mix_bridge: LAST.mix_bridge, ingredients: LAST.ingredients
+        trajectory: LAST.trajectory, bridge: LAST.bridge, mix_bridge: LAST.mix_bridge, ingredients: LAST.ingredients,
+        price_drill: LAST.price_drill
       };
       var r = await fetch(base + '/margin-ai', {
         method: 'POST',
