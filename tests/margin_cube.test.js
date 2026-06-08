@@ -72,6 +72,41 @@ test('ingredientContribution = cost/ton(compare) − cost/ton(base)', () => {
   assert.equal(corn.contribution, 3000)
 })
 
+test('ingredientContribution carries price forward when one month has no purchase', () => {
+  const rows = [
+    { month: 'b', ssg: 'PIG', rev: 1, gp: 0, kg: 1_000_000 },
+    { month: 'c', ssg: 'PIG', rev: 1, gp: 0, kg: 1_000_000 }
+  ]
+  const intensity = { PIG: { Corn: 0.6, Bakery: 0.1 } }
+  // Bakery has NO compare-month purchase: must NOT book -0.1*15*1000 = -1500 as a fake decrease.
+  const basket = { b: { Corn: 20, Bakery: 15 }, c: { Corn: 25 } }
+  const ic = ingredientContribution(rows, intensity, basket, 'b', 'c')
+  const bakery = ic.items.find(i => i.name === 'Bakery')
+  // identical inclusion both months + carried price → contribution 0 → item filtered out entirely
+  assert.equal(bakery, undefined)
+  const corn = ic.items.find(i => i.name === 'Corn')
+  assert.equal(corn.contribution, 3000)      // real both-month price move still attributed
+  assert.equal(corn.carried, false)
+  assert.equal(ic.net, 3000)                  // net excludes the unpurchased ingredient
+})
+
+test('ingredientContribution carried price still shows recipe-shift effect', () => {
+  // Bakery price only exists in base month; inclusion rises because the SSG mix
+  // shifts toward the bakery-heavy recipe → only the recipe effect is shown, flagged carried.
+  const rows = [
+    { month: 'b', ssg: 'PIG', rev: 1, gp: 0, kg: 500_000 }, { month: 'b', ssg: 'LAYER', rev: 1, gp: 0, kg: 500_000 },
+    { month: 'c', ssg: 'PIG', rev: 1, gp: 0, kg: 900_000 }, { month: 'c', ssg: 'LAYER', rev: 1, gp: 0, kg: 100_000 }
+  ]
+  const intensity = { PIG: { Bakery: 0.2 }, LAYER: { Corn: 0.5 } }
+  const basket = { b: { Bakery: 10, Corn: 20 }, c: { Corn: 20 } }
+  const ic = ingredientContribution(rows, intensity, basket, 'b', 'c')
+  const bakery = ic.items.find(i => i.name === 'Bakery')
+  // inclusion b = (500*0.2)/1000 = 0.1 kg/kg→100kg/t ; c = (900*0.2)/1000 = 0.18 → 180kg/t
+  // carried price 10 ⇒ contribution = (0.18-0.1)*10*1000 = +800 (recipe effect only)
+  assert.equal(bakery.contribution, 800)
+  assert.equal(bakery.carried, true)
+})
+
 test('region2025 maps shipping warehouses correctly', () => {
   assert.equal(region2025(103, 'ANYTHING'), 'Luzon')   // grp 103 = Luzon in Old
   assert.equal(region2025(104, 'BUKID'), 'Mindanao')

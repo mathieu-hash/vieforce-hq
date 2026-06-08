@@ -123,9 +123,13 @@ function mixBridge(rows, baseMonth, cmpMonth, topN = 10) {
 
 // Panel 4 — recipe-weighted ingredient cost contribution (METHODOLOGY §4).
 // intensity = {ssg: {ing: kg_per_kg_feed}} ; basket = {month: {ing: price_per_kg}}.
+// A price MOVE is only attributed when a real purchase price exists in BOTH months;
+// if one month has no purchase, the other month's price is carried forward so only
+// the recipe/mix effect remains (carried:true on the item). Otherwise a partial month
+// with few POs books every unpurchased ingredient's full cost as a fake "decrease".
 function ingredientContribution(rows, intensity, basket, baseMonth, cmpMonth, topN = 10) {
-  // ₱/ton of feed for ingredient `ing` in month `mo`, given the selection's SSG tonnage mix.
-  function costPerTon(mo) {
+  // kg of ingredient `ing` per ton of feed in month `mo`, given the selection's SSG tonnage mix.
+  function inclPerTon(mo) {
     // tons per SSG in this month (dimensional; recipe only exists for SSGs with intensity)
     const t = {}
     for (const r of rows) { if (r.month === mo) t[r.ssg] = (t[r.ssg] || 0) + (+r.kg || 0) / 1000 }
@@ -137,26 +141,37 @@ function ingredientContribution(rows, intensity, basket, baseMonth, cmpMonth, to
       const intab = intensity[s]; if (!intab) continue
       for (const ing of Object.keys(intab)) blended[ing] = (blended[ing] || 0) + t[s] * intab[ing]
     }
-    const price = basket[mo] || {}
     const out = {}
-    for (const ing of Object.keys(blended)) {
-      out[ing] = (blended[ing] / recipeTons) * (price[ing] || 0) * 1000  // ₱/ton of feed
-    }
+    for (const ing of Object.keys(blended)) out[ing] = blended[ing] / recipeTons  // kg per ton of feed
     return out
   }
-  const cB = costPerTon(baseMonth), cC = costPerTon(cmpMonth)
-  const ings = new Set([...Object.keys(cB), ...Object.keys(cC)])
+  const iB = inclPerTon(baseMonth), iC = inclPerTon(cmpMonth)
+  const pB = basket[baseMonth] || {}, pC = basket[cmpMonth] || {}
+  const ings = new Set([...Object.keys(iB), ...Object.keys(iC)])
   const items = []
   for (const ing of ings) {
-    const contribution = (cC[ing] || 0) - (cB[ing] || 0)   // +ve = costlier (margin headwind)
-    if (contribution !== 0) items.push({ name: ing, contribution: Math.round(contribution * 10) / 10, cost_now: Math.round((cC[ing] || 0) * 10) / 10 })
+    const hasB = pB[ing] != null, hasC = pC[ing] != null
+    if (!hasB && !hasC) continue                            // never priced — nothing honest to show
+    const effB = hasB ? pB[ing] : pC[ing]                   // carry-forward across the missing month
+    const effC = hasC ? pC[ing] : pB[ing]
+    const cB = (iB[ing] || 0) * effB * 1000                 // ₱/ton of feed
+    const cC = (iC[ing] || 0) * effC * 1000
+    const contribution = cC - cB                            // +ve = costlier (margin headwind)
+    if (contribution !== 0) {
+      items.push({
+        name: ing,
+        contribution: Math.round(contribution * 10) / 10,
+        cost_now: Math.round(cC * 10) / 10,
+        carried: hasB !== hasC                              // price carried from the other month (no purchase)
+      })
+    }
   }
   items.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
   return {
     available: items.length > 0,
     items: items.slice(0, topN),
     net: Math.round(items.reduce((s, i) => s + i.contribution, 0) * 10) / 10,
-    note: 'Recipe-weighted at market purchase price; booked COGS lags by ~the inventory holding period.'
+    note: 'Recipe-weighted at market purchase price; booked COGS lags by ~the inventory holding period. Ingredients without a purchase in one month carry the other month’s price (recipe effect only).'
   }
 }
 
