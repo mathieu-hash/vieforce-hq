@@ -25,6 +25,13 @@
   }
   function esc(s) { return window.esc ? window.esc(s) : String(s == null ? '' : s); }
   function pt(n) { return '₱' + Math.round(+n || 0).toLocaleString(); }
+  // "2026-05" -> "May'26"
+  function monLbl(ym) {
+    if (!ym || ym.length < 7) return ym || '';
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var y = ym.slice(2, 4), m = parseInt(ym.slice(5, 7), 10);
+    return (MON[m - 1] || '') + "'" + y;
+  }
   function ptS(n) { n = +n || 0; var s = '₱' + Math.round(Math.abs(n)).toLocaleString(); return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); }
   function kill(c) { if (c && c._ch) { try { c._ch.destroy(); } catch (e) {} c._ch = null; } if (window.Chart && Chart.getChart) { var e = Chart.getChart(c); if (e) { try { e.destroy(); } catch (x) {} } } }
 
@@ -54,12 +61,47 @@
       '#mexp-diss .ptbl th{text-align:right;font-weight:700;color:var(--text3);padding:3px 10px 4px 0;border-bottom:1px solid var(--glass-border);text-transform:uppercase;font-size:9px;letter-spacing:.3px}' +
       '#mexp-diss .ptbl th:first-child,#mexp-diss .ptbl td:first-child{text-align:left}' +
       '#mexp-diss .ptbl td{text-align:right;padding:3px 10px 3px 0;border-bottom:1px solid rgba(255,255,255,0.05);color:var(--text2);white-space:nowrap}' +
+      // ---- 12-month category margin table ----
+      '#mexp-diss .ctwrap{overflow-x:auto}' +
+      '#mexp-diss .cthd{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}' +
+      '#mexp-diss .ctnote{font-size:9.5px;color:var(--text3);font-weight:600;margin:6px 0 10px;line-height:1.45}' +
+      '#mexp-diss .ctoggle{display:inline-flex;border:1px solid var(--glass-border);border-radius:8px;overflow:hidden}' +
+      '#mexp-diss .ctoggle button{background:transparent;border:0;color:var(--text3);font-size:10px;font-weight:800;letter-spacing:.3px;padding:5px 11px;cursor:pointer}' +
+      '#mexp-diss .ctoggle button.on{background:var(--blue);color:#fff}' +
+      '#mexp-diss table.ctbl{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}' +
+      '#mexp-diss table.ctbl th{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--glass-border);text-align:right;white-space:nowrap}' +
+      '#mexp-diss table.ctbl th.ctrow,#mexp-diss table.ctbl td.ctrow{text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;position:sticky;left:0;background:var(--surface);z-index:1}' +
+      '#mexp-diss table.ctbl th.ctpartial{color:var(--gold)}' +
+      '#mexp-diss table.ctbl td{padding:4px 8px;text-align:right;color:var(--text);white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.04)}' +
+      '#mexp-diss table.ctbl td.ctpartial{border-left:1px dashed rgba(241,177,29,.5);border-right:1px dashed rgba(241,177,29,.5)}' +
+      '#mexp-diss table.ctbl td.ctnull{color:var(--text3)}' +
+      '#mexp-diss table.ctbl tr.ctavg td{border-top:2px solid var(--glass-border);font-weight:900;color:var(--text);padding-top:7px}' +
+      '#mexp-diss table.ctbl tr.ctavg td.ctrow{text-transform:uppercase;letter-spacing:.3px;font-size:10px}' +
+      '#mexp-diss table.ctbl tr.ctzero td.ctrow{color:var(--text3);font-weight:600;font-style:italic}' +
+      '#mexp-diss .ctt{font-size:8.5px;font-weight:700;color:var(--text3);opacity:.65;margin-left:4px}' +
       '</style>' +
       '<div class="dh"><div><div class="dt">Finished-Feed Dissection <span style="font-size:10px;color:var(--gold)">GM/ton</span></div>' +
       '<div class="dsub" id="diss-sub">—</div></div><button class="aibtn" id="diss-ai">✦ AI read</button></div>' +
-      '<div class="dgrid">' +
+      // ---- 12-month category margin table (headline trend artifact) ----
+      '<div class="dp dpfull" id="diss-cat" style="margin-top:0">' +
+        '<div class="cthd">' +
+          '<div class="dp-h" style="display:flex;flex-direction:column;gap:2px">' +
+            '<h4 style="margin:0">Category margin · trailing 12 months</h4>' +
+            '<span style="font-size:9.5px;color:var(--text3);font-weight:600">Finished feed · GM by SSG category · biggest-volume first · inherits Region/BU/Customer filter</span>' +
+          '</div>' +
+          '<div class="ctoggle" id="diss-cat-toggle">' +
+            '<button data-mode="ton" class="on">₱/ton</button>' +
+            '<button data-mode="pct">GM%</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ctnote" id="diss-cat-note"></div>' +
+        '<div class="ctwrap"><div id="diss-cat-body"></div></div>' +
+      '</div>' +
+      '<div class="dgrid" style="margin-top:16px">' +
       '<div class="dp"><h4>GM/ton &amp; Revenue/ton trajectory</h4><div class="cw"><canvas id="diss-traj"></canvas></div></div>' +
-      '<div class="dp"><h4 id="diss-bridge-h">GM/ton bridge</h4><div class="cw"><canvas id="diss-bridge"></canvas></div></div>' +
+      '<div class="dp"><h4 id="diss-bridge-h">GM/ton bridge</h4>' +
+        '<div class="dsub" id="diss-bridge-sub" style="font-size:9px;color:var(--text3);font-weight:600;margin:-4px 0 6px">Feed only · full month-over-month · category level</div>' +
+        '<div class="cw"><canvas id="diss-bridge"></canvas></div></div>' +
       '</div>' +
       '<div class="dgrid2">' +
       '<div class="dp"><h4>Product-mix bridge (by SSG)</h4><div class="cw"><canvas id="diss-mix"></canvas></div></div>' +
@@ -69,14 +111,39 @@
       '<div class="aiout" id="diss-aiout"></div>';
     host.appendChild(sec);
     document.getElementById('diss-ai').addEventListener('click', runAi);
+    // category-table ₱/ton ↔ GM% toggle (re-renders from cached payload, no refetch)
+    var tog = document.getElementById('diss-cat-toggle');
+    if (tog) tog.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-mode]') : null;
+      if (!b) return;
+      var m = b.getAttribute('data-mode');
+      if (m === CAT_MODE) return;
+      CAT_MODE = m;
+      Array.prototype.forEach.call(tog.querySelectorAll('button'), function (x) {
+        x.classList.toggle('on', x.getAttribute('data-mode') === m);
+      });
+      renderCategoryTable(LAST_CT);
+    });
     return sec;
   }
 
   var LAST = null;
+  var LAST_CT = null;      // cached category_trend payload (for toggle re-render)
+  var CAT_MODE = 'ton';    // 'ton' = GM ₱/ton (default) | 'pct' = GM%
+
+  // Subtle "updating" state for the dissection block during phase B (set by controller).
+  window.MEXP_setDissectionUpdating = function (on) {
+    var sec = document.getElementById('mexp-diss'); if (!sec) return;
+    if (on) sec.classList.add('mexp-dim'); else sec.classList.remove('mexp-dim');
+  };
 
   window.MEXP_renderDissection = function (d) {
     var sec = ensure(); if (!sec) return;
     LAST = d || null;
+    // Category table renders even when the rest of the dissection is unavailable,
+    // as long as category_trend is present.
+    LAST_CT = (d && d.category_trend) || null;
+    renderCategoryTable(LAST_CT);
     if (!d || d.available === false) {
       document.getElementById('diss-sub').textContent = (d && d.reason) || 'No finished-feed data for this selection.';
       ['diss-traj', 'diss-bridge', 'diss-mix', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
@@ -229,6 +296,182 @@
     });
     tbl.appendChild(tb);
     el.appendChild(tbl);
+  }
+
+  // =========================================================================
+  // 12-MONTH CATEGORY MARGIN TABLE
+  // Rows = SSG categories (biggest-volume first, API order), cols = months.
+  // Cell = GM ₱/ton (default) or GM% (toggle). Heat-shaded green↑ / red<0.
+  // Bottom = volume-weighted AVG row. Partial month flagged.
+  // =========================================================================
+  function fmtTon(v) { return v == null ? '—' : '₱' + Math.round(+v).toLocaleString(); }
+  function fmtPct(v) { return v == null ? '—' : ((+v).toFixed(1) + '%'); }
+
+  // Mix two hex/rgb-ish colors; t in [0,1]. We use rgba string output.
+  function shadeFor(v, lo, hi, mode) {
+    // v null handled by caller. Returns {bg, fg} for a cell.
+    if (v == null || isNaN(v)) return null;
+    var p = P();
+    if (v < 0) {
+      // red ramp by magnitude vs |lo|
+      var mag = Math.min(1, Math.abs(v) / (Math.abs(lo) || 1));
+      var a = 0.12 + 0.42 * mag;
+      return { bg: 'rgba(229,57,53,' + a.toFixed(3) + ')', fg: a > 0.4 ? '#fff' : 'var(--text)' };
+    }
+    var span = (hi - Math.max(0, lo)) || 1;
+    var t = Math.max(0, Math.min(1, (v - Math.max(0, lo)) / span));
+    // green ramp: stronger green = higher GM. Vienovo green at full strength.
+    var a2 = 0.06 + 0.5 * t;
+    return { bg: 'rgba(149,201,61,' + a2.toFixed(3) + ')', fg: a2 > 0.42 ? '#0b1a05' : 'var(--text)' };
+  }
+
+  // Robust scale bounds from real cells, excluding zero-tonnage rows (e.g. Untagged
+  // carries absurd ₱/ton because tonnage rounds to 0) so they don't blow out the ramp.
+  function scaleBounds(ct, mode) {
+    var vals = [];
+    (ct.categories || []).forEach(function (cat) {
+      if ((+cat.total_tons || 0) <= 0) return; // skip outlier zero-volume rows
+      (cat.cells || []).forEach(function (c) {
+        var v = mode === 'pct' ? c.gm_pct : c.gm_ton;
+        if (v != null && !isNaN(v)) vals.push(+v);
+      });
+    });
+    (ct.avg || []).forEach(function (c) {
+      var v = mode === 'pct' ? c.gm_pct : c.gm_ton;
+      if (v != null && !isNaN(v)) vals.push(+v);
+    });
+    if (!vals.length) return { lo: 0, hi: 1 };
+    vals.sort(function (a, b) { return a - b; });
+    // 5th / 95th percentile clamp to tame remaining outliers
+    var lo = vals[Math.floor(0.05 * (vals.length - 1))];
+    var hi = vals[Math.ceil(0.95 * (vals.length - 1))];
+    if (hi <= lo) hi = lo + 1;
+    return { lo: lo, hi: hi };
+  }
+
+  function renderCategoryTable(ct) {
+    var body = document.getElementById('diss-cat-body');
+    var noteEl = document.getElementById('diss-cat-note');
+    var panel = document.getElementById('diss-cat');
+    if (!body) return;
+    if (!ct || ct.available === false || !ct.months || !ct.months.length) {
+      if (panel) panel.style.display = (ct && ct.available === false) ? 'none' : panel.style.display;
+      body.textContent = '';
+      var m = document.createElement('div');
+      m.style.cssText = 'font-size:11px;color:var(--text3);font-weight:600;padding:10px 2px';
+      m.textContent = (ct && ct.note) || 'Category trend unavailable for this selection.';
+      body.appendChild(m);
+      if (noteEl) noteEl.textContent = '';
+      return;
+    }
+    if (panel) panel.style.display = '';
+    var mode = CAT_MODE;
+    var fmt = mode === 'pct' ? fmtPct : fmtTon;
+    var months = ct.months;
+    var partial = ct.partial_month || null;
+    var bounds = scaleBounds(ct, mode);
+
+    var tbl = document.createElement('table');
+    tbl.className = 'ctbl';
+
+    // header
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    var th0 = document.createElement('th');
+    th0.className = 'ctrow';
+    th0.textContent = 'Category';
+    hr.appendChild(th0);
+    months.forEach(function (ym) {
+      var th = document.createElement('th');
+      var isP = (ym === partial);
+      th.className = isP ? 'ctpartial' : '';
+      th.textContent = monLbl(ym);
+      if (isP) {
+        var s = document.createElement('span');
+        s.className = 'ctt';
+        s.textContent = '(part.)';
+        th.appendChild(s);
+      }
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    tbl.appendChild(thead);
+
+    // body rows
+    var tb = document.createElement('tbody');
+    (ct.categories || []).forEach(function (cat) {
+      var isZero = (+cat.total_tons || 0) <= 0;
+      var tr = document.createElement('tr');
+      if (isZero) tr.className = 'ctzero';
+      var td0 = document.createElement('td');
+      td0.className = 'ctrow';
+      td0.textContent = cat.ssg;
+      if (!isZero) {
+        var vol = document.createElement('span');
+        vol.className = 'ctt';
+        vol.textContent = Math.round(+cat.total_tons || 0).toLocaleString() + 't';
+        td0.appendChild(vol);
+      }
+      tr.appendChild(td0);
+      // index cells by month for safe alignment
+      var byMonth = {};
+      (cat.cells || []).forEach(function (c) { byMonth[c.month] = c; });
+      months.forEach(function (ym) {
+        var c = byMonth[ym];
+        var v = c ? (mode === 'pct' ? c.gm_pct : c.gm_ton) : null;
+        var td = document.createElement('td');
+        if (ym === partial) td.className = 'ctpartial';
+        if (v == null || isNaN(v)) {
+          td.className = (td.className ? td.className + ' ' : '') + 'ctnull';
+          td.textContent = '—';
+        } else {
+          td.textContent = fmt(v);
+          // zero-tonnage rows are not heat-shaded (their ₱/ton is meaningless)
+          if (!isZero) {
+            var sh = shadeFor(+v, bounds.lo, bounds.hi, mode);
+            if (sh) { td.style.background = sh.bg; td.style.color = sh.fg; }
+          } else {
+            td.style.color = 'var(--text3)';
+          }
+        }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+
+    // AVG row (volume-weighted) — bold, separated
+    var tf = document.createElement('tbody');
+    var avgByMonth = {};
+    (ct.avg || []).forEach(function (c) { avgByMonth[c.month] = c; });
+    var ar = document.createElement('tr');
+    ar.className = 'ctavg';
+    var a0 = document.createElement('td');
+    a0.className = 'ctrow';
+    a0.textContent = mode === 'pct' ? 'AVG GM%' : 'AVG GM/T';
+    ar.appendChild(a0);
+    months.forEach(function (ym) {
+      var c = avgByMonth[ym];
+      var v = c ? (mode === 'pct' ? c.gm_pct : c.gm_ton) : null;
+      var td = document.createElement('td');
+      if (ym === partial) td.className = 'ctpartial';
+      if (v == null || isNaN(v)) { td.textContent = '—'; td.style.color = 'var(--text3)'; }
+      else {
+        td.textContent = fmt(v);
+        var sh = shadeFor(+v, bounds.lo, bounds.hi, mode);
+        if (sh) { td.style.background = sh.bg; td.style.color = sh.fg; }
+      }
+      ar.appendChild(td);
+    });
+    tf.appendChild(ar);
+    tbl.appendChild(tf);
+
+    body.textContent = '';
+    body.appendChild(tbl);
+    if (noteEl) {
+      noteEl.textContent = (ct.note || '') +
+        (partial ? '  ·  ' + monLbl(partial) + ' is a partial month (dashed) — month-to-date only.' : '');
+    }
   }
 
   // ---- AI read (server-proxied) ----

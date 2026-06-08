@@ -53,7 +53,10 @@
   };
 
   // Last fetched payload — kept so unit toggle can re-render matrix without refetch.
-  var LAST = { matrix: null, fetchSeq: 0 };
+  // hasCore = at least one successful phase-A render has painted (controls first-load
+  // vs. non-destructive refresh). coreSig = param signature of the in-flight/last phase-A
+  // fetch, used to suppress duplicate invocations for identical params.
+  var LAST = { matrix: null, fetchSeq: 0, hasCore: false, coreSig: null, coreInFlight: false };
   var built = false;
 
   // --- Config tables for chips ----------------------------------------------
@@ -114,8 +117,13 @@
     '<style id="mexp-style">',
     '.mexp-wrap{padding:18px 20px 40px;color:var(--text)}',
     '.mexp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}',
-    '.mexp-title{font-size:20px;font-weight:900;letter-spacing:-.3px;color:var(--text)}',
+    '.mexp-title{font-size:20px;font-weight:900;letter-spacing:-.3px;color:var(--text);display:flex;align-items:center;gap:10px}',
     '.mexp-sub{font-size:11px;color:var(--text3);margin-top:3px;font-weight:600}',
+    // updating pill (non-destructive refresh hint) + dim state
+    '.mexp-pill{display:none;align-items:center;gap:6px;font-size:9px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:var(--gold);background:rgba(241,177,29,.12);border:1px solid rgba(241,177,29,.35);padding:3px 9px;border-radius:999px}',
+    '.mexp-pill .mexp-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:mexppulse 1s infinite}',
+    '@keyframes mexppulse{0%,100%{opacity:.35}50%{opacity:1}}',
+    '#pg-margin-explorer .mexp-dim{opacity:.6;transition:opacity .15s;pointer-events:none}',
     '.mexp-clear{border:1px solid var(--glass-border);background:rgba(255,255,255,.035);color:var(--text2);font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:6px 11px;border-radius:8px;cursor:pointer}',
     '.mexp-clear:hover{border-color:var(--glass-border-hover);color:var(--text)}',
     // filter bar
@@ -142,6 +150,8 @@
     '.mexp-panel{border:1px solid var(--glass-border);border-radius:var(--r-lg);background:var(--surface);padding:14px 16px}',
     '.mexp-panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}',
     '.mexp-panel-t{font-size:12px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;color:var(--text2)}',
+    '.mexp-panel-st{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.2px;margin-top:3px;line-height:1.45}',
+    '.mexp-panel-hcol{display:flex;flex-direction:column;gap:0}',
     '.mexp-canvas-wrap{position:relative;width:100%;min-height:170px}',
     '.mexp-canvas-wrap canvas{width:100%!important;display:block}',
     '.mexp-note{font-size:10px;color:var(--text3);font-weight:600;margin-top:10px;line-height:1.5}',
@@ -188,7 +198,9 @@
       '<div class="mexp-wrap">' +
         '<div class="mexp-head">' +
           '<div>' +
-            '<div class="mexp-title">Margin Explorer</div>' +
+            '<div class="mexp-title">Margin Explorer' +
+              '<span class="mexp-pill" id="mexp-updating"><span class="mexp-dot"></span>Updating</span>' +
+            '</div>' +
             '<div class="mexp-sub" id="mexp-window">Loading window…</div>' +
           '</div>' +
           '<button class="mexp-clear" id="mexp-clear">Clear filters</button>' +
@@ -240,10 +252,11 @@
             '<div id="mexp-matrix"><div class="mexp-loading">Loading…</div></div>' +
           '</div>' +
           '<div class="mexp-panel">' +
-            '<div class="mexp-panel-h"><span class="mexp-panel-t">GM Bridge</span></div>' +
+            '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
+              '<span class="mexp-panel-t">GM Bridge</span>' +
+              '<span class="mexp-panel-st">All sellable scope · vs prior comparable window · SKU-level, cost split RM/Pkg/Feedtag</span>' +
+            '</div></div>' +
             '<div class="mexp-canvas-wrap"><canvas id="mexp-bridge"></canvas></div>' +
-            '<div class="mexp-panel-h" style="margin-top:16px"><span class="mexp-panel-t">Trend</span></div>' +
-            '<div class="mexp-canvas-wrap" style="min-height:140px"><canvas id="mexp-trend"></canvas></div>' +
             '<div class="mexp-coming" id="mexp-movers">Movers &amp; gap analysis — coming in Phase 2</div>' +
           '</div>' +
         '</div>' +
@@ -359,48 +372,101 @@
   // =========================================================================
   // FETCH + RENDER
   // =========================================================================
-  function buildParams() {
+  // Phase-A (fast core) and phase-B (slow dissection) share these scope params.
+  // include is appended per-phase so the heavy cross-DB cube only loads in phase B.
+  function baseParams() {
     var p = {
       period:   STATE.period,
       region:   STATE.region,
       bu:       STATE.bu,
       group_by: STATE.group_by,
-      compare:  STATE.compare,
-      include:  'bridge,trend,movers,gap,dissection'
+      compare:  STATE.compare
     };
     if (STATE.ref_month) p.ref_month = STATE.ref_month;
     if (STATE.customer)  p.customer = STATE.customer;
     return p;
   }
+  function coreParams() {
+    var p = baseParams();
+    p.include = 'bridge,trend,movers,gap';
+    return p;
+  }
+  function dissectionParams() {
+    var p = baseParams();
+    p.include = 'dissection';
+    return p;
+  }
+  // Stable signature of the scope (ignores _t cache-buster + include) so we can
+  // detect a duplicate phase-A fetch for params already in flight / just rendered.
+  function scopeSig() {
+    var b = baseParams();
+    return [b.period, b.region, b.bu, b.group_by, b.compare, b.ref_month || '', b.customer || ''].join('|');
+  }
 
-  function showMatrixLoading() {
+  // -- Loading-state helpers (non-destructive) -------------------------------
+  // First load (no prior render): show the big loader in the matrix slot.
+  // Refilter (prior render exists): keep the last good content, dim the body and
+  // flip on a small "updating…" pill in the header — never blank good data.
+  function setUpdating(on) {
+    var pill = $('mexp-updating');
+    var body = $('pg-margin-explorer') && $('pg-margin-explorer').querySelector('.mexp-body');
+    var diss = $('mexp-diss');
+    if (pill) pill.style.display = on ? 'inline-flex' : 'none';
+    [body, diss].forEach(function (el) {
+      if (!el) return;
+      if (on) { el.classList.add('mexp-dim'); }
+      else { el.classList.remove('mexp-dim'); }
+    });
+  }
+  function showFirstLoad() {
     var m = $('mexp-matrix');
     if (m) m.innerHTML = '<div class="mexp-loading">Loading margin data…</div>';
   }
   function showError(msg) {
     var m = $('mexp-matrix');
-    if (m) m.innerHTML = '<div class="mexp-error">Could not load margin data.<br>' + _esc(msg) + '</div>';
+    // Only clobber the matrix with an error if there is nothing good to keep.
+    if (m && !LAST.hasCore) m.innerHTML = '<div class="mexp-error">Could not load margin data.<br>' + _esc(msg) + '</div>';
+    else {
+      var pill = $('mexp-updating');
+      if (pill) { pill.textContent = '⚠ update failed'; pill.style.display = 'inline-flex'; }
+    }
   }
 
-  async function fetchAndRender() {
-    if (typeof window.apiFetch !== 'function') {
-      showError('apiFetch unavailable.');
-      return;
-    }
-    var seq = ++LAST.fetchSeq;
-    showMatrixLoading();
+  // Public entry for any filter change. Bumps ONE sequence that supersedes BOTH
+  // phases of any in-flight load, then kicks off phase A (which chains phase B).
+  function fetchAndRender() {
+    if (typeof window.apiFetch !== 'function') { showError('apiFetch unavailable.'); return; }
 
+    var sig = scopeSig();
+    // Double-invocation guard: identical scope already fetching phase A → no-op.
+    if (LAST.coreInFlight && LAST.coreSig === sig) return;
+
+    var seq = ++LAST.fetchSeq;     // supersedes any older phase A AND phase B
+    LAST.coreSig = sig;
+    LAST.coreInFlight = true;
+
+    if (LAST.hasCore) setUpdating(true);   // keep prior render, show subtle hint
+    else showFirstLoad();                  // very first paint — big loader ok
+
+    fetchCore(seq);
+  }
+
+  // ---- Phase A: fast core (hero, window, matrix, bridge, ingredient movers) ----
+  async function fetchCore(seq) {
     var data;
     try {
-      data = await window.apiFetch('margin-explorer', buildParams());
+      data = await window.apiFetch('margin-explorer', coreParams());
     } catch (err) {
-      if (seq !== LAST.fetchSeq) return; // stale
-      console.error('[MEXP] fetch error:', err);
+      if (seq !== LAST.fetchSeq) return;            // a newer action superseded us
+      LAST.coreInFlight = false;
+      console.error('[MEXP] core fetch error:', err);
+      setUpdating(false);
       showError((err && err.message) ? err.message : 'Request failed.');
       return;
     }
-    if (seq !== LAST.fetchSeq) return; // a newer request superseded this one
-    if (!data) { showError('Empty response.'); return; }
+    if (seq !== LAST.fetchSeq) return;              // stale — abandon silently
+    LAST.coreInFlight = false;
+    if (!data) { setUpdating(false); showError('Empty response.'); return; }
 
     LAST.matrix = data.matrix || null;
 
@@ -408,9 +474,38 @@
     try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
     try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
     try { renderBridge(data.bridge); } catch (e) { console.error('[MEXP] bridge:', e); }
-    try { renderTrend(data.trend); }   catch (e) { console.error('[MEXP] trend:', e); }
     try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
-    try { if (typeof window.MEXP_renderDissection === 'function') window.MEXP_renderDissection(data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
+
+    LAST.hasCore = true;
+    setUpdating(false);
+
+    // Chain phase B (slow) under the SAME seq, so a newer phase A abandons it.
+    fetchDissection(seq);
+  }
+
+  // ---- Phase B: lazy dissection (5 panels + 12-month category table) ----
+  async function fetchDissection(seq) {
+    if (typeof window.MEXP_renderDissection !== 'function') return;
+    // subtle updating state on the dissection block only (core already painted)
+    if (typeof window.MEXP_setDissectionUpdating === 'function') {
+      try { window.MEXP_setDissectionUpdating(true); } catch (e) {}
+    }
+    var data;
+    try {
+      data = await window.apiFetch('margin-explorer', dissectionParams());
+    } catch (err) {
+      if (seq !== LAST.fetchSeq) return;            // superseded
+      console.error('[MEXP] dissection fetch error:', err);
+      if (typeof window.MEXP_setDissectionUpdating === 'function') {
+        try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
+      }
+      return;
+    }
+    if (seq !== LAST.fetchSeq) return;              // a newer phase A started — abandon
+    if (typeof window.MEXP_setDissectionUpdating === 'function') {
+      try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
+    }
+    try { window.MEXP_renderDissection(data && data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
   }
 
   function renderWindow(meta) {
@@ -549,18 +644,6 @@
       } else {
         n.style.display = 'none';
       }
-    }
-  }
-
-  function renderTrend(trend) {
-    var c = $('mexp-trend');
-    if (!c) return;
-    if (typeof window.MEXP_renderTrend === 'function') {
-      window.MEXP_renderTrend(c, trend);
-    } else if (!trend || !trend.series || !trend.series.length) {
-      placeholderCanvas(c, 'Trend — coming in Phase 2');
-    } else {
-      placeholderCanvas(c, 'Trend renderer unavailable');
     }
   }
 
