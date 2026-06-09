@@ -726,8 +726,10 @@
     if (!cb || cb.available === false) { box.style.display = 'none'; box.innerHTML = ''; return; }
     var fmtD = function (n) { n = Math.round(+n || 0); var s = '₱' + Math.abs(n).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
     var cls = function (n) { return (+n > 0 ? 'pos' : (+n < 0 ? 'neg' : '')); };
-    var rows = function (items, total) {
-      var t = Math.abs(+total || 0) || 1;
+    var rows = function (items) {
+      // share of GROSS contribution (Σ|value|) so mixed +/− categories read sensibly
+      // (a net bar of −77 can have individual gross moves far larger than 77).
+      var t = items.reduce(function (s, x) { return s + Math.abs(+x.value || 0); }, 0) || 1;
       return items.map(function (it) {
         var v = +it.value || 0, sh = Math.round(Math.abs(v) / t * 100);
         return '<tr><td class="mexp-dl" title="' + _esc(it.label) + '">' + _esc(it.label) + '</td>' +
@@ -753,14 +755,14 @@
       ].filter(function (x) { return Math.round(+x.value || 0) !== 0; });
       if (citems.length) {
         html += '<div class="mexp-drill"><div class="mexp-drill-h"><b>Cost</b> → RM / Packaging / Feedtag</div>' +
-          '<table class="mexp-drill-tbl"><tbody>' + rows(citems, cb.cost) +
+          '<table class="mexp-drill-tbl"><tbody>' + rows(citems) +
           foot('Cost', cb.cost, citems, cb.cost) + '</tbody></table></div>';
       }
     }
     if (cb.product_mix_by_ssg && cb.product_mix_by_ssg.length) {
       var pitems = cb.product_mix_by_ssg.map(function (x) { return { label: x.ssg, value: x.value }; });
       html += '<div class="mexp-drill"><div class="mexp-drill-h"><b>Product Mix</b> → by category (SSG)</div>' +
-        '<table class="mexp-drill-tbl"><tbody>' + rows(pitems, cb.product_mix) +
+        '<table class="mexp-drill-tbl"><tbody>' + rows(pitems) +
         foot('Product Mix', cb.product_mix, pitems, cb.product_mix) + '</tbody></table></div>';
     }
     if (html) { box.innerHTML = html; box.style.display = 'grid'; }
