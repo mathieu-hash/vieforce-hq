@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v5', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v6', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -254,6 +254,22 @@ module.exports = async (req, res) => {
       const bk = bridge.bridgeGMperKg(prev0, cur1)
       const T = 1000
 
+      // TRUE-price decomposition at customer×SKU granularity: the SKU bridge above
+      // blends customers within a SKU, so a shift in WHICH customers bought leaks
+      // into "Price". This pair-level pass makes the Price bar = real same-customer
+      // same-SKU price move; composition splits into Customer Mix + Product Mix.
+      let pairBk = null
+      try {
+        const pairSql = `SELECT T0.CardCode AS cust, T1.ItemCode AS sku,
+            ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.LineTotal),0) AS revenue, ISNULL(SUM(T1.GrssProfit),0) AS gp
+          ${baseFrom} ${scopeWhere} GROUP BY T0.CardCode, T1.ItemCode HAVING SUM(T1.InvQty) <> 0`
+        const [pairCur, pairPrev] = await Promise.all([
+          query(pairSql, params),
+          query(pairSql, { ...params, dateFrom: bFrom, dateTo: bTo })
+        ])
+        pairBk = bridge.bridgeGMperTonByPair(pairPrev, pairCur)
+      } catch (e) { console.warn('[margin-explorer] pair bridge failed:', e.message) }
+
       // Ingredient contribution PER TON of feed (price + inclusion decomposition), cur vs prior.
       // For each raw-material ingredient: issued_kg, blended price (₱/kg), inclusion (kg/kg feed),
       // and ₱-per-ton-of-feed cost. Δ split into price effect vs inclusion (recipe) effect.
@@ -403,6 +419,19 @@ module.exports = async (req, res) => {
         note: cogsSplit
           ? 'GM/ton bridge: Price + Mix + COGS split RM/Packaging/Feedtag (production-order ratio, OITM.LastPurPrc). Per-unit ⇒ no volume.'
           : 'GM/ton bridge: COGS single bucket (no production ratio available for this slice).'
+      }
+
+      // True-price decomposition (customer×SKU): real same-customer same-SKU price
+      // move vs Customer Mix vs Product Mix. The headline Price bar should be this
+      // true_price, NOT the SKU-blended `price` above (which hides customer mix).
+      if (pairBk && pairBk.available) {
+        bridgeOut.true_price = Math.round((pairBk.true_price || 0) * T)
+        bridgeOut.true_cost = Math.round((pairBk.true_cost || 0) * T)
+        bridgeOut.customer_mix = Math.round((pairBk.customer_mix || 0) * T)
+        bridgeOut.product_mix = Math.round((pairBk.product_mix || 0) * T)
+        bridgeOut.true_interaction = Math.round((pairBk.interaction || 0) * T)
+        bridgeOut.true_basis = 'customer×SKU'
+        bridgeOut.true_note = 'Price = real price move for the SAME customer buying the SAME SKU. Customer Mix = which customers bought (their different deal prices); Product Mix = which SKUs sold. Composition is NOT a price change.'
       }
     }
 

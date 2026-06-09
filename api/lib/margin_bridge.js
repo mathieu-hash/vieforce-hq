@@ -283,9 +283,96 @@ function bridgeGMperKgBySsg(rows0, rows1) {
   }
 }
 
+// ── TRUE-price GM/ton bridge at customer×SKU granularity ──────────────────────
+// The SKU-level bridge above blends customers WITHIN each SKU, so a shift in WHICH
+// customers bought (at their different deal prices) leaks into the "Price" bar.
+// This decomposition keys on (customer, SKU) pairs so the Price bar reflects ONLY
+// a real price move for the SAME customer buying the SAME SKU. Everything else is
+// composition, split into Customer Mix (within-SKU customer shift) and Product Mix
+// (between-SKU shift). All terms are ₱/ton at base weights.
+//
+// rows = [{ cust, sku, kg, revenue, gp }]   (per customer×SKU per window)
+// HARD INVARIANT (unit-tested):
+//   true_price + true_cost + customer_mix + product_mix + interaction === delta   (₱/ton)
+function bridgeGMperTonByPair(rows0, rows1) {
+  const idx = (rows) => {
+    const m = new Map()
+    for (const r of rows || []) {
+      const cust = r.cust == null ? '' : String(r.cust)
+      const sku = r.sku == null ? '' : String(r.sku)
+      const key = cust + '|' + sku
+      const o = m.get(key) || { cust, sku, kg: 0, revenue: 0, gp: 0 }
+      o.kg += num(r.kg); o.revenue += num(r.revenue); o.gp += num(r.gp)
+      m.set(key, o)
+    }
+    return m
+  }
+  const B = idx(rows0), C = idx(rows1)
+  const tB = [...B.values()].reduce((s, o) => s + o.kg, 0) / 1000
+  const tC = [...C.values()].reduce((s, o) => s + o.kg, 0) / 1000
+  if (tB <= 0 || tC <= 0) {
+    return { available: false, gm0_per_ton: 0, gm1_per_ton: 0, true_price: 0, true_cost: 0, customer_mix: 0, product_mix: 0, interaction: 0, delta: 0, n_pairs_both: 0 }
+  }
+  const gmB = [...B.values()].reduce((s, o) => s + o.gp, 0) / tB  // ₱/ton base overall
+  const gmC = [...C.values()].reduce((s, o) => s + o.gp, 0) / tC
+  const perTon = (numr, kg) => (kg > 0 ? numr * 1000 / kg : 0)
+
+  // pair-level true price & true cost (same cust+SKU present in BOTH windows)
+  let truePrice = 0, trueCost = 0, nBoth = 0
+  for (const [k, b] of B) {
+    const c = C.get(k); if (!c) continue
+    const wB = (b.kg / 1000) / tB
+    const pB = perTon(b.revenue, b.kg), pC = perTon(c.revenue, c.kg)
+    const kB = perTon(b.revenue - b.gp, b.kg), kC = perTon(c.revenue - c.gp, c.kg)
+    truePrice += wB * (pC - pB)
+    trueCost += -wB * (kC - kB)          // cost ↑ ⇒ GM ↓
+    nBoth++
+  }
+  // total mix = Σ(wC − wB)·gBar  (base pair GM/ton; base-overall for new pairs)
+  const keys = new Set([...B.keys(), ...C.keys()])
+  let mixTotal = 0
+  for (const k of keys) {
+    const b = B.get(k), c = C.get(k)
+    const wB = b ? (b.kg / 1000) / tB : 0
+    const wC = c ? (c.kg / 1000) / tC : 0
+    const gBar = b && b.kg > 0 ? perTon(b.gp, b.kg) : gmB
+    mixTotal += (wC - wB) * gBar
+  }
+  // product mix = SKU-level weight shift at base SKU GM/ton (sums customers within a SKU)
+  const bySku = (map) => {
+    const m = new Map()
+    for (const o of map.values()) {
+      const s = m.get(o.sku) || { kg: 0, gp: 0 }
+      s.kg += o.kg; s.gp += o.gp; m.set(o.sku, s)
+    }
+    return m
+  }
+  const SB = bySku(B), SC = bySku(C)
+  const skus = new Set([...SB.keys(), ...SC.keys()])
+  let productMix = 0
+  for (const s of skus) {
+    const b = SB.get(s), c = SC.get(s)
+    const wB = b ? (b.kg / 1000) / tB : 0
+    const wC = c ? (c.kg / 1000) / tC : 0
+    const gBar = b && b.kg > 0 ? perTon(b.gp, b.kg) : gmB
+    productMix += (wC - wB) * gBar
+  }
+  const customerMix = mixTotal - productMix          // within-SKU customer shift = remainder
+  const delta = gmC - gmB
+  const interaction = delta - (truePrice + trueCost + mixTotal)
+  return {
+    available: true,
+    gm0_per_ton: gmB, gm1_per_ton: gmC,
+    true_price: truePrice, true_cost: trueCost,
+    customer_mix: customerMix, product_mix: productMix,
+    interaction, delta, n_pairs_both: nBoth,
+  }
+}
+
 module.exports = {
   bridgeGP,
   bridgeGMperKg,
   bridgeGMperKgBySsg,
+  bridgeGMperTonByPair,
   ingredientContribution,
 }
