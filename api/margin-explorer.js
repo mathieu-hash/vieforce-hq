@@ -424,14 +424,16 @@ module.exports = async (req, res) => {
       // True-price decomposition (customer×SKU): real same-customer same-SKU price
       // move vs Customer Mix vs Product Mix. The headline Price bar should be this
       // true_price, NOT the SKU-blended `price` above (which hides customer mix).
+      // pairBk fields are ALREADY ₱/ton (the function works in tons) — do NOT ×T.
+      // Fold the cross/entering-pair residual into Product Mix so the 4 bars
+      // (True Price + Customer Mix + Product Mix + Cost) reconcile exactly to delta.
       if (pairBk && pairBk.available) {
-        bridgeOut.true_price = Math.round((pairBk.true_price || 0) * T)
-        bridgeOut.true_cost = Math.round((pairBk.true_cost || 0) * T)
-        bridgeOut.customer_mix = Math.round((pairBk.customer_mix || 0) * T)
-        bridgeOut.product_mix = Math.round((pairBk.product_mix || 0) * T)
-        bridgeOut.true_interaction = Math.round((pairBk.interaction || 0) * T)
+        bridgeOut.true_price = Math.round(pairBk.true_price || 0)
+        bridgeOut.true_cost = Math.round(pairBk.true_cost || 0)
+        bridgeOut.customer_mix = Math.round(pairBk.customer_mix || 0)
+        bridgeOut.product_mix = Math.round((pairBk.product_mix || 0) + (pairBk.interaction || 0))
         bridgeOut.true_basis = 'customer×SKU'
-        bridgeOut.true_note = 'Price = real price move for the SAME customer buying the SAME SKU. Customer Mix = which customers bought (their different deal prices); Product Mix = which SKUs sold. Composition is NOT a price change.'
+        bridgeOut.true_note = 'Price = real price move for the SAME customer buying the SAME SKU. Customer Mix = which customers bought (their different deal prices); Product Mix = which SKUs/new accounts invoiced. Composition is NOT a price change.'
       }
     }
 
