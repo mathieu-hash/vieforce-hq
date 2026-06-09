@@ -103,17 +103,10 @@
         '<div class="ctnote" id="diss-cat-note"></div>' +
         '<div class="ctwrap"><div id="diss-cat-body"></div></div>' +
       '</div>' +
-      '<div class="dgrid" style="margin-top:16px">' +
-      '<div class="dp"><h4>GM/ton &amp; Revenue/ton trajectory</h4><div class="cw"><canvas id="diss-traj"></canvas></div></div>' +
-      '<div class="dp"><h4 id="diss-bridge-h">GM/ton bridge</h4>' +
-        '<div class="dsub" id="diss-bridge-sub" style="font-size:9px;color:var(--text3);font-weight:600;margin:-4px 0 6px">Feed only · full month-over-month · category level</div>' +
-        '<div class="cw"><canvas id="diss-bridge"></canvas></div></div>' +
-      '</div>' +
       '<div class="dgrid2">' +
-      '<div class="dp"><h4>Product-mix bridge (by SSG)</h4><div class="cw"><canvas id="diss-mix"></canvas></div></div>' +
+      '<div class="dp"><h4>GM/ton &amp; Revenue/ton trajectory</h4><div class="cw"><canvas id="diss-traj"></canvas></div></div>' +
       '<div class="dp"><h4>Ingredient cost contribution (recipe-weighted) <span style="font-weight:400;font-size:9px;opacity:.75">* = no purchase in one month — price carried, recipe effect only</span></h4><div class="cw"><canvas id="diss-ing"></canvas></div></div>' +
       '</div>' +
-      '<div class="dp dpfull"><h4>Price bar decomposition — real price moves vs composition</h4><div id="diss-price"></div></div>' +
       '<div class="aiout" id="diss-aiout"></div>';
     host.appendChild(sec);
     document.getElementById('diss-ai').addEventListener('click', runAi);
@@ -160,26 +153,20 @@
       if (HAD_GOOD) {
         var subEl = document.getElementById('diss-sub');
         if (subEl) subEl.textContent = '⚠ couldn’t refresh just now (source busy) — showing last good data';
-        return; // charts, price drill, category table all left intact
+        return; // charts + category table left intact
       }
       LAST = d || null;
       document.getElementById('diss-sub').textContent = (d && d.reason) || 'No finished-feed data for this selection.';
-      ['diss-traj', 'diss-bridge', 'diss-mix', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
-      renderPriceDrill(null);
+      ['diss-traj', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
       return;
     }
     LAST = d;
     HAD_GOOD = true;
     var cmpLbl = d.compare_month + (d.compare_partial ? ' (' + (d.compare_days || '') + 'd partial — early read, noisy)' : '');
     document.getElementById('diss-sub').textContent =
-      'Finished feed (Live 103 / Old 103+104) · bridge ' + d.base_month + ' → ' + cmpLbl;
-    var bh = document.getElementById('diss-bridge-h');
-    if (bh) bh.textContent = 'GM/ton bridge · ' + d.base_month + ' → ' + cmpLbl;
+      'Finished feed (Live 103 / Old 103+104) · ' + d.base_month + ' → ' + cmpLbl;
     renderTraj(d.trajectory || []);
-    renderBridge(d.bridge || {});
-    renderDiverging('diss-mix', (d.mix_bridge && d.mix_bridge.items) || [], 'ssg', true);
     renderDiverging('diss-ing', (d.ingredients && d.ingredients.items) || [], 'name', false);
-    renderPriceDrill(d.price_drill || null);
   };
 
   function baseOpts() {
@@ -212,38 +199,6 @@
     });
   }
 
-  function renderBridge(b) {
-    var c = document.getElementById('diss-bridge'); if (!c || !window.Chart) return; kill(c);
-    var p = P();
-    if (b.available === false) { return; }
-    var steps = [
-      { l: 'Base', v: b.base, anc: 1 },
-      { l: 'Price', d: b.price }, { l: 'Mix', d: b.mix }, { l: 'Cost', d: b.cost }, { l: 'Interac.', d: b.interaction },
-      { l: 'Compare', v: b.compare, anc: 1 }
-    ];
-    var run = b.base, labels = [], ranges = [], colors = [], lab = [];
-    steps.forEach(function (s) {
-      labels.push(s.l);
-      if (s.anc) { ranges.push([0, s.v]); colors.push(s.l === 'Base' ? p.grey : p.navy); lab.push(pt(s.v)); run = s.v; }
-      else { var st = run, en = run + (s.d || 0); ranges.push([Math.min(st, en), Math.max(st, en)]); colors.push((s.d || 0) >= 0 ? p.green : p.red); lab.push(ptS(s.d)); run = en; }
-    });
-    var plug = {
-      id: 'dbl', afterDatasetsDraw: function (ch) {
-        var ct = ch.ctx, m = ch.getDatasetMeta(0); ct.save(); ct.font = '700 9px system-ui'; ct.fillStyle = p.text; ct.textAlign = 'center';
-        m.data.forEach(function (bar, i) { ct.fillText(lab[i], bar.x, bar.y - 4); });
-        ct.restore();
-      }
-    };
-    c._ch = new Chart(c.getContext('2d'), {
-      type: 'bar',
-      data: { labels: labels, datasets: [{ data: ranges, backgroundColor: colors, borderRadius: 3, barPercentage: .82 }] },
-      options: Object.assign(baseOpts(), {
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (i) { return lab[i.dataIndex]; } } } },
-        scales: { y: { grid: { color: p.grid }, ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return '₱' + (v / 1000).toFixed(0) + 'k'; } } }, x: { grid: { display: false }, ticks: { color: p.text3, font: { size: 9 } } } }
-      }), plugins: [plug]
-    });
-  }
-
   // diverging horizontal bars; costUpRed=true → +contribution red (cost rose); for mix +green
   function renderDiverging(id, items, key, mixMode) {
     var c = document.getElementById(id); if (!c || !window.Chart) return; kill(c);
@@ -262,60 +217,6 @@
         scales: { x: { grid: { color: p.grid }, ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return ptS(v); } } }, y: { grid: { display: false }, ticks: { color: p.text3, font: { size: 9 } } } }
       })
     });
-  }
-
-  // Panel 5 — price_drill: headline + top-SKU table. All values via textContent (no HTML injection).
-  // true price colored red/green (real moves); mix columns muted blue (composition, not price action).
-  function renderPriceDrill(pd) {
-    var el = document.getElementById('diss-price'); if (!el) return;
-    el.textContent = '';
-    var p = P();
-    if (!pd || pd.available === false) {
-      var m = document.createElement('div'); m.className = 'phead'; m.style.color = p.text3; m.style.fontWeight = '400';
-      m.textContent = 'Price decomposition unavailable' + (pd && pd.reason ? ' — ' + pd.reason : '.');
-      el.appendChild(m);
-      return;
-    }
-    var head = document.createElement('div'); head.className = 'phead';
-    head.textContent = 'Price ' + ptS(pd.total) + '/t = true price ' + ptS(pd.true_price) +
-      ' + customer mix ' + ptS(pd.customer_mix) + ' + SKU mix ' + ptS(pd.sku_mix) +
-      (pd.residual ? ' (+ residual ' + ptS(pd.residual) + ')' : '') +
-      (pd.price_held_pct == null ? '' : ' · ' + Math.round(pd.price_held_pct) + '% of volume at unchanged price');
-    el.appendChild(head);
-    var rows = pd.top_rows || [];
-    if (!rows.length) return;
-    var tbl = document.createElement('table'); tbl.className = 'ptbl';
-    var thead = document.createElement('thead'); var hr = document.createElement('tr');
-    ['SKU', '₱/t was → now', 'true price', 'cust-mix', '% price held'].forEach(function (h) {
-      var th = document.createElement('th'); th.textContent = h; hr.appendChild(th);
-    });
-    thead.appendChild(hr); tbl.appendChild(thead);
-    var tb = document.createElement('tbody');
-    rows.forEach(function (r) {
-      var tr = document.createElement('tr');
-      var td0 = document.createElement('td');
-      td0.textContent = (r.name || r.sku || '') + (r.ssg ? ' · ' + r.ssg : '');
-      tr.appendChild(td0);
-      var td1 = document.createElement('td');
-      td1.textContent = pt(r.rev_ton_b) + ' → ' + pt(r.rev_ton_c);
-      tr.appendChild(td1);
-      var td2 = document.createElement('td');
-      td2.textContent = ptS(r.true_price) + '/t';
-      td2.style.color = r.true_price < 0 ? p.red : (r.true_price > 0 ? p.green : p.text3);
-      td2.style.fontWeight = '700';
-      tr.appendChild(td2);
-      var td3 = document.createElement('td');
-      td3.textContent = ptS(r.customer_mix) + '/t';
-      td3.style.color = p.navy;
-      tr.appendChild(td3);
-      var td4 = document.createElement('td');
-      td4.textContent = r.held_pct == null ? '—' : r.held_pct + '%';
-      td4.style.color = p.text3;
-      tr.appendChild(td4);
-      tb.appendChild(tr);
-    });
-    tbl.appendChild(tb);
-    el.appendChild(tbl);
   }
 
   // =========================================================================

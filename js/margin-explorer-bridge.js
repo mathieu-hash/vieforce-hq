@@ -293,6 +293,130 @@
   };
 
   // ===========================================================================
+  // CANONICAL BRIDGE — the ONE authoritative GM/ton waterfall (phase B)
+  //   Prior GM/ton → Price → Cost → Customer/BU Mix → Product Mix → Current
+  // Price & Cost are the REAL levers (green/red). Customer/BU Mix & Product Mix
+  // are composition → muted blue. price+cost+customer_mix+product_mix === delta.
+  // ===========================================================================
+  window.MEXP_renderCanonicalBridge = function (canvasEl, cb) {
+    if (!canvasEl) return null;
+    if (!window.Chart) { renderNote(canvasEl, 'Chart library not loaded.'); return null; }
+    if (!cb || cb.available === false) {
+      renderNote(canvasEl, (cb && cb.note) || (cb && cb.reason) || 'Exact bridge not available for this anchor.');
+      return null;
+    }
+
+    var p = pal();
+    var prior = +cb.prior_gm_ton || 0;
+    var current = +cb.current_gm_ton || 0;
+    function fmtV(n) { return '₱' + Math.round(+n || 0).toLocaleString() + '/t'; }
+    function fmtD(n) { var s = '₱' + Math.round(Math.abs(+n || 0)).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); }
+
+    var steps = [
+      { label: 'Prior GM/t', value: prior, kind: 'anchor', color: p.grey },
+      { label: 'Price', delta: +cb.price || 0, kind: 'delta' },
+      { label: 'Cost', delta: +cb.cost || 0, kind: 'delta' },
+      { label: 'Customer/BU Mix', delta: +cb.customer_mix || 0, kind: 'delta', muted: true },
+      { label: 'Product Mix', delta: +cb.product_mix || 0, kind: 'delta', muted: true },
+      { label: 'Current GM/t', value: current, kind: 'anchor', color: p.blue }
+    ];
+
+    var running = prior;
+    var labels = [], ranges = [], barColors = [], stepDeltas = [], dataLabels = [];
+    steps.forEach(function (s) {
+      labels.push(s.label);
+      if (s.kind === 'anchor') {
+        ranges.push([0, s.value]);
+        barColors.push(s.color);
+        stepDeltas.push(null);
+        dataLabels.push(fmtV(s.value));
+        running = s.value;
+      } else {
+        var d = s.delta || 0;
+        var start = running, end = running + d;
+        ranges.push([Math.min(start, end), Math.max(start, end)]);
+        barColors.push(s.muted ? p.muted : (d >= 0 ? p.green : p.red));
+        stepDeltas.push(d);
+        dataLabels.push(fmtD(d));
+        running = end;
+      }
+    });
+
+    destroyExisting(canvasEl);
+    var ctx = canvasEl.getContext('2d');
+    var labelPlugin = {
+      id: 'mexpCanonLabels',
+      afterDatasetsDraw: function (chart) {
+        var c = chart.ctx;
+        var meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data) return;
+        c.save();
+        c.font = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
+        c.textAlign = 'center';
+        c.fillStyle = p.text;
+        c.textBaseline = 'bottom';
+        meta.data.forEach(function (bar, i) {
+          if (!bar) return;
+          var txt = dataLabels[i];
+          if (txt) c.fillText(txt, bar.x, bar.y - 4);
+        });
+        c.restore();
+      }
+    };
+
+    var chart = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: ranges,
+          backgroundColor: barColors,
+          hoverBackgroundColor: barColors,
+          borderRadius: 3,
+          borderSkipped: false,
+          barPercentage: 0.72,
+          categoryPercentage: 0.85
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 350 },
+        layout: { padding: { top: 22 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: function (items) { return items[0] ? items[0].label : ''; },
+              label: function (item) {
+                var i = item.dataIndex;
+                var d = stepDeltas[i];
+                if (d == null) { return fmtV(ranges[i][1]); }
+                return fmtD(d);
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: p.grid },
+            ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return fmtV(v); } }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: p.text3, font: { size: 9 }, maxRotation: 0, autoSkip: false }
+          }
+        }
+      },
+      plugins: [labelPlugin]
+    });
+
+    canvasEl._mexpChart = chart;
+    return chart;
+  };
+
+  // ===========================================================================
   // TREND — small line chart (or Phase 2 placeholder)
   // ===========================================================================
   window.MEXP_renderTrend = function (canvasEl, trend) {
