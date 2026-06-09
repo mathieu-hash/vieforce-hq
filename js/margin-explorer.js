@@ -653,12 +653,20 @@
 
     // No canonical block on this refresh (e.g. SAP flap) — keep last good.
     if (!cb) return;
+    // Transient unavailable (flap mid-query) AFTER we've drawn a good bridge —
+    // keep the last good chart, never blank it. Only render the unavailable
+    // state on the very first paint when there's nothing to preserve.
+    if (cb.available === false && LAST.bridgeGood) {
+      if (note) { note.textContent = '⚠ couldn’t refresh the bridge just now (source busy) — showing last good'; note.style.display = 'block'; }
+      return;
+    }
 
     if (typeof window.MEXP_renderCanonicalBridge === 'function') {
       window.MEXP_renderCanonicalBridge(c, cb);
     } else {
       placeholderCanvas(c, 'Bridge renderer unavailable');
     }
+    if (cb.available !== false) LAST.bridgeGood = true;   // a real bridge has painted
     if (load) load.style.display = 'none';
 
     // Header: "GM/ton Bridge — <base> → <compare>" (+ partial flag).

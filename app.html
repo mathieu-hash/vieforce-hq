@@ -3926,7 +3926,7 @@ function initApp(s) {
   }
   setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
   // Auto-refresh every 60s
-  setInterval(function(){ DC = {}; loadPage(PG); stampRefresh(); }, 60000);
+  setInterval(function(){ if(PG==='pg-margin-explorer') return; DC = {}; loadPage(PG); stampRefresh(); }, 60000);
   stampRefresh();  // initial stamp
   // Re-inject whenever a page's tables refresh (debounced)
   var exportInjectTimer;
