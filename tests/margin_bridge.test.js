@@ -9,8 +9,68 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { bridgeGP, bridgeGMperKg, bridgeGMperKgBySsg, ingredientContribution } =
+const { bridgeGP, bridgeGMperKg, bridgeGMperKgBySsg, bridgeGMperTonByPair, ingredientContribution } =
   require('../api/lib/margin_bridge.js')
+
+test('bridgeGMperTonByPair: same cust+SKU price cut lands in true_price, not mix', () => {
+  // one customer, one SKU, identical tons; only the price drops. Pure true price.
+  const b = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3500000, gp: 700000 }] // 100t, 35000/t, gm 7000/t
+  const c = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3400000, gp: 600000 }] // price 34000/t, gm 6000/t
+  const r = bridgeGMperTonByPair(b, c)
+  assert.ok(Math.abs(r.true_price - (-1000)) < 1e-6, 'true_price = -1000/t')
+  assert.ok(Math.abs(r.customer_mix) < 1e-6 && Math.abs(r.product_mix) < 1e-6, 'no mix')
+  assert.ok(Math.abs((r.true_price + r.true_cost + r.customer_mix + r.product_mix + r.interaction) - r.delta) < 1e-6, 'reconciles')
+})
+
+test('bridgeGMperTonByPair: customer-mix shift (same SKU, unchanged prices) → customer_mix, true_price≈0', () => {
+  // SKU X, two customers at DIFFERENT prices, both prices unchanged; volume shifts to the dearer one.
+  const b = [
+    { cust: 'A', sku: 'X', kg: 100000, revenue: 3000000, gp: 500000 }, // 30000/t gm5000
+    { cust: 'B', sku: 'X', kg: 100000, revenue: 4000000, gp: 900000 }  // 40000/t gm9000
+  ]
+  const c = [
+    { cust: 'A', sku: 'X', kg: 50000, revenue: 1500000, gp: 250000 },  // same 30000/t
+    { cust: 'B', sku: 'X', kg: 150000, revenue: 6000000, gp: 1350000 } // same 40000/t
+  ]
+  const r = bridgeGMperTonByPair(b, c)
+  assert.ok(Math.abs(r.true_price) < 1e-6, 'no real price move')
+  assert.ok(Math.abs(r.product_mix) < 1e-6, 'single SKU ⇒ no product mix')
+  assert.ok(r.customer_mix > 0, 'richer-customer shift lands in customer_mix')
+  assert.ok(Math.abs((r.true_price + r.true_cost + r.customer_mix + r.product_mix + r.interaction) - r.delta) < 1e-6, 'reconciles')
+})
+
+test('bridgeGMperTonByPair: product-mix shift (different SKUs, unchanged prices) → product_mix', () => {
+  // two SKUs, one customer, prices unchanged; volume shifts between SKUs of different margin.
+  const b = [
+    { cust: 'A', sku: 'X', kg: 100000, revenue: 3000000, gp: 400000 }, // gm4000
+    { cust: 'A', sku: 'Y', kg: 100000, revenue: 3000000, gp: 800000 }  // gm8000
+  ]
+  const c = [
+    { cust: 'A', sku: 'X', kg: 50000, revenue: 1500000, gp: 200000 },
+    { cust: 'A', sku: 'Y', kg: 150000, revenue: 4500000, gp: 1200000 }
+  ]
+  const r = bridgeGMperTonByPair(b, c)
+  assert.ok(Math.abs(r.true_price) < 1e-6, 'no real price move')
+  assert.ok(r.product_mix > 0, 'shift to higher-margin SKU lands in product_mix')
+  assert.ok(Math.abs(r.customer_mix) < 1e-6, 'single customer ⇒ no customer mix')
+  assert.ok(Math.abs((r.true_price + r.true_cost + r.customer_mix + r.product_mix + r.interaction) - r.delta) < 1e-6, 'reconciles')
+})
+
+test('bridgeGMperTonByPair: mixed fixture reconciles exactly', () => {
+  const b = [
+    { cust: 'A', sku: 'X', kg: 80000, revenue: 2400000, gp: 400000 },
+    { cust: 'B', sku: 'X', kg: 120000, revenue: 4200000, gp: 900000 },
+    { cust: 'A', sku: 'Y', kg: 60000, revenue: 2100000, gp: 600000 }
+  ]
+  const c = [
+    { cust: 'A', sku: 'X', kg: 50000, revenue: 1550000, gp: 250000 }, // small price move
+    { cust: 'B', sku: 'X', kg: 150000, revenue: 5250000, gp: 1150000 },
+    { cust: 'C', sku: 'Y', kg: 90000, revenue: 3240000, gp: 950000 }  // new customer+pair
+  ]
+  const r = bridgeGMperTonByPair(b, c)
+  assert.ok(r.available, 'available')
+  assert.ok(Math.abs((r.true_price + r.true_cost + r.customer_mix + r.product_mix + r.interaction) - r.delta) < 1e-6, 'all terms reconcile to delta')
+})
 
 const TOL = 1e-9
 
