@@ -33,7 +33,10 @@
       text:  cssVar('--text', '#F0F4FA'),
       text3: cssVar('--text3', 'rgba(240,244,250,0.4)'),
       grid:  'rgba(255,255,255,0.05)',
-      grey:  'rgba(240,244,250,0.28)'
+      grey:  'rgba(240,244,250,0.28)',
+      // composition (mix) bars — muted desaturated blue so they read as
+      // "not a price action" vs. the saturated green/red real levers.
+      muted: 'rgba(0,174,239,0.42)'
     };
   }
 
@@ -118,7 +121,24 @@
     var perTon = bridge.unit === 'php_per_ton';
     function fmtV(n){ if(perTon) return '₱'+Math.round(+n||0).toLocaleString()+'/t'; return money(n); }
     function fmtD(n){ if(perTon){ var s='₱'+Math.round(Math.abs(+n||0)).toLocaleString()+'/t'; return n>0?'+'+s:(n<0?'−'+s:s);} return signedMoney(n); }
-    var steps = [
+    // ---- TRUE-PRICE decomposition (preferred when present) -------------------
+    // When the SKU-level bridge carries the customer×SKU true-price split, render
+    //   Prior → True Price → Customer Mix → Product Mix → Cost → Current
+    // True Price + Cost are REAL levers (green/red). Customer/Product Mix are
+    // composition — a muted blue so they read as "not a price action".
+    var hasTrue = (bridge.true_price != null) && !!bridge.true_basis;
+    var steps;
+    if (hasTrue) {
+      steps = [
+        { label: perTon ? 'Prior GM/t' : 'Prior GP', value: prior, kind: 'anchor', color: p.grey },
+        { label: 'True Price',   delta: +bridge.true_price || 0,   kind: 'delta' },
+        { label: 'Customer Mix', delta: +bridge.customer_mix || 0, kind: 'delta', muted: true },
+        { label: 'Product Mix',  delta: +bridge.product_mix || 0,  kind: 'delta', muted: true },
+        { label: 'Cost',         delta: +bridge.true_cost || 0,    kind: 'delta' },
+        { label: perTon ? 'Current GM/t' : 'Current GP', value: current, kind: 'anchor', color: p.blue }
+      ];
+    } else {
+    steps = [
       { label: perTon ? 'Prior GM/t' : 'Prior GP', value: prior, kind: 'anchor', color: p.grey },
       { label: 'Price', delta: +bridge.price || 0, kind: 'delta' },
       { label: 'Mix', delta: +bridge.mix || 0, kind: 'delta' }
@@ -152,6 +172,7 @@
     }
 
     steps.push({ label: perTon ? 'Current GM/t' : 'Current GP', value: current, kind: 'anchor', color: p.blue });
+    }
 
     // Compute floating [base, top] ranges along a running total.
     var running = prior;
@@ -176,7 +197,8 @@
         ranges.push([Math.min(start, end), Math.max(start, end)]);
         // Color: revenue-style drivers green when +, red when −.
         // Cost segments: delta sign already encodes GP impact (− = cost rose).
-        barColors.push(d >= 0 ? p.green : p.red);
+        // Composition (mix) bars: muted blue regardless of sign — not a price action.
+        barColors.push(s.muted ? p.muted : (d >= 0 ? p.green : p.red));
         stepDeltas.push(d);
         dataLabels.push(fmtD(d));
         running = end;

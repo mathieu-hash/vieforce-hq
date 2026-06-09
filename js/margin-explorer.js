@@ -145,14 +145,20 @@
     '.mexp-kpi-d.up{color:var(--green)}',
     '.mexp-kpi-d.down{color:var(--red)}',
     '.mexp-kpi-d.flat{color:var(--text3)}',
-    // 2-col body
-    '.mexp-body{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;align-items:start}',
+    // 2-col body — Matrix | Bridge, stretched to equal height so neither column
+    // leaves a dead blank region; ingredient table sits full-width below.
+    '.mexp-body{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:stretch;margin-bottom:16px}',
     '.mexp-panel{border:1px solid var(--glass-border);border-radius:var(--r-lg);background:var(--surface);padding:14px 16px}',
+    '.mexp-body>.mexp-panel{display:flex;flex-direction:column}',
+    // matrix fills the panel; bridge panel centers its canvas vertically
+    '#pg-margin-explorer .mexp-body>.mexp-panel:first-child #mexp-matrix{flex:1 1 auto}',
+    '#pg-margin-explorer .mexp-body>.mexp-panel:last-child{justify-content:flex-start}',
+    '.mexp-ing-panel{margin-top:0}',
     '.mexp-panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}',
     '.mexp-panel-t{font-size:12px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;color:var(--text2)}',
     '.mexp-panel-st{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.2px;margin-top:3px;line-height:1.45}',
     '.mexp-panel-hcol{display:flex;flex-direction:column;gap:0}',
-    '.mexp-canvas-wrap{position:relative;width:100%;min-height:170px}',
+    '.mexp-canvas-wrap{position:relative;width:100%;min-height:240px;flex:1 1 auto}',
     '.mexp-canvas-wrap canvas{width:100%!important;display:block}',
     '.mexp-note{font-size:10px;color:var(--text3);font-weight:600;margin-top:10px;line-height:1.5}',
     '.mexp-coming{font-size:11px;color:var(--text3);font-weight:700;padding:18px 8px;text-align:center;border:1px dashed var(--glass-border);border-radius:10px;margin-top:12px}',
@@ -243,7 +249,7 @@
         '</div>' +
         '<div class="mexp-note" id="mexp-hero-note" style="display:none"></div>' +
 
-        // ---- 2-col body ----
+        // ---- 2-col body: Drill Matrix | GM Bridge (balanced heights) ----
         '<div class="mexp-body">' +
           '<div class="mexp-panel">' +
             '<div class="mexp-panel-h">' +
@@ -254,11 +260,14 @@
           '<div class="mexp-panel">' +
             '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
               '<span class="mexp-panel-t">GM Bridge</span>' +
-              '<span class="mexp-panel-st">All sellable scope · vs prior comparable window · SKU-level, cost split RM/Pkg/Feedtag</span>' +
+              '<span class="mexp-panel-st">All sellable scope · vs prior comparable window · same-customer same-SKU price</span>' +
             '</div></div>' +
             '<div class="mexp-canvas-wrap"><canvas id="mexp-bridge"></canvas></div>' +
-            '<div class="mexp-coming" id="mexp-movers">Movers &amp; gap analysis — coming in Phase 2</div>' +
           '</div>' +
+        '</div>' +
+        // ---- ingredient cost / movers — full width below (5-col table reads better wide) ----
+        '<div class="mexp-panel mexp-ing-panel">' +
+          '<div class="mexp-coming" id="mexp-movers">Movers &amp; gap analysis — coming in Phase 2</div>' +
         '</div>' +
       '</div>';
 
@@ -637,7 +646,12 @@
       wrap.parentElement.insertBefore(n, wrap.nextSibling);
     }
     if (n) {
-      if (bridge && bridge.available && bridge.level === 'ssg') {
+      if (bridge && bridge.available && bridge.true_price != null && bridge.true_basis) {
+        // True-price decomposition note (full-contrast, one line).
+        n.textContent = 'ⓘ ' + (bridge.true_note ||
+          'Price = real price move for the same customer buying the same SKU. Customer/Product Mix is composition, not a price change.');
+        n.style.display = 'block';
+      } else if (bridge && bridge.available && bridge.level === 'ssg') {
         n.textContent = 'ⓘ ' + (bridge.note || 'Category-level bridge — SKU detail not comparable across Jan-2026 consolidation.') +
           (bridge.basis ? ' (' + bridge.basis + ')' : '');
         n.style.display = 'block';

@@ -68,14 +68,20 @@
       '#mexp-diss .ctoggle{display:inline-flex;border:1px solid var(--glass-border);border-radius:8px;overflow:hidden}' +
       '#mexp-diss .ctoggle button{background:transparent;border:0;color:var(--text3);font-size:10px;font-weight:800;letter-spacing:.3px;padding:5px 11px;cursor:pointer}' +
       '#mexp-diss .ctoggle button.on{background:var(--blue);color:#fff}' +
-      '#mexp-diss table.ctbl{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}' +
-      '#mexp-diss table.ctbl th{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--glass-border);text-align:right;white-space:nowrap}' +
+      // clean financial table — no heat fills; thin separators; tabular nums.
+      '#mexp-diss table.ctbl{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums}' +
+      '#mexp-diss table.ctbl th{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--text3);padding:5px 10px;border-bottom:1px solid var(--glass-border);text-align:right;white-space:nowrap}' +
       '#mexp-diss table.ctbl th.ctrow,#mexp-diss table.ctbl td.ctrow{text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;position:sticky;left:0;background:var(--surface);z-index:1}' +
-      '#mexp-diss table.ctbl th.ctpartial{color:var(--gold)}' +
-      '#mexp-diss table.ctbl td{padding:4px 8px;text-align:right;color:var(--text);white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.04)}' +
-      '#mexp-diss table.ctbl td.ctpartial{border-left:1px dashed rgba(241,177,29,.5);border-right:1px dashed rgba(241,177,29,.5)}' +
+      '#mexp-diss table.ctbl th.ctpartial{color:var(--text3)}' +
+      // plain transparent cells, right-aligned, thin row separator only
+      '#mexp-diss table.ctbl td{padding:4px 10px;text-align:right;background:transparent;color:var(--text);white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.04)}' +
+      // negatives: red text only (no fill)
+      '#mexp-diss table.ctbl td.ctneg{color:var(--red)}' +
+      // partial month column: muted text + thin dashed left border (no loud gold fill)
+      '#mexp-diss table.ctbl th.ctpartial,#mexp-diss table.ctbl td.ctpartial{border-left:1px dashed var(--glass-border)}' +
       '#mexp-diss table.ctbl td.ctnull{color:var(--text3)}' +
       '#mexp-diss table.ctbl tr.ctavg td{border-top:2px solid var(--glass-border);font-weight:900;color:var(--text);padding-top:7px}' +
+      '#mexp-diss table.ctbl tr.ctavg td.ctneg{color:var(--red)}' +
       '#mexp-diss table.ctbl tr.ctavg td.ctrow{text-transform:uppercase;letter-spacing:.3px;font-size:10px}' +
       '#mexp-diss table.ctbl tr.ctzero td.ctrow{color:var(--text3);font-weight:600;font-style:italic}' +
       '#mexp-diss .ctt{font-size:8.5px;font-weight:700;color:var(--text3);opacity:.65;margin-left:4px}' +
@@ -128,6 +134,8 @@
   }
 
   var LAST = null;
+  var HAD_GOOD = false;    // true once a good dissection has painted (guards against
+                           // a transient unavailable refresh wiping good charts)
   var LAST_CT = null;      // cached category_trend payload (for toggle re-render)
   var CAT_MODE = 'ton';    // 'ton' = GM ₱/ton (default) | 'pct' = GM%
 
@@ -139,17 +147,29 @@
 
   window.MEXP_renderDissection = function (d) {
     var sec = ensure(); if (!sec) return;
-    LAST = d || null;
-    // Category table renders even when the rest of the dissection is unavailable,
-    // as long as category_trend is present.
-    LAST_CT = (d && d.category_trend) || null;
-    renderCategoryTable(LAST_CT);
+    // Category table: only re-render when the new payload actually carries one.
+    // A transient unavailable (SAP flap on a background refresh) must NOT wipe a
+    // good table — keep the last good render.
+    var newCT = (d && d.category_trend) || null;
+    if (newCT) { LAST_CT = newCT; renderCategoryTable(LAST_CT); }
+
     if (!d || d.available === false) {
+      // NON-DESTRUCTIVE: if we already painted a good dissection, keep the charts
+      // and just flag that the refresh couldn't complete (source busy / no rows
+      // this instant). Only show the empty state when we have nothing to preserve.
+      if (HAD_GOOD) {
+        var subEl = document.getElementById('diss-sub');
+        if (subEl) subEl.textContent = '⚠ couldn’t refresh just now (source busy) — showing last good data';
+        return; // charts, price drill, category table all left intact
+      }
+      LAST = d || null;
       document.getElementById('diss-sub').textContent = (d && d.reason) || 'No finished-feed data for this selection.';
       ['diss-traj', 'diss-bridge', 'diss-mix', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
       renderPriceDrill(null);
       return;
     }
+    LAST = d;
+    HAD_GOOD = true;
     var cmpLbl = d.compare_month + (d.compare_partial ? ' (' + (d.compare_days || '') + 'd partial — early read, noisy)' : '');
     document.getElementById('diss-sub').textContent =
       'Finished feed (Live 103 / Old 103+104) · bridge ' + d.base_month + ' → ' + cmpLbl;
@@ -301,53 +321,11 @@
   // =========================================================================
   // 12-MONTH CATEGORY MARGIN TABLE
   // Rows = SSG categories (biggest-volume first, API order), cols = months.
-  // Cell = GM ₱/ton (default) or GM% (toggle). Heat-shaded green↑ / red<0.
-  // Bottom = volume-weighted AVG row. Partial month flagged.
+  // Cell = GM ₱/ton (default) or GM% (toggle). Clean financial table — no heat
+  // fills; negatives in red text only. Bottom = volume-weighted AVG row.
   // =========================================================================
   function fmtTon(v) { return v == null ? '—' : '₱' + Math.round(+v).toLocaleString(); }
   function fmtPct(v) { return v == null ? '—' : ((+v).toFixed(1) + '%'); }
-
-  // Mix two hex/rgb-ish colors; t in [0,1]. We use rgba string output.
-  function shadeFor(v, lo, hi, mode) {
-    // v null handled by caller. Returns {bg, fg} for a cell.
-    if (v == null || isNaN(v)) return null;
-    var p = P();
-    if (v < 0) {
-      // red ramp by magnitude vs |lo|
-      var mag = Math.min(1, Math.abs(v) / (Math.abs(lo) || 1));
-      var a = 0.12 + 0.42 * mag;
-      return { bg: 'rgba(229,57,53,' + a.toFixed(3) + ')', fg: a > 0.4 ? '#fff' : 'var(--text)' };
-    }
-    var span = (hi - Math.max(0, lo)) || 1;
-    var t = Math.max(0, Math.min(1, (v - Math.max(0, lo)) / span));
-    // green ramp: stronger green = higher GM. Vienovo green at full strength.
-    var a2 = 0.06 + 0.5 * t;
-    return { bg: 'rgba(149,201,61,' + a2.toFixed(3) + ')', fg: a2 > 0.42 ? '#0b1a05' : 'var(--text)' };
-  }
-
-  // Robust scale bounds from real cells, excluding zero-tonnage rows (e.g. Untagged
-  // carries absurd ₱/ton because tonnage rounds to 0) so they don't blow out the ramp.
-  function scaleBounds(ct, mode) {
-    var vals = [];
-    (ct.categories || []).forEach(function (cat) {
-      if ((+cat.total_tons || 0) <= 0) return; // skip outlier zero-volume rows
-      (cat.cells || []).forEach(function (c) {
-        var v = mode === 'pct' ? c.gm_pct : c.gm_ton;
-        if (v != null && !isNaN(v)) vals.push(+v);
-      });
-    });
-    (ct.avg || []).forEach(function (c) {
-      var v = mode === 'pct' ? c.gm_pct : c.gm_ton;
-      if (v != null && !isNaN(v)) vals.push(+v);
-    });
-    if (!vals.length) return { lo: 0, hi: 1 };
-    vals.sort(function (a, b) { return a - b; });
-    // 5th / 95th percentile clamp to tame remaining outliers
-    var lo = vals[Math.floor(0.05 * (vals.length - 1))];
-    var hi = vals[Math.ceil(0.95 * (vals.length - 1))];
-    if (hi <= lo) hi = lo + 1;
-    return { lo: lo, hi: hi };
-  }
 
   function renderCategoryTable(ct) {
     var body = document.getElementById('diss-cat-body');
@@ -369,7 +347,6 @@
     var fmt = mode === 'pct' ? fmtPct : fmtTon;
     var months = ct.months;
     var partial = ct.partial_month || null;
-    var bounds = scaleBounds(ct, mode);
 
     var tbl = document.createElement('table');
     tbl.className = 'ctbl';
@@ -426,13 +403,10 @@
           td.textContent = '—';
         } else {
           td.textContent = fmt(v);
-          // zero-tonnage rows are not heat-shaded (their ₱/ton is meaningless)
-          if (!isZero) {
-            var sh = shadeFor(+v, bounds.lo, bounds.hi, mode);
-            if (sh) { td.style.background = sh.bg; td.style.color = sh.fg; }
-          } else {
-            td.style.color = 'var(--text3)';
-          }
+          // clean table: no heat fills. Negatives = red text only.
+          // Zero-tonnage rows (meaningless ₱/ton) stay muted.
+          if (isZero) td.style.color = 'var(--text3)';
+          else if (+v < 0) td.className = (td.className ? td.className + ' ' : '') + 'ctneg';
         }
         tr.appendChild(td);
       });
@@ -458,8 +432,7 @@
       if (v == null || isNaN(v)) { td.textContent = '—'; td.style.color = 'var(--text3)'; }
       else {
         td.textContent = fmt(v);
-        var sh = shadeFor(+v, bounds.lo, bounds.hi, mode);
-        if (sh) { td.style.background = sh.bg; td.style.color = sh.fg; }
+        if (+v < 0) td.className = (td.className ? td.className + ' ' : '') + 'ctneg';
       }
       ar.appendChild(td);
     });
