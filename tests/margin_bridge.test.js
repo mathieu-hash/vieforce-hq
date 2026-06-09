@@ -77,6 +77,36 @@ test('canonical: product-share shift within one customer → Product Mix, not Cu
   assert.ok(recon(r) < RTOL, 'reconciles')
 })
 
+test('canonical drill: product_mix_by_ssg sums to product_mix exactly', () => {
+  const a = [
+    { cust: 'A', sku: 'X', ssg: 'PIG', kg: 100000, revenue: 3000000, gp: 500000 },
+    { cust: 'A', sku: 'Y', ssg: 'LAYER', kg: 100000, revenue: 3000000, gp: 800000 },
+    { cust: 'B', sku: 'X', ssg: 'PIG', kg: 80000, revenue: 2400000, gp: 360000 }
+  ]
+  const b = [
+    { cust: 'A', sku: 'X', ssg: 'PIG', kg: 60000, revenue: 1830000, gp: 300000 },
+    { cust: 'A', sku: 'Y', ssg: 'LAYER', kg: 160000, revenue: 4800000, gp: 1280000 },
+    { cust: 'B', sku: 'X', ssg: 'PIG', kg: 90000, revenue: 2700000, gp: 410000 }
+  ]
+  const r = bridgeCanonicalGMperTon(a, b)
+  const sumSsg = r.product_mix_by_ssg.reduce((s, x) => s + x.value, 0)
+  assert.ok(Math.abs(sumSsg - r.product_mix) < 1e-6, 'Σ product_mix_by_ssg === product_mix')
+  assert.ok(recon(r) < RTOL, 'bridge still reconciles')
+})
+
+test('canonical drill: cost_components (RM/Pkg/Feedtag) sum to the Cost bar exactly', () => {
+  const a = [{ cust: 'A', sku: 'X', ssg: 'PIG', kg: 100000, revenue: 3500000, gp: 700000 }]
+  const b = [{ cust: 'A', sku: 'X', ssg: 'PIG', kg: 100000, revenue: 3500000, gp: 550000 }] // cost +1500/t
+  const ratio = { X: { pkg: 0.10, ft: 0.05 } } // 10% packaging, 5% feedtag, 85% RM
+  const r = bridgeCanonicalGMperTon(a, b, { costRatio: ratio })
+  const cc = r.cost_components
+  assert.ok(Math.abs((cc.rm + cc.packaging + cc.feedtag) - r.cost) < 1e-6, 'Σ components === cost')
+  // 85/10/5 split of the −1500 cost move
+  assert.ok(Math.abs(cc.packaging - (-150)) < 1e-6, 'packaging = 10% of -1500')
+  assert.ok(Math.abs(cc.feedtag - (-75)) < 1e-6, 'feedtag = 5%')
+  assert.ok(Math.abs(cc.rm - (-1275)) < 1e-6, 'rm = 85%')
+})
+
 test('canonical: entering + exiting cells reconcile exactly', () => {
   const a = [
     { cust: 'A', sku: 'X', kg: 80000, revenue: 2400000, gp: 400000 },

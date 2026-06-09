@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v7', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v8', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -536,9 +536,27 @@ module.exports = async (req, res) => {
               const cmpRows = drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
               const pd = cube.priceDrill(baseRows, cmpRows)
 
-              // THE canonical bridge — same customer×SKU rows, Bennet exact decomposition.
-              const cbk = bridge.bridgeCanonicalGMperTon(baseRows, cmpRows)
+              // Per-SKU booked-COGS component ratio (RM/Packaging/Feedtag) from production
+              // orders YTD→compare; lets the canonical Cost bar split into reconciling parts.
+              let costRatio = {}
+              try {
+                const ys2 = new Date(dateTo.getFullYear(), 0, 1)
+                const rr = await query(`
+                  SELECT W.ItemCode AS sku,
+                    SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0)) AS tot,
+                    SUM(CASE WHEN I2.ItmsGrpCod=104 AND I2.ItemCode LIKE 'FT%' THEN R.IssuedQty*ISNULL(I2.LastPurPrc,0) ELSE 0 END) AS ft,
+                    SUM(CASE WHEN I2.ItmsGrpCod=104 AND I2.ItemCode NOT LIKE 'FT%' THEN R.IssuedQty*ISNULL(I2.LastPurPrc,0) ELSE 0 END) AS pkg
+                  FROM OWOR W INNER JOIN WOR1 R ON W.DocEntry=R.DocEntry INNER JOIN OITM I2 ON R.ItemCode=I2.ItemCode
+                  WHERE W.PostDate BETWEEN @ys AND @de AND R.IssuedQty>0
+                  GROUP BY W.ItemCode HAVING SUM(R.IssuedQty*ISNULL(I2.LastPurPrc,0))>0`, { ys: ys2, de: dateTo })
+                rr.forEach(r => { const t = Number(r.tot) || 1; costRatio[r.sku] = { pkg: Number(r.pkg) / t, ft: Number(r.ft) / t } })
+              } catch (e) { console.warn('[margin-explorer] canonical cost-ratio failed:', e.message) }
+
+              // THE canonical bridge — same customer×SKU rows, Bennet exact decomposition,
+              // with reconciling drills (Cost→RM/Pkg/Feedtag, Product Mix→by SSG).
+              const cbk = bridge.bridgeCanonicalGMperTon(baseRows, cmpRows, { costRatio })
               if (cbk.available) {
+                const hasSplit = Object.keys(costRatio).length > 0
                 canonicalBridge = {
                   available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
                   method: 'Bennet indicator · customer×SKU · exact',
@@ -547,8 +565,14 @@ module.exports = async (req, res) => {
                   delta: Math.round(cbk.delta),
                   price: Math.round(cbk.price), cost: Math.round(cbk.cost),
                   customer_mix: Math.round(cbk.customer_mix), product_mix: Math.round(cbk.product_mix),
+                  cost_components: hasSplit ? {
+                    rm: Math.round(cbk.cost_components.rm),
+                    packaging: Math.round(cbk.cost_components.packaging),
+                    feedtag: Math.round(cbk.cost_components.feedtag)
+                  } : null,
+                  product_mix_by_ssg: cbk.product_mix_by_ssg.map(x => ({ ssg: x.ssg, value: Math.round(x.value) })).filter(x => x.value !== 0),
                   reconciles: Math.abs((cbk.price + cbk.cost + cbk.customer_mix + cbk.product_mix) - cbk.delta) < 1,
-                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth + (cmpPartial ? ' (compare month partial)' : '') + '. Price & Cost = SAME customer + SAME SKU; Customer/BU Mix & Product Mix = composition (who/what sold), not price action. Bennet decomposition — reconciles exactly.'
+                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth + (cmpPartial ? ' (compare month partial)' : '') + '. Price & Cost = SAME customer + SAME SKU; Customer/BU Mix & Product Mix = composition (who/what sold), not price action. Bennet decomposition — reconciles exactly. Cost splits into RM/Packaging/Feedtag and Product Mix splits by SSG — each ties back to its bar.'
                 }
               } else {
                 canonicalBridge = { available: false, reason: cbk.reason || 'no feed rows in anchor months' }
