@@ -53,8 +53,8 @@ module.exports = async (req, res) => {
     : 'live'
   const reqRegion = normalizeRegion(req.query.region)
   const reqSegment = normalizeSegment(req.query.segment)
-  // v2: pending-PO switched to OpenQty/open-line basis — bumped so stale full-Quantity payloads don't serve.
-  const cacheKey = `sales_v2_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  // v3: added gm_by_group SSG×12mo matrix — bumped so v2 payloads (no matrix) don't serve.
+  const cacheKey = `sales_v3_${refMonthKey}_${req.query.period || 'MTD'}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -151,6 +151,75 @@ module.exports = async (req, res) => {
       trendByMonth[k] = cur
     }
     const monthly_trend = Object.values(trendByMonth).sort((a, b) => a.month.localeCompare(b.month))
+
+    // --- GM ₱/ton by SSG group × trailing-12-calendar-month matrix ---
+    // Live replacement for the old hardcoded "GM per Ton by Group" table.
+    // Scope: finished feed (OITM.ItmsGrpCod=103). Tons = InvQty/1000 (InvQty is KG, per margin model).
+    // Window crosses the 2026-01 consolidation cutoff → queryBoth (historical + current) then merge by SSG+month.
+    // Respects the SAME region+segment line filters as the rest of the page (lineFilters).
+    const gmStart = new Date(); gmStart.setDate(1); gmStart.setMonth(gmStart.getMonth() - 11)
+    gmStart.setHours(0, 0, 0, 0)
+    // 12 calendar-month keys ending at the current month (chronological).
+    const gmMonths = []
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i)
+      gmMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+    }
+    const curYm = gmMonths[gmMonths.length - 1]
+    const gmWhere = `WHERE T0.DocDate >= @gmStart AND T0.CANCELED = 'N' AND T1.InvQty > 0 AND I.ItmsGrpCod = 103` + scopeSql
+    // SAFETY: applyRoleFilter uses session data from Supabase (not user input)
+    const gmFiltered = applyRoleFilter(session, gmWhere) + lineFilters
+    const gmRaw = await queryBoth(`
+      SELECT
+        ISNULL(S.Name, 'UNSPEC')                                        AS ssg,
+        FORMAT(T0.DocDate, 'yyyy-MM')                                   AS ym,
+        ISNULL(SUM(T1.GrssProfit), 0)                                   AS gp,
+        ISNULL(SUM(T1.InvQty) / 1000.0, 0)                              AS tons
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      INNER JOIN OITM I ON T1.ItemCode = I.ItemCode
+      LEFT JOIN [@OITMSSG] S ON S.Code = I.U_SSG
+      ${gmFiltered}
+      GROUP BY ISNULL(S.Name, 'UNSPEC'), FORMAT(T0.DocDate, 'yyyy-MM')
+    `, { gmStart, region })
+    // Merge (historical + current books may both return rows for the cutover month).
+    const gmAgg = {}    // ssg → { ssg, total_tons, cells: { ym → { gp, tons } } }
+    const gmTot = {}    // ym → { gp, tons }  (volume-weighted avg row)
+    for (const r of gmRaw) {
+      const ssg = (r.ssg === 'UNSPEC' || !r.ssg) ? 'Untagged' : r.ssg
+      const ym = r.ym
+      if (!gmMonths.includes(ym)) continue   // guard: ignore stray edge rows
+      const gp = Number(r.gp || 0), tons = Number(r.tons || 0)
+      if (!gmAgg[ssg]) gmAgg[ssg] = { ssg, total_tons: 0, cells: {} }
+      const c = gmAgg[ssg].cells[ym] || { gp: 0, tons: 0 }
+      c.gp += gp; c.tons += tons
+      gmAgg[ssg].cells[ym] = c
+      gmAgg[ssg].total_tons += tons
+      const t = gmTot[ym] || { gp: 0, tons: 0 }
+      t.gp += gp; t.tons += tons
+      gmTot[ym] = t
+    }
+    // ₱/ton per cell = SUM(GrssProfit) / SUM(tons), where tons already = kg/1000.
+    const gmGroups = Object.values(gmAgg)
+      .sort((a, b) => b.total_tons - a.total_tons)
+      .map(g => ({
+        ssg: g.ssg,
+        cells: gmMonths.map(ym => {
+          const c = g.cells[ym]
+          if (!c || c.tons <= 0) return { ym, gm_ton: null, tons: 0 }
+          return { ym, gm_ton: Math.round(c.gp / c.tons), tons: Math.round(c.tons * 10) / 10 }
+        })
+      }))
+    const gm_by_group = {
+      months: gmMonths,
+      current_month: curYm,
+      groups: gmGroups,
+      avg: gmMonths.map(ym => {
+        const t = gmTot[ym]
+        if (!t || t.tons <= 0) return { ym, gm_ton: null, tons: 0 }
+        return { ym, gm_ton: Math.round(t.gp / t.tons), tons: Math.round(t.tons * 10) / 10 }
+      })
+    }
 
     // --- Pending PO detail (open sales orders — OPEN lines only, residual qty/value) ---
     // OpenQty = undelivered remainder. Full T1.Quantity/LineTotal would overstate by the
@@ -466,7 +535,7 @@ module.exports = async (req, res) => {
                                  'Pending PO uses open-line residuals (RDR1.OpenQty × Price).']
                        }
                      },
-                     kpis, by_brand, top_customers, monthly_trend, pending_po,
+                     kpis, by_brand, top_customers, monthly_trend, pending_po, gm_by_group,
                      volume_mt: kpis.volume_mt, volume_bags: kpis.volume_bags,
                      revenue: kpis.revenue, gmt: kpis.gmt,
                      ytd_volume_mt: kpis.ytd_volume_mt, ytd_revenue: kpis.ytd_revenue }
