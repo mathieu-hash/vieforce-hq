@@ -293,7 +293,10 @@ module.exports = async (req, res) => {
     const shipSegmentFilter = segmentItemFilter(segment, 'I')
     const dailyShip = await query(`
       SELECT
-        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN T1.Quantity END) / 1000.0 / 30.0, 0) AS avg_daily
+        -- DLN1.Quantity is in the SALES UoM (bags); InvQty is the base kg qty
+        -- (same field the margin engine uses). Use InvQty/1000 for MT/day so
+        -- cover_days = on-hand-MT / shipped-MT-per-day is coherent (was 50x off).
+        ISNULL(SUM(T1.InvQty) / 1000.0 / 30.0, 0) AS avg_daily
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
