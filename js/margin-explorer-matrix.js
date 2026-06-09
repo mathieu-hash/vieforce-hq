@@ -92,13 +92,16 @@
         'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\'><path d=\'M0 0l5 6 5-6z\' fill=\'%23888\'/></svg>");' +
         'background-repeat:no-repeat;background-position:right 11px center}' +
       '.mexp-groupby:hover{border-color:var(--glass-border-hover)}' +
-      '.mexp-matrix-table{width:100%;border-collapse:collapse;font-size:13px}' +
-      '.mexp-matrix-table th{text-align:right;font-size:11px;font-weight:600;text-transform:uppercase;' +
-        'letter-spacing:.04em;color:var(--text3);padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap}' +
+      // table-layout:fixed → even, professional columns (no content-driven jitter)
+      '.mexp-matrix-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}' +
+      '.mexp-matrix-table th{text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;' +
+        'letter-spacing:.04em;color:var(--text3);padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '.mexp-matrix-table th.mexp-c-dim{text-align:left}' +
-      '.mexp-matrix-table td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--glass-border);' +
-        'color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums}' +
-      '.mexp-matrix-table td.mexp-c-dim{text-align:left;color:var(--text);font-weight:600}' +
+      // first (label) column gets a fixed share; the rest distribute evenly under fixed layout
+      '.mexp-matrix-table col.mexp-col-dim{width:26%}' +
+      '.mexp-matrix-table td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--glass-border);' +
+        'color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}' +
+      '.mexp-matrix-table td.mexp-c-dim{text-align:left;color:var(--text);font-weight:700}' +
       '.mexp-row{cursor:pointer;transition:background .12s}' +
       '.mexp-row:hover{background:rgba(255,255,255,0.03)}' +
       '.mexp-row.mexp-sel{background:rgba(0,196,232,0.10);box-shadow:inset 3px 0 0 var(--cyan)}' +
@@ -185,6 +188,11 @@
     var table = document.createElement('table');
     table.className = 'mexp-matrix-table';
 
+    // colgroup: fixed label column + 5 even numeric columns
+    var colg = document.createElement('colgroup');
+    colg.innerHTML = '<col class="mexp-col-dim">' + '<col><col><col><col><col>';
+    table.appendChild(colg);
+
     // Header
     var thead = document.createElement('thead');
     thead.innerHTML =
@@ -240,14 +248,11 @@
     var chevron = r.expandable ? '<span class="mexp-dim-chevron">›</span>' : '';
 
     tr.innerHTML =
-      '<td class="mexp-c-dim">' + _esc(r.dim) + chevron + '</td>' +
+      '<td class="mexp-c-dim" title="' + _esc(r.dim) + '">' + _esc(r.dim) + chevron + '</td>' +
       '<td class="mexp-primary" style="color:' + primaryColor + '">' +
         (primaryVal == null ? '—' : _esc(cfg.fmt(primaryVal))) + '</td>' +
       '<td>' + _esc(_fc(r.gp)) + '</td>' +
-      '<td><div class="mexp-share">' +
-        '<div class="mexp-share-bar"><div class="mexp-share-fill" style="width:' + fillPct.toFixed(1) + '%"></div></div>' +
-        '<span class="mexp-share-num">' + share.toFixed(1) + '%</span>' +
-      '</div></td>' +
+      '<td>' + share.toFixed(1) + '%</td>' +
       '<td>' + _esc(fmtTons(r.tons)) + '</td>' +
       '<td style="color:' + deltaColor(deltaRaw) + '">' + _esc(fmtDelta(deltaRaw, isPctDelta)) + '</td>';
 
@@ -283,7 +288,7 @@
       '<td class="mexp-c-dim">Total</td>' +
       '<td class="mexp-primary">' + _esc(primaryStr) + '</td>' +
       '<td>' + _esc(_fc(gpTotal)) + '</td>' +
-      '<td><div class="mexp-share"><span class="mexp-share-num">100.0%</span></div></td>' +
+      '<td>100.0%</td>' +
       '<td>' + _esc(fmtTons(sumTons)) + '</td>' +
       '<td></td>';
     tfoot.appendChild(tr);
