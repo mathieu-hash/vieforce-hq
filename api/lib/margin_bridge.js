@@ -383,15 +383,23 @@ function bridgeGMperTonByPair(rows0, rows1) {
 //            + Product Mix (within-customer SKU shift = total mix − customer mix)
 // Entering/exiting cells: rate=0 (no price to compare), full move into Mix.
 //
-// rows = [{ cust, sku, kg, revenue, gp }]   (one window). cust carries the "who"
+// rows = [{ cust, sku, ssg, kg, revenue, gp }]   (one window). cust carries the "who"
 // dimension (BU is a customer attribute → customer-level mix captures BU mix).
-function bridgeCanonicalGMperTon(rows0, rows1) {
+// opts.costRatio = { sku: { pkg, ft } } production cost-share per SKU → splits the
+// Cost bar into RM/Packaging/Feedtag that reconciles to it. ssg → Product Mix by SSG.
+//
+// Returns, additionally to the four exact bars:
+//   cost_components  = { rm, packaging, feedtag }   (Σ === cost)   [if costRatio given]
+//   product_mix_by_ssg = [{ ssg, value }] sorted    (Σ === product_mix)
+function bridgeCanonicalGMperTon(rows0, rows1, opts) {
+  opts = opts || {}
+  const costRatio = opts.costRatio || null
   const agg = (rows, keyFn) => {
     const m = new Map(); let Q = 0
     for (const r of rows || []) {
       const kg = num(r.kg); if (kg <= 0) continue
       const k = keyFn(r)
-      const o = m.get(k) || { kg: 0, revenue: 0, gp: 0 }
+      const o = m.get(k) || { kg: 0, revenue: 0, gp: 0, ssg: (r.ssg == null || r.ssg === '' ? 'UNSPEC' : String(r.ssg)), sku: r.sku }
       o.kg += kg; o.revenue += num(r.revenue); o.gp += num(r.gp); m.set(k, o)
       Q += kg
     }
@@ -402,49 +410,94 @@ function bridgeCanonicalGMperTon(rows0, rows1) {
 
   const C0 = agg(rows0, cellKey), C1 = agg(rows1, cellKey)
   if (C0.Q <= 0 || C1.Q <= 0) {
-    return { available: false, gm0_per_ton: 0, gm1_per_ton: 0, delta: 0, price: 0, cost: 0, customer_mix: 0, product_mix: 0, mix_total: 0 }
+    return { available: false, gm0_per_ton: 0, gm1_per_ton: 0, delta: 0, price: 0, cost: 0, customer_mix: 0, product_mix: 0, mix_total: 0, cost_components: { rm: 0, packaging: 0, feedtag: 0 }, product_mix_by_ssg: [] }
   }
   const gm0 = [...C0.m.values()].reduce((s, o) => s + o.gp, 0) / (C0.Q / 1000)
   const gm1 = [...C1.m.values()].reduce((s, o) => s + o.gp, 0) / (C1.Q / 1000)
 
-  // per-ton metric for a bucket {kg,revenue,gp}: returns [share, price, cost, margin]
   const metr = (o, Q) => {
     if (!o || o.kg <= 0) return null
     const t = o.kg / 1000
     return { s: o.kg / Q, p: o.revenue / t, c: (o.revenue - o.gp) / t, m: o.gp / t }
   }
-  // Generic Bennet split over a keyed aggregation. Returns {price, cost, mix}.
-  // price/cost only defined for keys present in BOTH windows; entering/exiting → mix only.
-  const split = (A, B, QA, QB) => {
-    const keys = new Set([...A.keys(), ...B.keys()])
-    let price = 0, cost = 0, mix = 0
-    for (const k of keys) {
-      const a = metr(A.get(k), QA), b = metr(B.get(k), QB)
-      if (a && b) {
-        const sbar = (a.s + b.s) / 2
-        price += sbar * (b.p - a.p)
-        cost += -sbar * (b.c - a.c)
-        mix += ((a.m + b.m) / 2) * (b.s - a.s)
-      } else if (b) {          // entering: Δs = b.s, m̄ = b.m
-        mix += b.m * b.s
-      } else if (a) {          // exiting: Δs = −a.s, m̄ = a.m
-        mix += a.m * (-a.s)
+
+  // ---- cell-level pass: bars + per-cell mix (tagged by SSG) + cost components ----
+  const keys = new Set([...C0.m.keys(), ...C1.m.keys()])
+  let price = 0, cost = 0, cellMix = 0
+  let costRm = 0, costPkg = 0, costFt = 0
+  const cellMixBySsg = {}            // ssg -> Σ cell mix contribution
+  for (const k of keys) {
+    const A = C0.m.get(k), B = C1.m.get(k)
+    const a = metr(A, C0.Q), b = metr(B, C1.Q)
+    const ssg = (B && B.ssg) || (A && A.ssg) || 'UNSPEC'
+    const sku = (B && B.sku) || (A && A.sku)
+    let mixContrib = 0
+    if (a && b) {
+      const sbar = (a.s + b.s) / 2
+      price += sbar * (b.p - a.p)
+      cost += -sbar * (b.c - a.c)
+      mixContrib = ((a.m + b.m) / 2) * (b.s - a.s)
+      if (costRatio) {
+        const r = costRatio[sku] || { pkg: 0, ft: 0 }
+        const dc = b.c - a.c
+        const dPkg = dc * (r.pkg || 0), dFt = dc * (r.ft || 0), dRm = dc - dPkg - dFt
+        costPkg += -sbar * dPkg; costFt += -sbar * dFt; costRm += -sbar * dRm
       }
-    }
-    return { price, cost, mix }
+    } else if (b) { mixContrib = b.m * b.s }
+    else if (a) { mixContrib = a.m * (-a.s) }
+    cellMix += mixContrib
+    cellMixBySsg[ssg] = (cellMixBySsg[ssg] || 0) + mixContrib
   }
 
-  const cell = split(C0.m, C1.m, C0.Q, C1.Q)            // full decomposition
+  // ---- customer-level mix (between customers) + attribute it to SSG by volume share ----
   const K0 = agg(rows0, custKey), K1 = agg(rows1, custKey)
-  const cust = split(K0.m, K1.m, K0.Q, K1.Q)            // customer-level → between-customer mix
-  const customerMix = cust.mix
-  const productMix = cell.mix - customerMix             // within-customer SKU shift (exact remainder)
+  const custKeys = new Set([...K0.m.keys(), ...K1.m.keys()])
+  // per-(cust,ssg) kg in each window, for fraction attribution
+  const csKey = (r) => (r.cust == null ? '' : String(r.cust)) + '|' + (r.ssg == null || r.ssg === '' ? 'UNSPEC' : String(r.ssg))
+  const CS0 = agg(rows0, csKey), CS1 = agg(rows1, csKey)
+  let customerMix = 0
+  const custMixBySsg = {}
+  for (const k of custKeys) {
+    const a = metr(K0.m.get(k), K0.Q), b = metr(K1.m.get(k), K1.Q)
+    let mc = 0
+    if (a && b) mc = ((a.m + b.m) / 2) * (b.s - a.s)
+    else if (b) mc = b.m * b.s
+    else if (a) mc = a.m * (-a.s)
+    customerMix += mc
+    // split this customer's mix across its SSGs by avg within-customer volume fraction
+    const kg0 = K0.m.get(k) ? K0.m.get(k).kg : 0
+    const kg1 = K1.m.get(k) ? K1.m.get(k).kg : 0
+    const ssgs = new Set()
+    for (const ck of CS0.m.keys()) if (ck.indexOf(k + '|') === 0) ssgs.add(ck.slice((k + '|').length))
+    for (const ck of CS1.m.keys()) if (ck.indexOf(k + '|') === 0) ssgs.add(ck.slice((k + '|').length))
+    let fracSum = 0; const fr = {}
+    for (const g of ssgs) {
+      const g0 = CS0.m.get(k + '|' + g) ? CS0.m.get(k + '|' + g).kg : 0
+      const g1 = CS1.m.get(k + '|' + g) ? CS1.m.get(k + '|' + g).kg : 0
+      const f0 = kg0 > 0 ? g0 / kg0 : 0, f1 = kg1 > 0 ? g1 / kg1 : 0
+      const f = (kg0 > 0 && kg1 > 0) ? (f0 + f1) / 2 : (kg1 > 0 ? f1 : f0)
+      fr[g] = f; fracSum += f
+    }
+    for (const g of ssgs) {
+      const w = fracSum > 0 ? fr[g] / fracSum : 0
+      custMixBySsg[g] = (custMixBySsg[g] || 0) + mc * w
+    }
+  }
+  const productMix = cellMix - customerMix
+
+  // Product mix by SSG = cell-mix(g) − customer-mix(g). Σ === productMix (exact).
+  const ssgSet = new Set([...Object.keys(cellMixBySsg), ...Object.keys(custMixBySsg)])
+  const product_mix_by_ssg = [...ssgSet]
+    .map(g => ({ ssg: g === 'UNSPEC' ? 'Untagged' : g, value: (cellMixBySsg[g] || 0) - (custMixBySsg[g] || 0) }))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
 
   return {
     available: true,
     gm0_per_ton: gm0, gm1_per_ton: gm1, delta: gm1 - gm0,
-    price: cell.price, cost: cell.cost,
-    customer_mix: customerMix, product_mix: productMix, mix_total: cell.mix,
+    price: price, cost: cost,
+    customer_mix: customerMix, product_mix: productMix, mix_total: cellMix,
+    cost_components: { rm: costRm, packaging: costPkg, feedtag: costFt },
+    product_mix_by_ssg,
   }
 }
 
