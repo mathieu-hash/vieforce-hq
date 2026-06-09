@@ -9,8 +9,87 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { bridgeGP, bridgeGMperKg, bridgeGMperKgBySsg, bridgeGMperTonByPair, ingredientContribution } =
+const { bridgeGP, bridgeGMperKg, bridgeGMperKgBySsg, bridgeGMperTonByPair, bridgeCanonicalGMperTon, ingredientContribution } =
   require('../api/lib/margin_bridge.js')
+
+// ── CANONICAL Bennet GM/ton bridge: exactness + index-number axioms ──
+const RTOL = 1e-9
+const recon = (r) => Math.abs((r.price + r.cost + r.customer_mix + r.product_mix) - r.delta)
+
+test('canonical: pure same-cell price change → 100% Price, exact', () => {
+  const a = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3500000, gp: 700000 }] // 35000/t, m 7000
+  const b = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3400000, gp: 600000 }] // price −1000 → m 6000
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(Math.abs(r.price - (-1000)) < RTOL, 'price = -1000/t')
+  assert.ok(Math.abs(r.cost) < RTOL && Math.abs(r.customer_mix) < RTOL && Math.abs(r.product_mix) < RTOL, 'others 0')
+  assert.ok(recon(r) < RTOL, 'reconciles')
+})
+
+test('canonical: pure cost change → 100% Cost', () => {
+  const a = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3500000, gp: 700000 }]
+  const b = [{ cust: 'A', sku: 'X', kg: 100000, revenue: 3500000, gp: 600000 }] // cost +1000 → gp −1000
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(Math.abs(r.cost - (-1000)) < RTOL, 'cost = -1000/t')
+  assert.ok(Math.abs(r.price) < RTOL, 'no price')
+  assert.ok(recon(r) < RTOL, 'reconciles')
+})
+
+test('canonical: proportional volume growth → GM/ton unchanged, ALL terms 0', () => {
+  const a = [
+    { cust: 'A', sku: 'X', kg: 100000, revenue: 3000000, gp: 500000 },
+    { cust: 'B', sku: 'Y', kg: 50000, revenue: 2000000, gp: 600000 }
+  ]
+  const b = a.map(o => ({ ...o, kg: o.kg * 1.5, revenue: o.revenue * 1.5, gp: o.gp * 1.5 })) // +50% everywhere
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(Math.abs(r.delta) < RTOL, 'GM/ton unchanged')
+  assert.ok(Math.abs(r.price) < RTOL && Math.abs(r.cost) < RTOL && Math.abs(r.customer_mix) < RTOL && Math.abs(r.product_mix) < RTOL, 'all 0')
+})
+
+test('canonical: customer-share shift (same prices) → Customer Mix, not Product Mix', () => {
+  // two customers, DIFFERENT margins, same SKU, prices unchanged; volume shifts to richer customer
+  const a = [
+    { cust: 'A', sku: 'X', kg: 100000, revenue: 3000000, gp: 500000 }, // m 5000
+    { cust: 'B', sku: 'X', kg: 100000, revenue: 4000000, gp: 900000 }  // m 9000
+  ]
+  const b = [
+    { cust: 'A', sku: 'X', kg: 50000, revenue: 1500000, gp: 250000 },
+    { cust: 'B', sku: 'X', kg: 150000, revenue: 6000000, gp: 1350000 }
+  ]
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(Math.abs(r.price) < RTOL && Math.abs(r.cost) < RTOL, 'no rate move')
+  assert.ok(r.customer_mix > 0, 'lands in customer mix')
+  assert.ok(Math.abs(r.product_mix) < RTOL, 'single SKU ⇒ no product mix')
+  assert.ok(recon(r) < RTOL, 'reconciles')
+})
+
+test('canonical: product-share shift within one customer → Product Mix, not Customer Mix', () => {
+  const a = [
+    { cust: 'A', sku: 'X', kg: 100000, revenue: 3000000, gp: 400000 }, // m 4000
+    { cust: 'A', sku: 'Y', kg: 100000, revenue: 3000000, gp: 800000 }  // m 8000
+  ]
+  const b = [
+    { cust: 'A', sku: 'X', kg: 50000, revenue: 1500000, gp: 200000 },
+    { cust: 'A', sku: 'Y', kg: 150000, revenue: 4500000, gp: 1200000 }
+  ]
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(Math.abs(r.customer_mix) < RTOL, 'single customer ⇒ no customer mix')
+  assert.ok(r.product_mix > 0, 'lands in product mix')
+  assert.ok(recon(r) < RTOL, 'reconciles')
+})
+
+test('canonical: entering + exiting cells reconcile exactly', () => {
+  const a = [
+    { cust: 'A', sku: 'X', kg: 80000, revenue: 2400000, gp: 400000 },
+    { cust: 'B', sku: 'Y', kg: 60000, revenue: 2100000, gp: 600000 } // exits
+  ]
+  const b = [
+    { cust: 'A', sku: 'X', kg: 90000, revenue: 2750000, gp: 470000 }, // price+cost move
+    { cust: 'C', sku: 'Z', kg: 70000, revenue: 2500000, gp: 800000 }  // enters
+  ]
+  const r = bridgeCanonicalGMperTon(a, b)
+  assert.ok(r.available, 'available')
+  assert.ok(recon(r) < RTOL, 'price+cost+custMix+prodMix === delta to the penny')
+})
 
 test('bridgeGMperTonByPair: same cust+SKU price cut lands in true_price, not mix', () => {
   // one customer, one SKU, identical tons; only the price drops. Pure true price.
