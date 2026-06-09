@@ -166,6 +166,24 @@
     '.mexp-bridge-foot{font-size:10px;font-weight:600;color:var(--text2);margin-top:10px;line-height:1.5}',
     '.mexp-bridge-foot .mexp-recon{color:var(--green);font-weight:800;margin-left:6px;white-space:nowrap}',
     '.mexp-bridge-foot .mexp-partial{color:var(--gold);font-weight:800}',
+    // --- reconciling drill tables under the bridge (Cost components + Product Mix by SSG) ---
+    // Two compact tables, side-by-side, each tied to its parent bar. tabular-nums,
+    // thin separators, negatives red. Footer line proves Σ === the bridge bar.
+    '#pg-margin-explorer .mexp-drills{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--glass-border)}',
+    '#pg-margin-explorer .mexp-drill{min-width:0}',
+    '#pg-margin-explorer .mexp-drill-h{font-size:9px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;gap:5px}',
+    '#pg-margin-explorer .mexp-drill-h b{color:var(--text2);font-weight:900}',
+    '#pg-margin-explorer .mexp-drill-tbl{width:100%;border-collapse:collapse;font-size:10.5px;font-variant-numeric:tabular-nums}',
+    '#pg-margin-explorer .mexp-drill-tbl td{padding:2.5px 0;border-bottom:1px solid rgba(255,255,255,.045);white-space:nowrap}',
+    '#pg-margin-explorer .mexp-drill-tbl td.mexp-dl{text-align:left;color:var(--text2);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis}',
+    '#pg-margin-explorer .mexp-drill-tbl td.mexp-dv{text-align:right;color:var(--text);font-weight:700;padding-left:10px}',
+    '#pg-margin-explorer .mexp-drill-tbl td.mexp-dv.neg{color:var(--red)}',
+    '#pg-margin-explorer .mexp-drill-tbl td.mexp-dv.pos{color:var(--green)}',
+    '#pg-margin-explorer .mexp-drill-tbl td.mexp-ds{text-align:right;color:var(--text3);font-weight:600;padding-left:10px;width:42px}',
+    '#pg-margin-explorer .mexp-drill-tbl tr.mexp-drill-foot td{border-top:1px solid var(--glass-border);border-bottom:none;padding-top:5px;font-weight:900;color:var(--text)}',
+    '#pg-margin-explorer .mexp-drill-tbl tr.mexp-drill-foot td.mexp-dl{color:var(--text2);text-transform:uppercase;letter-spacing:.3px;font-size:9px}',
+    '#pg-margin-explorer .mexp-drill-tbl tr.mexp-drill-foot td .mexp-tick{color:var(--green);margin-left:5px}',
+    '@media(max-width:1180px){#pg-margin-explorer .mexp-drills{grid-template-columns:1fr}}',
     // national tag on the ingredient table (production lens — not filtered by region/bu)
     '.mexp-natl-tag{font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--text3);border:1px solid var(--glass-border);border-radius:6px;padding:2px 7px;white-space:nowrap}',
     '.mexp-note{font-size:10px;color:var(--text3);font-weight:600;margin-top:10px;line-height:1.5}',
@@ -274,6 +292,7 @@
               '<div class="mexp-bridge-load" id="mexp-bridge-load">loading bridge…</div>' +
             '</div>' +
             '<div id="mexp-bridge-note" class="mexp-bridge-foot" style="display:none"></div>' +
+            '<div id="mexp-bridge-drills" class="mexp-drills" style="display:none"></div>' +
           '</div>' +
         '</div>' +
         // ---- ingredient cost / movers — full width below (5-col table reads better wide) ----
@@ -695,6 +714,57 @@
         note.style.display = 'block';
       }
     }
+
+    renderBridgeDrills(cb);
+  }
+
+  // Reconciling drills under the bridge: Cost → RM/Packaging/Feedtag (Σ === Cost bar)
+  // and Product Mix → by SSG (Σ === Product Mix bar). Each footer proves the tie.
+  function renderBridgeDrills(cb) {
+    var box = $('mexp-bridge-drills');
+    if (!box) return;
+    if (!cb || cb.available === false) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var fmtD = function (n) { n = Math.round(+n || 0); var s = '₱' + Math.abs(n).toLocaleString() + '/t'; return n > 0 ? '+' + s : (n < 0 ? '−' + s : s); };
+    var cls = function (n) { return (+n > 0 ? 'pos' : (+n < 0 ? 'neg' : '')); };
+    var rows = function (items, total) {
+      var t = Math.abs(+total || 0) || 1;
+      return items.map(function (it) {
+        var v = +it.value || 0, sh = Math.round(Math.abs(v) / t * 100);
+        return '<tr><td class="mexp-dl" title="' + _esc(it.label) + '">' + _esc(it.label) + '</td>' +
+          '<td class="mexp-dv ' + cls(v) + '">' + fmtD(v) + '</td>' +
+          '<td class="mexp-ds">' + sh + '%</td></tr>';
+      }).join('');
+    };
+    var foot = function (label, val, items, barTotal) {
+      // tolerance scales with item count — each row is rounded to ₱1, so N rows can
+      // drift up to ~N from the (also-rounded) bar total without being a real break.
+      var tie = Math.abs(items.reduce(function (s, x) { return s + (+x.value || 0); }, 0) - (+barTotal || 0)) <= Math.max(1.5, items.length);
+      return '<tr class="mexp-drill-foot"><td class="mexp-dl">= ' + label + '</td>' +
+        '<td class="mexp-dv ' + cls(val) + '">' + fmtD(val) + (tie ? '<span class="mexp-tick">✓</span>' : '') + '</td>' +
+        '<td class="mexp-ds"></td></tr>';
+    };
+    var html = '';
+    if (cb.cost_components) {
+      var cc = cb.cost_components;
+      var citems = [
+        { label: 'Raw materials', value: cc.rm },
+        { label: 'Packaging', value: cc.packaging },
+        { label: 'Feedtag', value: cc.feedtag }
+      ].filter(function (x) { return Math.round(+x.value || 0) !== 0; });
+      if (citems.length) {
+        html += '<div class="mexp-drill"><div class="mexp-drill-h"><b>Cost</b> → RM / Packaging / Feedtag</div>' +
+          '<table class="mexp-drill-tbl"><tbody>' + rows(citems, cb.cost) +
+          foot('Cost', cb.cost, citems, cb.cost) + '</tbody></table></div>';
+      }
+    }
+    if (cb.product_mix_by_ssg && cb.product_mix_by_ssg.length) {
+      var pitems = cb.product_mix_by_ssg.map(function (x) { return { label: x.ssg, value: x.value }; });
+      html += '<div class="mexp-drill"><div class="mexp-drill-h"><b>Product Mix</b> → by category (SSG)</div>' +
+        '<table class="mexp-drill-tbl"><tbody>' + rows(pitems, cb.product_mix) +
+        foot('Product Mix', cb.product_mix, pitems, cb.product_mix) + '</tbody></table></div>';
+    }
+    if (html) { box.innerHTML = html; box.style.display = 'grid'; }
+    else { box.style.display = 'none'; box.innerHTML = ''; }
   }
 
   function renderMovers(movers, gap, ingredients, ingMeta) {
