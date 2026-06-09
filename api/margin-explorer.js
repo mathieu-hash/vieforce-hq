@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v6', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v7', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -492,6 +492,9 @@ module.exports = async (req, res) => {
           // Live (2026) anchors only — 2025 (Old DB) customer/SKU codes were fully
           // re-coded at the Jan-2026 consolidation, so a cross-DB drill is meaningless.
           let priceDrillOut
+          // The ONE canonical bridge (Bennet, exact): Price + Cost + Customer/BU Mix +
+          // Product Mix, customer×SKU, feed 103, reconciles to the GM/ton delta.
+          let canonicalBridge = { available: false, reason: 'pre-2026 anchor — customer/SKU codes not comparable across the Jan-2026 consolidation' }
           if (baseMonth < '2026-01' || cmpMonth < '2026-01') {
             priceDrillOut = { available: false, reason: 'pre-2026 anchor' }
           } else {
@@ -508,10 +511,10 @@ module.exports = async (req, res) => {
               if (bu !== 'ALL') { dw += ` AND G.GroupName=@bu`; dp.bu = bu }
               if (customer) { dw += ` AND (T0.CardCode=@cust OR T0.CardName LIKE @custl)`; dp.cust = customer; dp.custl = '%' + customer + '%' }
               const DRILL_SQL = `
-                SELECT ym, ssg, sku, name, cust, SUM(rev) rev, SUM(kg) kg FROM (
+                SELECT ym, ssg, sku, name, cust, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp FROM (
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
-                    T1.LineTotal rev, T1.InvQty kg
+                    T1.LineTotal rev, T1.InvQty kg, T1.GrssProfit gp
                   FROM OINV T0 JOIN INV1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
@@ -520,7 +523,7 @@ module.exports = async (req, res) => {
                   UNION ALL
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
-                    -T1.LineTotal rev, -T1.InvQty kg
+                    -T1.LineTotal rev, -T1.InvQty kg, -T1.GrssProfit gp
                   FROM ORIN T0 JOIN RIN1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
@@ -528,11 +531,28 @@ module.exports = async (req, res) => {
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
                 ) X GROUP BY ym, ssg, sku, name, cust`
               const drillRaw = await query(DRILL_SQL, dp)
-              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, rev: Number(r.rev) || 0, kg: Number(r.kg) || 0 })
-              const pd = cube.priceDrill(
-                drillRaw.filter(r => r.ym === baseMonth).map(toRow),
-                drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
-              )
+              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0 })
+              const baseRows = drillRaw.filter(r => r.ym === baseMonth).map(toRow)
+              const cmpRows = drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
+              const pd = cube.priceDrill(baseRows, cmpRows)
+
+              // THE canonical bridge — same customer×SKU rows, Bennet exact decomposition.
+              const cbk = bridge.bridgeCanonicalGMperTon(baseRows, cmpRows)
+              if (cbk.available) {
+                canonicalBridge = {
+                  available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
+                  method: 'Bennet indicator · customer×SKU · exact',
+                  base_month: baseMonth, compare_month: cmpMonth, compare_partial: cmpPartial,
+                  prior_gm_ton: Math.round(cbk.gm0_per_ton), current_gm_ton: Math.round(cbk.gm1_per_ton),
+                  delta: Math.round(cbk.delta),
+                  price: Math.round(cbk.price), cost: Math.round(cbk.cost),
+                  customer_mix: Math.round(cbk.customer_mix), product_mix: Math.round(cbk.product_mix),
+                  reconciles: Math.abs((cbk.price + cbk.cost + cbk.customer_mix + cbk.product_mix) - cbk.delta) < 1,
+                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth + (cmpPartial ? ' (compare month partial)' : '') + '. Price & Cost = SAME customer + SAME SKU; Customer/BU Mix & Product Mix = composition (who/what sold), not price action. Bennet decomposition — reconciles exactly.'
+                }
+              } else {
+                canonicalBridge = { available: false, reason: cbk.reason || 'no feed rows in anchor months' }
+              }
               priceDrillOut = pd.available === false ? pd : {
                 available: true, unit: 'php_per_ton',
                 total: Math.round(pd.total),
@@ -565,6 +585,7 @@ module.exports = async (req, res) => {
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
             ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth),
             price_drill: priceDrillOut,
+            canonical_bridge: canonicalBridge,
             category_trend: cube.categoryTrend(C.rows, C.months)
           }
         } else {

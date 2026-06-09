@@ -369,10 +369,90 @@ function bridgeGMperTonByPair(rows0, rows1) {
   }
 }
 
+// ── CANONICAL GM/ton bridge — Bennet (Bennet–Bowley) indicator decomposition ──
+// The ONE authoritative bridge. Additively EXACT (zero residual by construction),
+// symmetric average weights, passes the index-number axioms:
+//   • a pure same-cell price change lands 100% in Price
+//   • proportional volume growth leaves GM/ton unchanged (all terms 0)
+//   • a pure customer-share shift lands in Customer/BU Mix; SKU shift in Product Mix
+//
+// GM/ton = Σ sᵢ·mᵢ   (sᵢ = tonnage share of cell i, mᵢ = unit margin ₱/ton)
+// Bennet identity per cell:  s₁m₁ − s₀m₀ = s̄·Δm + m̄·Δs   (exact)
+//   s̄·Δm  → Rate effect = Price (s̄·Δp) + Cost (−s̄·Δc)
+//   m̄·Δs  → Mix effect, split hierarchically: Customer/BU Mix (between customers)
+//            + Product Mix (within-customer SKU shift = total mix − customer mix)
+// Entering/exiting cells: rate=0 (no price to compare), full move into Mix.
+//
+// rows = [{ cust, sku, kg, revenue, gp }]   (one window). cust carries the "who"
+// dimension (BU is a customer attribute → customer-level mix captures BU mix).
+function bridgeCanonicalGMperTon(rows0, rows1) {
+  const agg = (rows, keyFn) => {
+    const m = new Map(); let Q = 0
+    for (const r of rows || []) {
+      const kg = num(r.kg); if (kg <= 0) continue
+      const k = keyFn(r)
+      const o = m.get(k) || { kg: 0, revenue: 0, gp: 0 }
+      o.kg += kg; o.revenue += num(r.revenue); o.gp += num(r.gp); m.set(k, o)
+      Q += kg
+    }
+    return { m, Q }
+  }
+  const cellKey = (r) => (r.cust == null ? '' : String(r.cust)) + '|' + (r.sku == null ? '' : String(r.sku))
+  const custKey = (r) => (r.cust == null ? '' : String(r.cust))
+
+  const C0 = agg(rows0, cellKey), C1 = agg(rows1, cellKey)
+  if (C0.Q <= 0 || C1.Q <= 0) {
+    return { available: false, gm0_per_ton: 0, gm1_per_ton: 0, delta: 0, price: 0, cost: 0, customer_mix: 0, product_mix: 0, mix_total: 0 }
+  }
+  const gm0 = [...C0.m.values()].reduce((s, o) => s + o.gp, 0) / (C0.Q / 1000)
+  const gm1 = [...C1.m.values()].reduce((s, o) => s + o.gp, 0) / (C1.Q / 1000)
+
+  // per-ton metric for a bucket {kg,revenue,gp}: returns [share, price, cost, margin]
+  const metr = (o, Q) => {
+    if (!o || o.kg <= 0) return null
+    const t = o.kg / 1000
+    return { s: o.kg / Q, p: o.revenue / t, c: (o.revenue - o.gp) / t, m: o.gp / t }
+  }
+  // Generic Bennet split over a keyed aggregation. Returns {price, cost, mix}.
+  // price/cost only defined for keys present in BOTH windows; entering/exiting → mix only.
+  const split = (A, B, QA, QB) => {
+    const keys = new Set([...A.keys(), ...B.keys()])
+    let price = 0, cost = 0, mix = 0
+    for (const k of keys) {
+      const a = metr(A.get(k), QA), b = metr(B.get(k), QB)
+      if (a && b) {
+        const sbar = (a.s + b.s) / 2
+        price += sbar * (b.p - a.p)
+        cost += -sbar * (b.c - a.c)
+        mix += ((a.m + b.m) / 2) * (b.s - a.s)
+      } else if (b) {          // entering: Δs = b.s, m̄ = b.m
+        mix += b.m * b.s
+      } else if (a) {          // exiting: Δs = −a.s, m̄ = a.m
+        mix += a.m * (-a.s)
+      }
+    }
+    return { price, cost, mix }
+  }
+
+  const cell = split(C0.m, C1.m, C0.Q, C1.Q)            // full decomposition
+  const K0 = agg(rows0, custKey), K1 = agg(rows1, custKey)
+  const cust = split(K0.m, K1.m, K0.Q, K1.Q)            // customer-level → between-customer mix
+  const customerMix = cust.mix
+  const productMix = cell.mix - customerMix             // within-customer SKU shift (exact remainder)
+
+  return {
+    available: true,
+    gm0_per_ton: gm0, gm1_per_ton: gm1, delta: gm1 - gm0,
+    price: cell.price, cost: cell.cost,
+    customer_mix: customerMix, product_mix: productMix, mix_total: cell.mix,
+  }
+}
+
 module.exports = {
   bridgeGP,
   bridgeGMperKg,
   bridgeGMperKgBySsg,
   bridgeGMperTonByPair,
+  bridgeCanonicalGMperTon,
   ingredientContribution,
 }
