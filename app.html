@@ -1844,7 +1844,7 @@ body{
             <div class="card-hdr">
               <div>
                 <div class="card-title">GM per Ton by Group — Monthly</div>
-                <div class="sls-sub">₱/MT · monthly snapshot to Apr 2026</div>
+                <div class="sls-sub">₱/ton · finished feed · last 12 months · follows Region/Segment</div>
               </div>
               <div class="card-badge b-blue">SAP · OINV</div>
             </div>
@@ -1861,18 +1861,10 @@ body{
               .gm-matrix .row-total td{background:rgba(0,174,239,0.08);font-weight:700;border-top:2px solid var(--divider)}
               .gm-neg{color:var(--red) !important;font-weight:700 !important}
             </style>
-            <table class="gm-matrix">
-              <tr><th>Group</th><th>Oct 2025</th><th>Nov 2025</th><th>Dec 2025</th><th>Jan 2026</th><th>Feb 2026</th><th>Mar 2026</th><th>Apr 2026</th></tr>
-              <tr class="row-blue"><td>PIGLET</td><td>10,317</td><td>9,943</td><td>9,821</td><td>9,988</td><td>9,259</td><td>9,179</td><td>10,352</td></tr>
-              <tr class="row-green"><td>PIG</td><td>6,661</td><td>6,501</td><td>6,177</td><td>6,445</td><td>6,241</td><td>6,361</td><td>7,013</td></tr>
-              <tr class="row-blue"><td>BROILER</td><td>9,439</td><td>6,685</td><td>6,285</td><td>6,905</td><td>5,522</td><td>5,027</td><td>6,734</td></tr>
-              <tr class="row-green"><td>LAYER</td><td>4,896</td><td>4,882</td><td>4,399</td><td>4,806</td><td>4,257</td><td>4,529</td><td>5,591</td></tr>
-              <tr class="row-blue"><td>GAMEBIRD</td><td>5,912</td><td>6,099</td><td>6,158</td><td>3,261</td><td>4,765</td><td>4,289</td><td>6,251</td></tr>
-              <tr class="row-green"><td>PET</td><td>7,056</td><td>9,305</td><td>6,197</td><td>8,609</td><td class="gm-neg">-1,062</td><td>18,874</td><td>5,066</td></tr>
-              <tr class="row-blue"><td>FREE RANGE</td><td>7,432</td><td>7,306</td><td>6,703</td><td>6,458</td><td>6,240</td><td>6,554</td><td>7,040</td></tr>
-              <tr class="row-green"><td>MIXED GRAINS</td><td>3,511</td><td>3,113</td><td>2,838</td><td>3,247</td><td>3,222</td><td>3,775</td><td>4,258</td></tr>
-              <tr class="row-blue"><td>OTHERS</td><td>4,825</td><td>3,415</td><td>3,715</td><td>10,988</td><td>10,990</td><td>4,349</td><td>5,474</td></tr>
-              <tr class="row-total"><td>AVG GM/T</td><td>6,987</td><td>6,703</td><td>6,421</td><td>6,636</td><td>6,231</td><td>6,201</td><td>6,953</td></tr>
+            <table class="gm-matrix" id="sls-gmmatrix">
+              <tbody id="sls-gmmatrix-body">
+                <tr><td style="text-align:center;color:var(--text3);font-size:11px">Loading…</td></tr>
+              </tbody>
             </table>
             </div>
           </div>
@@ -4772,6 +4764,41 @@ async function loadSales(){
       }
       seth('sls-vrcust-tbody', vrcHtml);
       if(vrcTot>0) sett('sls-vrcust-sub', 'Top 10 = '+(vrcTopMt/vrcTot*100).toFixed(0)+'% of '+(PD||'MTD')+' volume');
+    }
+    // GM ₱/ton by SSG group × trailing-12-month matrix — live from gm_by_group, follows Region/Segment.
+    if(d.gm_by_group && d.gm_by_group.months && d.gm_by_group.months.length){
+      var gm = d.gm_by_group;
+      var fmtYm = function(ym){
+        var p = String(ym||'').split('-'); if(p.length<2) return ym;
+        var mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(+p[1])-1] || p[1];
+        return mn+"'"+p[0].slice(2);
+      };
+      var gmCell = function(v){
+        if(v==null) return '<td style="color:var(--text3)">—</td>';
+        var s = fcn(Math.round(v));
+        return v<0 ? '<td class="gm-neg">'+s+'</td>' : '<td>'+s+'</td>';
+      };
+      var hdr = '<tr><th>Group</th>';
+      gm.months.forEach(function(ym){
+        var part = (ym===gm.current_month) ? '<span style="font-weight:400;text-transform:none;color:var(--text3)"> part.</span>' : '';
+        hdr += '<th>'+esc(fmtYm(ym))+part+'</th>';
+      });
+      hdr += '</tr>';
+      var body = '';
+      (gm.groups||[]).forEach(function(g, i){
+        var cls = (i % 2 === 0) ? 'row-blue' : 'row-green';
+        body += '<tr class="'+cls+'"><td>'+esc(g.ssg||'—')+'</td>';
+        (g.cells||[]).forEach(function(c){ body += gmCell(c ? c.gm_ton : null); });
+        body += '</tr>';
+      });
+      if(gm.avg && gm.avg.length){
+        body += '<tr class="row-total"><td>AVG GM/T</td>';
+        gm.avg.forEach(function(c){ body += gmCell(c ? c.gm_ton : null); });
+        body += '</tr>';
+      }
+      seth('sls-gmmatrix-body', hdr + body);
+    } else {
+      seth('sls-gmmatrix-body', '<tr><td style="text-align:center;color:var(--text3);font-size:11px">No GM data for this filter</td></tr>');
     }
     pulseRefresh('pg-sales');
   } catch(e) { console.error('Sales:', e); showError('pg-sales','Unable to load sales data'); }
