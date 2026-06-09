@@ -73,18 +73,23 @@ module.exports = async (req, res) => {
     const params = { plant, region }
 
     // --- Plant-level summary (bags + MT) ---
+    // UoM facts (SAP-verified): OITW.OnHand is in KILO for weight-UoM items
+    // (OITM.InvntryUom='KILO'). MT = OnHand/1000. Bags = OnHand/NumInSale (kg per
+    // 50KG/BAG sales unit). The MT aggregates are guarded to KILO items only so
+    // piece/vial SKUs (vet/additives) don't pollute tonnage; bag counts include
+    // all FG rows but divide by the item's own NumInSale.
     const plants = await query(`
       SELECT
         W.WhsCode                                                              AS plant_code,
         W.WhsName                                                              AS plant_name,
-        ISNULL(SUM(IW.OnHand), 0)                                              AS on_hand_bags,
-        ISNULL(SUM(IW.IsCommited), 0)                                          AS committed_bags,
-        ISNULL(SUM(IW.OnOrder), 0)                                             AS on_order_bags,
-        ISNULL(SUM(IW.OnHand - IW.IsCommited), 0)                              AS available_bags,
-        ISNULL(SUM(IW.OnHand * ISNULL(I.NumInSale, 1)) / 1000.0, 0)            AS total_on_hand,
-        ISNULL(SUM(IW.IsCommited * ISNULL(I.NumInSale, 1)) / 1000.0, 0)        AS total_committed,
-        ISNULL(SUM(IW.OnOrder * ISNULL(I.NumInSale, 1)) / 1000.0, 0)           AS total_on_order,
-        ISNULL(SUM((IW.OnHand - IW.IsCommited) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS total_available
+        ISNULL(SUM(IW.OnHand / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                     AS on_hand_bags,
+        ISNULL(SUM(IW.IsCommited / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                 AS committed_bags,
+        ISNULL(SUM(IW.OnOrder / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                    AS on_order_bags,
+        ISNULL(SUM((IW.OnHand - IW.IsCommited) / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)   AS available_bags,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnHand END) / 1000.0, 0)                  AS total_on_hand,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.IsCommited END) / 1000.0, 0)              AS total_committed,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnOrder END) / 1000.0, 0)                 AS total_on_order,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN (IW.OnHand - IW.IsCommited) END) / 1000.0, 0) AS total_available
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
@@ -103,14 +108,14 @@ module.exports = async (req, res) => {
         W.WhsName                                                       AS plant_name,
         IW.ItemCode                                                     AS item_code,
         I.ItemName                                                      AS item_name,
-        ISNULL(IW.OnHand, 0)                                            AS on_hand_bags,
-        ISNULL(IW.IsCommited, 0)                                        AS committed_bags,
-        ISNULL(IW.OnOrder, 0)                                           AS on_order_bags,
-        ISNULL(IW.OnHand - IW.IsCommited, 0)                            AS available_bags,
-        ISNULL(IW.OnHand * ISNULL(I.NumInSale, 1) / 1000.0, 0)          AS qty_on_hand,
-        ISNULL(IW.IsCommited * ISNULL(I.NumInSale, 1) / 1000.0, 0)      AS qty_committed,
-        ISNULL(IW.OnOrder * ISNULL(I.NumInSale, 1) / 1000.0, 0)         AS qty_on_order,
-        ISNULL((IW.OnHand - IW.IsCommited) * ISNULL(I.NumInSale, 1) / 1000.0, 0) AS qty_available
+        ISNULL(IW.OnHand / NULLIF(ISNULL(I.NumInSale, 1), 0), 0)                  AS on_hand_bags,
+        ISNULL(IW.IsCommited / NULLIF(ISNULL(I.NumInSale, 1), 0), 0)              AS committed_bags,
+        ISNULL(IW.OnOrder / NULLIF(ISNULL(I.NumInSale, 1), 0), 0)                 AS on_order_bags,
+        ISNULL((IW.OnHand - IW.IsCommited) / NULLIF(ISNULL(I.NumInSale, 1), 0), 0) AS available_bags,
+        ISNULL(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnHand / 1000.0 ELSE 0 END, 0)                  AS qty_on_hand,
+        ISNULL(CASE WHEN I.InvntryUom = 'KILO' THEN IW.IsCommited / 1000.0 ELSE 0 END, 0)              AS qty_committed,
+        ISNULL(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnOrder / 1000.0 ELSE 0 END, 0)                 AS qty_on_order,
+        ISNULL(CASE WHEN I.InvntryUom = 'KILO' THEN (IW.OnHand - IW.IsCommited) / 1000.0 ELSE 0 END, 0) AS qty_available
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       INNER JOIN OITM I  ON IW.ItemCode = I.ItemCode
@@ -131,14 +136,14 @@ module.exports = async (req, res) => {
           WHEN W.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
           ELSE 'Other'
         END                                                                AS region,
-        ISNULL(SUM(IW.OnHand), 0)                                          AS on_hand_bags,
-        ISNULL(SUM(IW.IsCommited), 0)                                      AS committed_bags,
-        ISNULL(SUM(IW.OnOrder), 0)                                         AS on_order_bags,
-        ISNULL(SUM(IW.OnHand - IW.IsCommited), 0)                          AS available_bags,
-        ISNULL(SUM(IW.OnHand * ISNULL(I.NumInSale, 1)) / 1000.0, 0)       AS on_hand,
-        ISNULL(SUM(IW.IsCommited * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS committed,
-        ISNULL(SUM(IW.OnOrder * ISNULL(I.NumInSale, 1)) / 1000.0, 0)      AS on_order,
-        ISNULL(SUM((IW.OnHand - IW.IsCommited) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS available
+        ISNULL(SUM(IW.OnHand / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                AS on_hand_bags,
+        ISNULL(SUM(IW.IsCommited / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)            AS committed_bags,
+        ISNULL(SUM(IW.OnOrder / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)              AS on_order_bags,
+        ISNULL(SUM((IW.OnHand - IW.IsCommited) / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0) AS available_bags,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnHand END) / 1000.0, 0)                  AS on_hand,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.IsCommited END) / 1000.0, 0)              AS committed,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnOrder END) / 1000.0, 0)                 AS on_order,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN (IW.OnHand - IW.IsCommited) END) / 1000.0, 0) AS available
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
@@ -168,14 +173,14 @@ module.exports = async (req, res) => {
           WHEN UPPER(I.ItemName) LIKE '%VANA%' OR UPPER(I.ItemName) LIKE '%SHRIMP%' THEN 'AQUA'
           ELSE 'OTHERS'
         END                                                                AS group_name,
-        ISNULL(SUM(IW.OnHand), 0)                                          AS on_hand_bags,
-        ISNULL(SUM(IW.IsCommited), 0)                                      AS committed_bags,
-        ISNULL(SUM(IW.OnOrder), 0)                                         AS on_order_bags,
-        ISNULL(SUM(IW.OnHand - IW.IsCommited), 0)                          AS available_bags,
-        ISNULL(SUM(IW.OnHand * ISNULL(I.NumInSale, 1)) / 1000.0, 0)       AS on_hand_mt,
-        ISNULL(SUM(IW.OnOrder * ISNULL(I.NumInSale, 1)) / 1000.0, 0)      AS on_order_mt,
-        ISNULL(SUM(IW.IsCommited * ISNULL(I.NumInSale, 1)) / 1000.0, 0)   AS committed_mt,
-        ISNULL(SUM((IW.OnHand - IW.IsCommited) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS available_mt
+        ISNULL(SUM(IW.OnHand / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                AS on_hand_bags,
+        ISNULL(SUM(IW.IsCommited / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)            AS committed_bags,
+        ISNULL(SUM(IW.OnOrder / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)              AS on_order_bags,
+        ISNULL(SUM((IW.OnHand - IW.IsCommited) / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0) AS available_bags,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnHand END) / 1000.0, 0)                  AS on_hand_mt,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.OnOrder END) / 1000.0, 0)                 AS on_order_mt,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN IW.IsCommited END) / 1000.0, 0)              AS committed_mt,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN (IW.OnHand - IW.IsCommited) END) / 1000.0, 0) AS available_mt
       FROM OWHS W
       INNER JOIN OITW IW ON W.WhsCode = IW.WhsCode
       LEFT JOIN OITM I ON IW.ItemCode = I.ItemCode
@@ -215,8 +220,8 @@ module.exports = async (req, res) => {
         W.Warehouse                                        AS plant_code,
         CASE WHEN W.DueDate >= DATEADD(DAY, -30, GETDATE()) THEN 'real' ELSE 'stale' END AS bucket,
         COUNT(*)                                           AS wo_count,
-        ISNULL(SUM(W.PlannedQty - W.CmpltQty), 0)          AS bags,
-        ISNULL(SUM((W.PlannedQty - W.CmpltQty) * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt,
+        ISNULL(SUM((W.PlannedQty - W.CmpltQty) / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0) AS bags,
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN (W.PlannedQty - W.CmpltQty) END) / 1000.0, 0) AS mt,
         MIN(W.DueDate)                                     AS oldest_due_date
       FROM OWOR W
       LEFT JOIN OITM I ON W.ItemCode = I.ItemCode
@@ -288,7 +293,7 @@ module.exports = async (req, res) => {
     const shipSegmentFilter = segmentItemFilter(segment, 'I')
     const dailyShip = await query(`
       SELECT
-        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0 / 30.0, 0) AS avg_daily
+        ISNULL(SUM(CASE WHEN I.InvntryUom = 'KILO' THEN T1.Quantity END) / 1000.0 / 30.0, 0) AS avg_daily
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
@@ -306,10 +311,11 @@ module.exports = async (req, res) => {
     const nationalCoverDays = Math.round(totalOnHand / avgDaily)
     const plantsNegative = plants.filter(p => Number(p.available_bags || 0) < 0).length
 
-    // Grand-total available clamps to 0 (can't sell less than nothing on aggregate).
-    // Per-plant / per-region keep negatives — they're actionable shortage signals.
-    const aggAvailBags = Math.max(0, Math.round(totalAvailBags))
-    const aggAvailMt   = Math.max(0, Math.round(plants.reduce((s, p) => s + Number(p.total_available || 0), 0) * 10) / 10)
+    // Grand-total available is a REAL signed number — committed can exceed on-hand
+    // for some SKUs, so a negative aggregate is a genuine shortage signal, not an
+    // error. Do NOT clamp to 0 (that masked the live available total as 0).
+    const aggAvailBags = Math.round(totalAvailBags)
+    const aggAvailMt   = Math.round(plants.reduce((s, p) => s + Number(p.total_available || 0), 0) * 10) / 10
     const summary = {
       // Bags (the UI's default display unit)
       on_floor:        Math.round(totalOnHandBags),
