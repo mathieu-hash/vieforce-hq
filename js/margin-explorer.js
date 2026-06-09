@@ -160,6 +160,14 @@
     '.mexp-panel-hcol{display:flex;flex-direction:column;gap:0}',
     '.mexp-canvas-wrap{position:relative;width:100%;min-height:240px;flex:1 1 auto}',
     '.mexp-canvas-wrap canvas{width:100%!important;display:block}',
+    // canonical bridge loading hint (overlay, non-destructive — only shown until phase B lands)
+    '.mexp-bridge-load{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.3px;pointer-events:none}',
+    // canonical bridge footer note (full-contrast small text) + reconcile tick
+    '.mexp-bridge-foot{font-size:10px;font-weight:600;color:var(--text2);margin-top:10px;line-height:1.5}',
+    '.mexp-bridge-foot .mexp-recon{color:var(--green);font-weight:800;margin-left:6px;white-space:nowrap}',
+    '.mexp-bridge-foot .mexp-partial{color:var(--gold);font-weight:800}',
+    // national tag on the ingredient table (production lens — not filtered by region/bu)
+    '.mexp-natl-tag{font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--text3);border:1px solid var(--glass-border);border-radius:6px;padding:2px 7px;white-space:nowrap}',
     '.mexp-note{font-size:10px;color:var(--text3);font-weight:600;margin-top:10px;line-height:1.5}',
     '.mexp-coming{font-size:11px;color:var(--text3);font-weight:700;padding:18px 8px;text-align:center;border:1px dashed var(--glass-border);border-radius:10px;margin-top:12px}',
     // states
@@ -259,10 +267,13 @@
           '</div>' +
           '<div class="mexp-panel">' +
             '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
-              '<span class="mexp-panel-t">GM Bridge</span>' +
-              '<span class="mexp-panel-st">All sellable scope · vs prior comparable window · same-customer same-SKU price</span>' +
+              '<span class="mexp-panel-t" id="mexp-bridge-title">GM/ton Bridge</span>' +
+              '<span class="mexp-panel-st">Finished feed · exact Bennet (customer×SKU) · Price &amp; Cost are real levers, Mix is composition</span>' +
             '</div></div>' +
-            '<div class="mexp-canvas-wrap"><canvas id="mexp-bridge"></canvas></div>' +
+            '<div class="mexp-canvas-wrap"><canvas id="mexp-bridge"></canvas>' +
+              '<div class="mexp-bridge-load" id="mexp-bridge-load">loading bridge…</div>' +
+            '</div>' +
+            '<div id="mexp-bridge-note" class="mexp-bridge-foot" style="display:none"></div>' +
           '</div>' +
         '</div>' +
         // ---- ingredient cost / movers — full width below (5-col table reads better wide) ----
@@ -482,7 +493,8 @@
     try { renderWindow(data.meta); } catch (e) { console.error('[MEXP] window:', e); }
     try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
     try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
-    try { renderBridge(data.bridge); } catch (e) { console.error('[MEXP] bridge:', e); }
+    // The ONE bridge is canonical_bridge (phase B). Phase A no longer paints a
+    // competing bridge — just keep the "loading bridge…" hint until phase B lands.
     try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
 
     LAST.hasCore = true;
@@ -514,6 +526,8 @@
     if (typeof window.MEXP_setDissectionUpdating === 'function') {
       try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
     }
+    // The ONE authoritative bridge — fed by phase B's canonical_bridge.
+    try { renderCanonicalBridge(data && data.dissection && data.dissection.canonical_bridge); } catch (e) { console.error('[MEXP] canonical bridge:', e); }
     try { window.MEXP_renderDissection(data && data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
   }
 
@@ -627,36 +641,50 @@
     fetchAndRender();
   }
 
-  function renderBridge(bridge) {
+  // ---- THE ONE canonical bridge (phase B). Non-destructive: keep last good
+  // render if a refresh hands back nothing, and only clear the "loading bridge…"
+  // hint once we've drawn a real bridge. ----
+  function renderCanonicalBridge(cb) {
     var c = $('mexp-bridge');
     if (!c) return;
-    if (typeof window.MEXP_renderBridge === 'function') {
-      window.MEXP_renderBridge(c, bridge);
+    var load = $('mexp-bridge-load');
+    var note = $('mexp-bridge-note');
+    var title = $('mexp-bridge-title');
+
+    // No canonical block on this refresh (e.g. SAP flap) — keep last good.
+    if (!cb) return;
+
+    if (typeof window.MEXP_renderCanonicalBridge === 'function') {
+      window.MEXP_renderCanonicalBridge(c, cb);
     } else {
       placeholderCanvas(c, 'Bridge renderer unavailable');
     }
-    // Level note — visible when the bridge falls back to category (SSG) level.
-    // Full-contrast DOM text (never 40%-opacity on canvas — fce2afc lesson).
-    var wrap = c.parentElement;
-    var n = $('mexp-bridge-note');
-    if (!n && wrap && wrap.parentElement) {
-      n = document.createElement('div');
-      n.id = 'mexp-bridge-note';
-      n.style.cssText = 'font-size:10px;font-weight:700;color:var(--text);margin-top:8px;line-height:1.5;display:none';
-      wrap.parentElement.insertBefore(n, wrap.nextSibling);
+    if (load) load.style.display = 'none';
+
+    // Header: "GM/ton Bridge — <base> → <compare>" (+ partial flag).
+    if (title) {
+      var hdr = 'GM/ton Bridge';
+      if (cb.available !== false && cb.base_month && cb.compare_month) {
+        hdr += ' — ' + cb.base_month + ' → ' + cb.compare_month;
+      }
+      title.textContent = hdr;
     }
-    if (n) {
-      if (bridge && bridge.available && bridge.true_price != null && bridge.true_basis) {
-        // True-price decomposition note (full-contrast, one line).
-        n.textContent = 'ⓘ ' + (bridge.true_note ||
-          'Price = real price move for the same customer buying the same SKU. Customer/Product Mix is composition, not a price change.');
-        n.style.display = 'block';
-      } else if (bridge && bridge.available && bridge.level === 'ssg') {
-        n.textContent = 'ⓘ ' + (bridge.note || 'Category-level bridge — SKU detail not comparable across Jan-2026 consolidation.') +
-          (bridge.basis ? ' (' + bridge.basis + ')' : '');
-        n.style.display = 'block';
+
+    if (note) {
+      if (cb.available === false) {
+        note.textContent = 'ⓘ ' + (cb.reason || cb.note || 'Exact bridge not available for this anchor.');
+        note.style.display = 'block';
       } else {
-        n.style.display = 'none';
+        var html = '';
+        if (cb.compare_partial) {
+          html += '<span class="mexp-partial">(' +
+            (/jun/i.test(String(cb.compare_month)) || /-06$/.test(String(cb.compare_month)) ? 'June ' : '') +
+            'partial — early read)</span> ';
+        }
+        html += _esc(cb.note || '');
+        if (cb.reconciles === true) html += '<span class="mexp-recon">reconciles ✓</span>';
+        note.innerHTML = html;
+        note.style.display = 'block';
       }
     }
   }
@@ -694,7 +722,8 @@
           '</tr>';
       }).join('');
       var sub = (ingMeta && ingMeta.note) ? es(ingMeta.note) : '';
-      el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Cost / Ton of Feed</span></div>' +
+      el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Cost / Ton of Feed</span>' +
+        '<span class="mexp-natl-tag" title="Production lens — recipe-weighted national ingredient cost. Does not respond to the Region/BU filter.">National — not filtered by Region/BU</span></div>' +
         '<style>' +
         '.mexp-ing-tbl{width:100%;border-collapse:collapse;font-size:11px}' +
         '.mexp-ing-tbl th,.mexp-ing-tbl td{padding:3px 6px;border-bottom:1px solid var(--surface2,#1b2940)}' +
