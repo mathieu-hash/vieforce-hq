@@ -68,7 +68,7 @@ function standardResponses() {
   return [
     ['I.ItemName AS item_name',        []],                  // items detail (unique ItemName alias)
     ['GROUP BY W.WhsCode, W.WhsName',  plants],              // plants summary (only place with this GROUP BY)
-    ["WHEN W.WhsCode IN ('AC','ACEXT','PFMIS','PFMCIS')", [            // by_region (WhsCode CASE)
+    ["IN ('AC','ACEXT','PFMIS','PFMCIS')", [            // by_region (base-matched WhsCode CASE)
       { region: 'Luzon', on_hand_bags: 500000, committed_bags: 100000,
         on_order_bags: 50000, available_bags: 400000,
         on_hand: 25000, committed: 5000, on_order: 2500, available: 20000 }

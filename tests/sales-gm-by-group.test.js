@@ -108,7 +108,7 @@ test('gm_by_group applies region + segment filters (Visayas + KA) like the rest 
   await run(handler, { period: 'MTD', region: 'Visayas', segment: 'KA' })
   const sql = gmSql(handler)
   // region: regionCaseSql on the INV1 line alias (T1) = @region
-  assert.ok(/T1\.WhsCode IN \('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO'\)/.test(sql), 'region case on line alias present')
+  assert.ok(/IN \('HOREB','HBEXT','BAC','ARGAO'\)/.test(sql), 'region case (base-matched) on line alias present')
   assert.ok(sql.includes('= @region'), 'region predicate present')
   // segment: KA predicate on the doc alias T0
   assert.ok(/T0\.SlpCode IN \(/.test(sql), 'KA segment predicate present (SlpCode list)')

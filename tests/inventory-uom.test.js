@@ -68,7 +68,7 @@ function responses() {
   return [
     ['I.ItemName AS item_name',        []],
     ['GROUP BY W.WhsCode, W.WhsName',  plants],
-    ["WHEN W.WhsCode IN ('AC','ACEXT','PFMIS','PFMCIS')", []],
+    ["IN ('AC','ACEXT','PFMIS','PFMCIS')", []],
     ["WHEN UPPER(I.ItemName) LIKE '%HOG%'", []],
     ['AS negative_count',              [{ negative_count: 7 }]],
     ['FROM OWOR W',                    []],

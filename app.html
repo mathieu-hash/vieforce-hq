@@ -8740,12 +8740,14 @@ function gsSelect(code){
    ================================================================= */
 // Canonical plant (WhsCode) → region map — MUST match api/lib/region-map.js.
 // Confirmed 2026-07-03: BAC = Bacolod (Visayas), ALAE = Mindanao.
+// Matches on the BASE plant code (strips "-<suffix>" bins like HOREB-IT/BAC-QA).
 function plantRegionOf(wh){
   if(!wh) return 'Other';
   var w = String(wh).toUpperCase();
-  if(w === 'AC' || w === 'ACEXT' || w === 'PFMIS' || w === 'PFMCIS') return 'Luzon';
-  if(w === 'HOREB' || w === 'HBEXT' || w === 'HBEXT-QA' || w === 'BAC' || w === 'ARGAO') return 'Visayas';
-  if(w === 'BUKID' || w === 'SOUTH' || w === 'CAG' || w === 'ALAE' || w === 'CCPC') return 'Mindanao';
+  var b = w.indexOf('-') > 0 ? w.slice(0, w.indexOf('-')) : w;
+  if(b === 'AC' || b === 'ACEXT' || b === 'PFMIS' || b === 'PFMCIS') return 'Luzon';
+  if(b === 'HOREB' || b === 'HBEXT' || b === 'BAC' || b === 'ARGAO') return 'Visayas';
+  if(b === 'BUKID' || b === 'SOUTH' || b === 'CAG' || b === 'ALAE' || b === 'CCPC') return 'Mindanao';
   return 'Other';
 }
 
