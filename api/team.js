@@ -18,9 +18,11 @@
 // CRITICAL: no customer-code exclusion. CCPC and similar are real customers.
 
 const { query, queryH, queryBoth } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
 const { getProratedYtdBudgetMt } = require('./lib/budget_2026')
+const { countShippingDays } = require('./lib/shipping_days')
 const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
 // FY2026 monthly volume budget (mirrors api/dashboard.js + api/budget.js).
@@ -30,17 +32,8 @@ const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql, fi
 // Director SlpCode (Joel Durano). Excluded from RSM list — he IS the EVP.
 const DIRECTOR_SLPCODE = 3
 
-function countShippingDays(from, to) {
-  // Mon-Sat workdays inclusive. v1 ignores PH holidays (IT will provide cal).
-  let n = 0
-  const cur = new Date(from); cur.setHours(0, 0, 0, 0)
-  const end = new Date(to);   end.setHours(0, 0, 0, 0)
-  while (cur <= end) {
-    if (cur.getDay() !== 0) n++   // 0 = Sunday
-    cur.setDate(cur.getDate() + 1)
-  }
-  return n
-}
+// Shipping-day count now comes from lib/shipping_days (Mon-Sat MINUS PH holidays)
+// so team speed matches the Speed page (speed.js/budget.js use the same source).
 
 function ytdBudgetMt(today) {
   return getProratedYtdBudgetMt(today)
@@ -702,7 +695,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [team]:', err.message, err.stack)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'team')
   }
 }

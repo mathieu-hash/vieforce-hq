@@ -107,7 +107,11 @@ function buildEnv(scopeResolvedBy, queryStub, queryHStub, serviceAuth = true) {
   const realScope = require(scopePath)
   registerMock(arPath, scopePath, {
     ...realScope,
-    scopeForUser: async (uuid) => scopeResolvedBy(uuid)
+    scopeForUser: async (uuid) => scopeResolvedBy(uuid),
+    resolveRequestScope: async (req) => {
+      const p = req && req.query && req.query.scope
+      return (typeof p === 'string' && p.startsWith('user:')) ? scopeResolvedBy(p.slice(5).trim()) : null
+    }
   })
 
   registerMock(arPath, path.join(apiDir, '_db.js'), {
@@ -117,7 +121,8 @@ function buildEnv(scopeResolvedBy, queryStub, queryHStub, serviceAuth = true) {
 
   registerMock(arPath, path.join(libDir, 'cache.js'), {
     get: () => null,
-    set: () => {}
+    set: () => {},
+    keyableUrl: (u) => u
   })
 
   return require(arPath)

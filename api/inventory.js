@@ -1,8 +1,10 @@
 const { query } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const { scopeForUser } = require('./_scope')
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, regionFilterSql } = require('./lib/business_filters')
+const { regionCaseSql, regionOfWhs } = require('./lib/region-map')
 
 // Inventory has no customer/doc alias (no OINV/OCRD), so segment can only be
 // narrowed by ItemName. Of the commercial segments (DIST/KA/PET), only PET is
@@ -53,7 +55,7 @@ module.exports = async (req, res) => {
   // meta field from leaking into / out of the cached response incorrectly.
   const reqRegion = normalizeRegion(req.query.region)
   const reqSegment = normalizeSegment(req.query.segment)
-  const cacheKey = `inventory_v2_${req.url}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
+  const cacheKey = `inventory_v2_${cache.keyableUrl(req.url)}_${reqRegion}_${reqSegment}_${session.role}_${session.region || 'ALL'}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -130,12 +132,7 @@ module.exports = async (req, res) => {
     // --- By region (bags + MT) ---
     const by_region = await query(`
       SELECT
-        CASE
-          WHEN W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN W.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN W.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END                                                                AS region,
+        ${regionCaseSql('W')}                                                                AS region,
         ISNULL(SUM(IW.OnHand / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)                AS on_hand_bags,
         ISNULL(SUM(IW.IsCommited / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)            AS committed_bags,
         ISNULL(SUM(IW.OnOrder / NULLIF(ISNULL(I.NumInSale, 1), 0)), 0)              AS on_order_bags,
@@ -151,12 +148,7 @@ module.exports = async (req, res) => {
         AND UPPER(IW.ItemCode) LIKE 'FG%'
         ${segmentFilter}
       GROUP BY
-        CASE
-          WHEN W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN W.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN W.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END
+        ${regionCaseSql('W')}
       ORDER BY region
     `)
 
@@ -215,6 +207,12 @@ module.exports = async (req, res) => {
     // Split into REAL (DueDate within 30 days) vs STALE (DueDate > 30 days ago — abandoned).
     // Status codes: P=Planned, R=Released (active), L=Closed, C=Cancelled. VPI uses 'R' only.
     // Per-plant, per-region merge uses REAL production only (stale shown as a global badge).
+    // Scope OWOR to the same Region/Segment as on-floor stock. OWOR's plant column
+    // is W.Warehouse (NOT WhsCode), so use regionCaseSql('W','Warehouse'); gate on
+    // ALL exactly like regionFilterSql. Segment narrows via ItemName (OITM alias I).
+    // ALL/ALL → both filters '' → byte-identical SQL to before.
+    const oworRegionFilter = region === 'ALL' ? '' : ` AND ${regionCaseSql('W', 'Warehouse')} = @region`
+    const oworSegmentFilter = segmentItemFilter(segment, 'I')
     const production = await query(`
       SELECT
         W.Warehouse                                        AS plant_code,
@@ -228,8 +226,10 @@ module.exports = async (req, res) => {
       WHERE W.Status = 'R'
         AND UPPER(W.ItemCode) LIKE 'FG%'
         AND W.PlannedQty > W.CmpltQty
+        ${oworRegionFilter}
+        ${oworSegmentFilter}
       GROUP BY W.Warehouse, CASE WHEN W.DueDate >= DATEADD(DAY, -30, GETDATE()) THEN 'real' ELSE 'stale' END
-    `).catch(e => { console.warn('[inventory] OWOR query failed:', e.message); return [] })
+    `, { region }).catch(e => { console.warn('[inventory] OWOR query failed:', e.message); return [] })
 
     const prodMap = {}   // plant_code -> { bags, mt }  (REAL only, for card merge)
     let totalInProductionBags = 0, totalInProductionMt = 0
@@ -258,12 +258,7 @@ module.exports = async (req, res) => {
       p.in_production_mt   = Math.round(prod.mt * 10) / 10
     }
     // Merge REAL production into by_region
-    const regionOf = (wh) => {
-      if (['AC','ACEXT','BAC'].includes(wh)) return 'Luzon'
-      if (['HOREB','ARGAO','ALAE'].includes(wh)) return 'Visayas'
-      if (['BUKID','CCPC'].includes(wh)) return 'Mindanao'
-      return 'Other'
-    }
+    const regionOf = (wh) => regionOfWhs(wh)
     const regionProdMap = {}
     for (const [wh, v] of Object.entries(prodMap)) {
       const r = regionOf(wh)
@@ -363,7 +358,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 900)
     res.json(result)
   } catch (err) {
-    console.error('API error [inventory]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'inventory')
   }
 }

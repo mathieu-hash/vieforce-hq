@@ -1,6 +1,7 @@
-const { query } = require('./_db')
+const { query, queryDateRange } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
-const { scopeForUser } = require('./_scope')
+const { resolveRequestScope } = require('./_scope')
 const cache = require('../lib/cache')
 const {
   countShippingDays,
@@ -144,23 +145,10 @@ module.exports = async (req, res) => {
   const { start: dateFrom, end: dateTo } = getPeriodBounds(period, todayPH)
   const periodEnd = getPeriodEndBound(period, todayPH)
 
-  // Parse optional scope=user:<uuid>. Resolve once; each ODLN query gets its
-  // own filter fragment via buildSpeedScopeFilter (always alias T0 — every
-  // ODLN query in this file aliases it that way).
-  let scope = null
-  const scopeParam = req.query.scope
-  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
-    const uuid = scopeParam.slice(5).trim()
-    if (uuid) {
-      try {
-        scope = await scopeForUser(uuid)
-      } catch (err) {
-        console.error('[speed] scope resolve failed:', err.message)
-        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
-                  slpCodes: [], districtCodes: [] }
-      }
-    }
-  }
+  // Scope resolved centrally; each ODLN query gets its own filter fragment via
+  // buildSpeedScopeFilter (always alias T0). Service token → ?scope=user; user
+  // session → own identity when SCOPE_USER_SESSIONS is on; never the client param.
+  const scope = await resolveRequestScope(req, session)
   const speedFilter = buildSpeedScopeFilter(scope, 'T0')
 
   // Zero-state short-circuit — no ODLN reads, no division math, no NaN risk.
@@ -234,16 +222,34 @@ module.exports = async (req, res) => {
       `, { dateFrom, dateTo, region })
     }
 
-    const actual_mt = totalRow[0]?.actual_mt || 0
+    const actual_mt = totalRow[0]?.actual_mt || 0   // through today — factual volume shipped so far
     const today = todayPH
 
-    // Calendar-aware shipping day counters. Today (Manila) counts as a shipping day.
-    // Sundays + PH holidays (api/data/shipping_calendar_ph.json) are excluded.
-    const elapsed_days = countShippingDays(dateFrom, today)
+    // Run-rate basis = COMPLETED shipping days only. Today is still in progress
+    // (its deliveries aren't all posted yet), so counting it as an elapsed day
+    // divides the volume by one too many days and understates both the daily
+    // pullout and the projection. Anchor the rate to the last completed day
+    // (yesterday); countShippingDays skips any Sundays/holidays in between.
+    const asOf = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+
+    // Volume shipped THROUGH the last completed day = the rate numerator. Kept
+    // separate from actual_mt so the page still shows today's shipped volume.
+    const rateRow = await query(`
+      SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS completed_mt
+      FROM ODLN T0
+      INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      WHERE T0.DocDate BETWEEN @dateFrom AND @asOf AND T0.CANCELED = 'N'${lineFilters}
+    `, { dateFrom, asOf, region })
+    const actual_completed = rateRow[0]?.completed_mt || 0
+
+    // Calendar-aware shipping-day counters (Sundays + PH holidays excluded).
+    // elapsed = COMPLETED shipping days (through asOf, i.e. NOT today).
+    const elapsed_days = countShippingDays(dateFrom, asOf)
     const total_days = countShippingDays(dateFrom, periodEnd)
     const holidays_in_period = listHolidaysInPeriod(dateFrom, periodEnd)
 
-    const speed_per_day = elapsed_days > 0 ? actual_mt / elapsed_days : 0
+    const speed_per_day = elapsed_days > 0 ? actual_completed / elapsed_days : 0
     const projected_mt = elapsed_days > 0
       ? Math.round(speed_per_day * total_days)
       : 0
@@ -349,7 +355,9 @@ module.exports = async (req, res) => {
     const vs_lm_pct = lm_same > 0 ? Math.round(((cur_mtd_mt - lm_same) / lm_same) * 1000) / 10 : 0
 
     // ---- vs prior period (same shape, shifted back) for dynamic Daily Pullout ----
-    const prior = getPriorPeriodWindow(period, dateFrom, today)
+    // Anchor to asOf (last completed day) to match the current rate basis, so the
+    // comparison is completed-days vs completed-days rather than vs a partial today.
+    const prior = getPriorPeriodWindow(period, dateFrom, asOf)
     const priorRow = await query(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS mt
       FROM ODLN T0
@@ -365,16 +373,22 @@ module.exports = async (req, res) => {
       ? Math.round(((speed_per_day - prior_daily_pullout) / prior_daily_pullout) * 1000) / 10
       : 0
 
-    const lyWin = getLastYearSpeedWindow(dateFrom, today)
-    const lyRow = await query(`
+    const lyWin = getLastYearSpeedWindow(dateFrom, asOf)
+    // Last-year window is 2025 → lives in Vienovo_Old. queryDateRange dispatches
+    // to the historical pool (or splits across the cutoff), whereas a plain
+    // query() would hit Vienovo_Live (2026+ only) and always return ~0.
+    const lyRow = await queryDateRange(`
       SELECT ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS ly_mt
       FROM ODLN T0
       INNER JOIN DLN1 T1 ON T0.DocEntry = T1.DocEntry
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
-      WHERE T0.DocDate BETWEEN @lyFrom AND @lyTo AND T0.CANCELED='N'${lineFilters}
-    `, { lyFrom: lyWin.from, lyTo: lyWin.to, region })
+      WHERE T0.DocDate BETWEEN @dateFrom AND @dateTo AND T0.CANCELED='N'${lineFilters}
+    `, { region }, lyWin.from, lyWin.to)
 
-    const last_year_volume = lyRow[0]?.ly_mt || 0
+    // Sum across rows: today the LY window is fully historical (one row), but if
+    // it ever spans the migration cutoff queryDateRange returns one aggregate row
+    // per DB — sum so we don't read only the historical half.
+    const last_year_volume = lyRow.reduce((a, r) => a + (Number(r.ly_mt) || 0), 0)
     const ly_elapsed_days = countShippingDays(lyWin.from, lyWin.to)
     const last_year_daily_pullout = ly_elapsed_days > 0 ? last_year_volume / ly_elapsed_days : 0
     const vs_last_year_pct = last_year_daily_pullout > 0
@@ -395,7 +409,7 @@ module.exports = async (req, res) => {
         },
         data_quality: {
           contains_proxy: false,
-          notes: ['Speed projection = shipped MT per elapsed shipping day times shipping days in selected period.']
+          notes: ['Speed projection = shipped MT per COMPLETED shipping day (today excluded, since it is still in progress) times shipping days in the selected period.']
         }
       },
       period,
@@ -453,7 +467,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [speed]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'speed')
   }
 }

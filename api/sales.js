@@ -1,17 +1,13 @@
 const { query, queryBoth, queryDateRange } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
-const { scopeForUser, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = require('./_scope')
+const { resolveRequestScope, buildScopeWhere, emptySalesPayload, scopeResponseMeta } = require('./_scope')
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, regionFilterSql, regionCaseSql, segmentFilterSql, filterMeta } = require('./lib/business_filters')
 
-// Canonical plant (WhsCode) → region map — aligned with api/lib/margin_cube.js.
-// BAC = BACOLOD (Visayas), ALAE/SOUTH/CAG = Mindanao, PFMIS/PFMCIS = Isabela (Luzon).
-const PO_PLANT_REGION = {
-  AC: 'Luzon', ACEXT: 'Luzon', PFMIS: 'Luzon', PFMCIS: 'Luzon',
-  HOREB: 'Visayas', HBEXT: 'Visayas', 'HBEXT-QA': 'Visayas', BAC: 'Visayas', ARGAO: 'Visayas',
-  BUKID: 'Mindanao', SOUTH: 'Mindanao', CAG: 'Mindanao', ALAE: 'Mindanao', CCPC: 'Mindanao'
-}
-function plantRegion(plant) { return PO_PLANT_REGION[plant] || 'Other' }
+// Plant (WhsCode) → region via the canonical single-source map.
+const { regionOfWhs } = require('./lib/region-map')
+function plantRegion(plant) { return regionOfWhs(plant) }
 
 module.exports = async (req, res) => {
   // CORS
@@ -24,19 +20,10 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Parse optional scope=user:<uuid> — Patrol passes this to get user-scoped data.
-  // When absent, behavior is identical to the pre-scope implementation.
-  let scope = null
-  const scopeParam = req.query.scope
-  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
-    const uuid = scopeParam.slice(5).trim()
-    if (uuid) {
-      scope = await scopeForUser(uuid).catch(err => {
-        console.warn('[sales] scopeForUser failed:', err.message)
-        return { userId: uuid, error: 'scope_resolve_failed', is_empty: true, slpCodes: [], districtCodes: [] }
-      })
-    }
-  }
+  // Resolve scope centrally: Patrol service token → ?scope=user:<uuid>; a user
+  // session → its own identity when SCOPE_USER_SESSIONS is enabled (never the
+  // client param). null = national.
+  const scope = await resolveRequestScope(req, session)
 
   const scopeFilter = buildScopeWhere(scope, 'T0')
 
@@ -550,8 +537,7 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [sales]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'sales')
   }
 }
 

@@ -59,6 +59,7 @@ function buildSalesHandler(queryStub) {
   })
   registerMock(salesPath, path.join(apiDir, '_scope.js'), {
     scopeForUser: async () => null,
+    resolveRequestScope: async () => null,
     buildScopeWhere: () => ({ sql: '', isEmpty: false }),
     emptySalesPayload: () => ({}),
     scopeResponseMeta: () => ({})

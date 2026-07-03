@@ -98,7 +98,11 @@ function buildEnv(scopeResolvedBy, queryStub) {
 
   // Stub _scope — scopeForUser returns whatever the test asked for
   registerMock(customerPath, path.join(apiDir, '_scope.js'), {
-    scopeForUser: async (uuid) => scopeResolvedBy(uuid)
+    scopeForUser: async (uuid) => scopeResolvedBy(uuid),
+    resolveRequestScope: async (req) => {
+      const p = req && req.query && req.query.scope
+      return (typeof p === 'string' && p.startsWith('user:')) ? scopeResolvedBy(p.slice(5).trim()) : null
+    }
   })
 
   // Stub customer-map (toHistoricalCode returns null — skips historical query branch)

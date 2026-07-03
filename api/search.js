@@ -1,7 +1,9 @@
 const { query } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
+const { regionCaseSql } = require('./lib/region-map')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -43,23 +45,13 @@ module.exports = async (req, res) => {
             AND T0.DocDate >= DATEADD(YEAR, -1, GETDATE())
         ), 0) AS ytd_volume,
         (SELECT TOP 1
-          CASE
-            WHEN T2.WhsCode IN ('AC','ACEXT','BAC')   THEN 'Luzon'
-            WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-            WHEN T2.WhsCode IN ('BUKID','CCPC')        THEN 'Mindanao'
-            ELSE 'Other'
-          END
+          ${regionCaseSql('T2')}
          FROM OINV TI2
          INNER JOIN INV1 T2 ON T2.DocEntry = TI2.DocEntry
          WHERE TI2.CardCode = C.CardCode AND TI2.CANCELED = 'N'
            AND TI2.DocDate >= DATEADD(YEAR, -1, GETDATE())
          GROUP BY
-           CASE
-             WHEN T2.WhsCode IN ('AC','ACEXT','BAC')   THEN 'Luzon'
-             WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-             WHEN T2.WhsCode IN ('BUKID','CCPC')        THEN 'Mindanao'
-             ELSE 'Other'
-           END
+           ${regionCaseSql('T2')}
          ORDER BY SUM(T2.LineTotal) DESC
         ) AS region
       FROM OCRD C
@@ -88,7 +80,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, payload, 30)
     res.json(payload)
   } catch (err) {
-    console.error('API error [search]:', err.message)
-    res.status(500).json({ error: 'Search error', detail: err.message })
+    return serverError(res, err, 'search')
   }
 }

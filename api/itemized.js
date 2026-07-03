@@ -1,4 +1,5 @@
-const { query } = require('./_db')
+const { queryDateRange } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession } = require('./_auth')
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql } = require('./lib/business_filters')
@@ -112,7 +113,16 @@ module.exports = async (req, res) => {
     if (isTotalNational) {
       const qStart = Date.now()
       const lineFilters = regionFilterSql(region, 'T1') + segmentFilterSql(segment, 'T0')
-      rawByItemMonth = await query(`
+      // Query each year through queryDateRange so the current year (Vienovo_Live)
+      // and the compare year (typically last year → Vienovo_Old) each hit the
+      // right DB. A single `query()` with `YEAR IN (@year,@cy)` ran only against
+      // Vienovo_Live, so every compare-year (LY) row came back empty. Using a
+      // DocDate BETWEEN range also makes the scan sargable (was a full-table scan).
+      const yearBounds = yr => ({
+        from: new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0)),
+        to:   new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999))
+      })
+      const itemMonthSql = `
         SELECT
           T1.ItemCode                                                           AS item_code,
           MAX(I.ItemName)                                                       AS item_name,
@@ -126,10 +136,17 @@ module.exports = async (req, res) => {
         INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I   ON T1.ItemCode = I.ItemCode
         WHERE T0.CANCELED = 'N'
-          AND YEAR(T0.DocDate) IN (@year, @cy)
+          AND T0.DocDate BETWEEN @dateFrom AND @dateTo
           AND UPPER(T1.ItemCode) LIKE 'FG%'${lineFilters}
         GROUP BY T1.ItemCode, MONTH(T0.DocDate), YEAR(T0.DocDate)
-      `, { year, cy: compareYear, region })
+      `
+      const cur = yearBounds(year)
+      const cmp = yearBounds(compareYear)
+      const [curRows, cmpRows] = await Promise.all([
+        queryDateRange(itemMonthSql, { region }, cur.from, cur.to),
+        queryDateRange(itemMonthSql, { region }, cmp.from, cmp.to)
+      ])
+      rawByItemMonth = [...curRows, ...cmpRows]
       queryMs = Date.now() - qStart
     }
 
@@ -287,8 +304,7 @@ module.exports = async (req, res) => {
     res.setHeader('X-Total-Ms', String(Date.now() - startMs))
     res.json(result)
   } catch (err) {
-    console.error('API error [itemized]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'itemized')
   }
 }
 

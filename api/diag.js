@@ -1,4 +1,5 @@
 const { query, queryH } = require('./_db')
+const { serverError } = require('./lib/http')
 const { getCustomerMap, toHistoricalCode } = require('./lib/customer-map')
 const { requireDiagAccess } = require('./lib/require-diag-access')
 
@@ -66,7 +67,7 @@ module.exports = async (req, res) => {
           : null
       })
     } catch (err) {
-      return res.status(500).json({ error: err.message, stack: err.stack })
+      return serverError(res, err, 'diag')
     }
   }
 
@@ -170,7 +171,7 @@ module.exports = async (req, res) => {
         falcor_in_historical: falcorHist
       })
     } catch (err) {
-      return res.status(500).json({ error: err.message, stack: err.stack })
+      return serverError(res, err, 'diag')
     }
   }
 
@@ -281,7 +282,7 @@ module.exports = async (req, res) => {
         }
       })
     } catch (err) {
-      return res.status(500).json({ error: err.message, stack: err.stack })
+      return serverError(res, err, 'diag')
     }
   }
 
@@ -535,6 +536,6 @@ module.exports = async (req, res) => {
       }
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, err, 'diag')
   }
 }

@@ -57,13 +57,14 @@ function buildArHandler(queryStub) {
   })
   registerMock(arPath, path.join(apiDir, '_scope.js'), {
     scopeForUser: async () => null,
+    resolveRequestScope: async () => null,
     buildScopeWhere: () => ({ sql: '' })
   })
   registerMock(arPath, path.join(apiDir, '_db.js'), {
     query: queryStub,
     queryH: async () => [{ ar_ly: 0, overdue_ly: 0 }]
   })
-  registerMock(arPath, path.join(libDir, 'cache.js'), { get: () => null, set: () => {} })
+  registerMock(arPath, path.join(libDir, 'cache.js'), { get: () => null, set: () => {}, keyableUrl: (u) => u })
   return require(arPath)
 }
 
@@ -81,7 +82,7 @@ test('ar_dso_region_filter_uses_line_apportioned_sql', async () => {
   assert.ok(dsoSql.includes('@dso_s90_active'), 'apportioned 90d denominator declared')
   assert.ok(dsoSql.includes('LineTotal * (O.DocTotal - O.PaidToDate)'), 'AR apportioned by line share')
   assert.ok(/INNER JOIN INV1 L ON L\.DocEntry = O\.DocEntry/.test(dsoSql), 'INV1 line join present')
-  assert.ok(/L\.WhsCode IN \('HOREB','ARGAO','ALAE'\)/.test(dsoSql), 'regionCaseSql on the line alias')
+  assert.ok(/L\.WhsCode IN \('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO'\)/.test(dsoSql), 'regionCaseSql on the line alias')
   assert.ok(/@dso_ar_active \/ \(@dso_s90_active\/90\.0\)[\s\S]*AS dso_active/.test(dsoSql),
             'dso_active computed from apportioned pair')
   assert.ok(/@dso_ar_total \/ \(@dso_s90_total\/90\.0\)[\s\S]*AS dso_total/.test(dsoSql),
@@ -147,7 +148,7 @@ test('dashboard_dso_region_filter_uses_line_apportioned_sql', async () => {
   assert.ok(dsoSql, 'DSO query ran')
   assert.ok(dsoSql.includes('LineTotal * (O.DocTotal - O.PaidToDate)'), 'AR apportioned by line share')
   assert.ok(/INNER JOIN INV1 L ON L\.DocEntry = O\.DocEntry/.test(dsoSql), 'INV1 line join present')
-  assert.ok(/L\.WhsCode IN \('HOREB','ARGAO','ALAE'\)/.test(dsoSql), 'regionCaseSql on the line alias')
+  assert.ok(/L\.WhsCode IN \('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO'\)/.test(dsoSql), 'regionCaseSql on the line alias')
   assert.ok(!dsoSql.includes('EXISTS (SELECT 1 FROM INV1'), 'EXISTS whole-invoice scoping replaced')
   assert.equal(queryStub.calls.find(c => c.sql.includes('@s90_active')).params.region, 'Visayas')
 

@@ -4,3 +4,14 @@ node_modules
 .env.local
 .vercel
 *.md
+*.backup
+_verify_*.png
+_mexp_*.png
+vieforce-hq-desktop.html
+.autopsy
+_audit_snapshots
+_margin_audit
+test-results
+.playwright-mcp
+.planning
+.superpowers

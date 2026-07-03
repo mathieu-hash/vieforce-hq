@@ -149,15 +149,12 @@
       if(gm && r) gmPct = (gm/r)*100;
     }
     var gmPctEl = $('evp-gm-pct'); if(gmPctEl) gmPctEl.textContent = (gmPct!=null) ? gmPct.toFixed(1)+'%' : '—';
-    var gmDelta = (dash && dash.delta_pct && dash.delta_pct.gross_margin) || 0;
-    if (typeof CMP === 'string' && CMP === 'vs_ly' && dash && dash.delta_pct_ly && dash.delta_pct_ly.gross_margin != null && dash.delta_pct_ly.gross_margin !== undefined) {
-      gmDelta = dash.delta_pct_ly.gross_margin;
-    }
+    // GM% is a RATE. The available delta (dash.delta_pct.gross_margin) is the
+    // period-over-period change of ABSOLUTE peso GM, not of the rate — showing it
+    // next to a rate is misleading (can read "↑15%" while the rate is flat). No
+    // GM%-basis delta is in the payload, so drop the arrow entirely.
     var gmTrendEl = $('evp-gm-trend');
-    if(gmTrendEl){
-      gmTrendEl.textContent = (gmDelta>=0?'↑':'↓')+' '+Math.abs(gmDelta).toFixed(1)+'%';
-      gmTrendEl.className = 'evp-pnl-trend '+(gmDelta>=0?'up':'down');
-    }
+    if(gmTrendEl){ gmTrendEl.textContent = ''; gmTrendEl.className = 'evp-pnl-trend'; }
 
     // Volume MT
     var vol = (dash && dash.volume_mt) || 0;
@@ -352,7 +349,7 @@
     }
 
     var rows = [
-      { label: '🥇 Region', value: topRegion ? (topRegion.region+' ('+fmtMT(topRegion.vol)+' MT)') : '—' },
+      { label: '🥇 Region', value: topRegion ? (topRegion.region+' ('+fmtMT(topRegion.vol)+' MT MTD)') : '—' },
       { label: '🥇 RSM',    value: topRsm    ? ((topRsm.rsm||topRsm.name)+' · '+fmtMT(topRsm.ytd_vol)+' MT YTD') : '—' },
       { label: '🥇 District', value: topDsmVal }
     ];

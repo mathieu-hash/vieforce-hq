@@ -13,21 +13,17 @@
 // CRITICAL: no customer exclusion. CCPC included.
 
 const { query, queryH } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 const { classify, FAMILIES } = require('./lib/brand-family')
 const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
+const { regionCaseSql } = require('./lib/region-map')
 const { resolveRefMonthAnchor } = require('./lib/shipping_days')
 
 const REGIONS = ['Luzon', 'Visayas', 'Mindanao', 'Other']
-const REGION_CASE = `
-  CASE
-    WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
-    WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
-    WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
-    ELSE 'Other'
-  END`
+const REGION_CASE = regionCaseSql('T1')
 
 // Same KA SlpCode set as analytics-sku-matrix
 const KA_SLPCODES = new Set([2, 7, 24])
@@ -262,7 +258,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 1800)
     res.json(result)
   } catch (err) {
-    console.error('API error [analytics/brand-coverage]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'analytics-brand-coverage')
   }
 }

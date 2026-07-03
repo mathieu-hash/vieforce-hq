@@ -1,4 +1,5 @@
 const { query } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
@@ -64,14 +65,48 @@ module.exports = async (req, res) => {
       ORDER BY gp_pct ASC
     `, { dateFrom, dateTo, region })
 
+    // --- National totals (UN-TRUNCATED) ---
+    // TOP 500 above is display-only. National GM/totals must aggregate ALL rows
+    // over the SAME filteredWhere (mirrors api/dashboard.js) or they bias low and
+    // disagree with the Home page.
+    const natlTotals = await query(`
+      SELECT
+        ISNULL(SUM(T1.LineTotal), 0)                                  AS sales,
+        ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0) AS vol,
+        ISNULL(SUM(T1.GrssProfit), 0)                                 AS gp
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
+      ${filteredWhere}
+    `, { dateFrom, dateTo, region })
+
+    // --- Bucket counts (UN-TRUNCATED) ---
+    // Copied verbatim from api/dashboard.js marginCounts so Home and Margin show
+    // identical critical/warning/watch/healthy counts (per-customer gp_pct).
+    const marginCounts = await query(`
+      SELECT
+        SUM(CASE WHEN gp_pct < 0 THEN 1 ELSE 0 END)                     AS critical,
+        SUM(CASE WHEN gp_pct >= 0 AND gp_pct < 10 THEN 1 ELSE 0 END)    AS warning,
+        SUM(CASE WHEN gp_pct >= 10 AND gp_pct < 15 THEN 1 ELSE 0 END)   AS watch,
+        SUM(CASE WHEN gp_pct >= 15 THEN 1 ELSE 0 END)                    AS healthy
+      FROM (
+        SELECT T0.CardCode,
+          CASE WHEN SUM(T1.LineTotal) > 0
+            THEN SUM(T1.GrssProfit) / SUM(T1.LineTotal) * 100
+            ELSE 0 END AS gp_pct
+        FROM OINV T0
+        INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+        ${filteredWhere}
+        GROUP BY T0.CardCode
+      ) sub
+    `, { dateFrom, dateTo, region })
+
     // Drop warehouse/internal-transfer codes/names before classifying
     const custMarginClean = custMargin.filter(c => !isNonCustomerRow(c.code, c.customer))
 
     // Classify customers (operate on cleaned list)
     const criticalRaw = custMarginClean.filter(c => c.gp_pct < 0)
     const warningRaw  = custMarginClean.filter(c => c.gp_pct >= 0 && c.gp_pct < 10)
-    const watch       = custMarginClean.filter(c => c.gp_pct >= 10 && c.gp_pct < 15)
-    const healthy     = custMarginClean.filter(c => c.gp_pct >= 15)
 
     // Apply per-user silence filter
     const criticalFiltered = applySilenceFilter(criticalRaw, 'margin_critical', silenceIdx, r => r.code)
@@ -81,9 +116,16 @@ module.exports = async (req, res) => {
 
     const negative_gp_total = critical.reduce((s, c) => s + c.gp, 0)
     const revenue_at_risk = [...critical, ...warning].reduce((s, c) => s + c.sales, 0)
-    const totalSales = custMargin.reduce((s, c) => s + c.sales, 0)
-    const totalVol = custMargin.reduce((s, c) => s + c.vol, 0)
-    const totalGP = custMargin.reduce((s, c) => s + c.gp, 0)
+    // National totals + bucket counts from the un-truncated aggregates (not the
+    // TOP-500 slice) so Home and Margin agree.
+    const totalSales = Number(natlTotals[0]?.sales || 0)
+    const totalVol   = Number(natlTotals[0]?.vol   || 0)
+    const totalGP    = Number(natlTotals[0]?.gp    || 0)
+    const counts = marginCounts[0] || {}
+    const criticalCount = Number(counts.critical || 0)
+    const warningCount  = Number(counts.warning  || 0)
+    const watchCount    = Number(counts.watch    || 0)
+    const healthyCount  = Number(counts.healthy  || 0)
 
     // --- SKU-level breakdown for critical customers ---
     const critCodes = critical.slice(0, 10).map(c => c.code)
@@ -124,9 +166,9 @@ module.exports = async (req, res) => {
     const by_region = await query(`
       SELECT
         CASE
-          WHEN W.WhsName LIKE '%Luzon%' OR W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN W.WhsName LIKE '%Visayas%' OR W.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN W.WhsName LIKE '%Mindanao%' OR W.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+          WHEN W.WhsName LIKE '%Luzon%' OR W.WhsCode IN ('AC','ACEXT','PFMIS','PFMCIS') THEN 'Luzon'
+          WHEN W.WhsName LIKE '%Visayas%' OR W.WhsCode IN ('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO') THEN 'Visayas'
+          WHEN W.WhsName LIKE '%Mindanao%' OR W.WhsCode IN ('BUKID','SOUTH','CAG','ALAE','CCPC') THEN 'Mindanao'
           ELSE 'Other'
         END                                                              AS region,
         ISNULL(SUM(T1.LineTotal), 0)                                     AS sales,
@@ -145,9 +187,9 @@ module.exports = async (req, res) => {
       ${filteredWhere}
       GROUP BY
         CASE
-          WHEN W.WhsName LIKE '%Luzon%' OR W.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN W.WhsName LIKE '%Visayas%' OR W.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN W.WhsName LIKE '%Mindanao%' OR W.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
+          WHEN W.WhsName LIKE '%Luzon%' OR W.WhsCode IN ('AC','ACEXT','PFMIS','PFMCIS') THEN 'Luzon'
+          WHEN W.WhsName LIKE '%Visayas%' OR W.WhsCode IN ('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO') THEN 'Visayas'
+          WHEN W.WhsName LIKE '%Mindanao%' OR W.WhsCode IN ('BUKID','SOUTH','CAG','ALAE','CCPC') THEN 'Mindanao'
           ELSE 'Other'
         END
       ORDER BY gp_pct ASC
@@ -300,14 +342,14 @@ module.exports = async (req, res) => {
       hero: {
         negative_gp_total: Math.round(negative_gp_total),
         revenue_at_risk: Math.round(revenue_at_risk),
-        critical_count: critical.length,
-        warning_count: warning.length
+        critical_count: criticalCount,
+        warning_count: warningCount
       },
       kpis: {
-        critical: critical.length,
-        warning: warning.length,
-        watch: watch.length,
-        healthy: healthy.length,
+        critical: criticalCount,
+        warning: warningCount,
+        watch: watchCount,
+        healthy: healthyCount,
         natl_gm_ton: Math.round(natl_gm_ton),
         natl_gp_pct: Math.round(natl_gp_pct * 10) / 10,
         best_region: bestRegion ? { name: bestRegion.region, gp_pct: Math.round(bestRegion.gp_pct * 10) / 10 } : null,
@@ -332,7 +374,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [margin]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'margin')
   }
 }

@@ -1,8 +1,10 @@
 const { query, queryH } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, applyRoleFilter, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
 const { countShippingDays, getPeriodEndBound, resolveRefMonthAnchor } = require('./lib/shipping_days')
 const { normalizeRegion, normalizeSegment, regionFilterSql, segmentFilterSql } = require('./lib/business_filters')
+const { regionCaseSql } = require('./lib/region-map')
 
 // FY2026 Budget — single source of truth in api/lib/budget_2026.js.
 // This endpoint formerly held its own duplicated copy; consuming the shared
@@ -126,12 +128,7 @@ module.exports = async (req, res) => {
     // --- Actual by region (YTD, approximate via warehouse) ---
     const regionActual = await query(`
       SELECT
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END                                                                AS region,
+        ${regionCaseSql('T1')}                                                                AS region,
         ISNULL(SUM(T1.Quantity * ISNULL(I.NumInSale, 1)) / 1000.0, 0)    AS vol,
         ISNULL(SUM(T1.LineTotal), 0)                                       AS sales,
         ISNULL(SUM(T1.GrssProfit), 0)                                      AS gm
@@ -140,12 +137,7 @@ module.exports = async (req, res) => {
       LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
       ${filteredWhere}
       GROUP BY
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-          ELSE 'Other'
-        END
+        ${regionCaseSql('T1')}
     `, { dateFrom, dateTo, ...sqlParams })
 
     // Build results
@@ -330,7 +322,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [budget]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'budget')
   }
 }

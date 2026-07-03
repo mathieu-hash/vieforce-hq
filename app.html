@@ -4671,7 +4671,7 @@ async function loadSales(){
         var poShown = pp.detail.slice(0, poCap);
         sett('po-detail-count', poShown.length + ' of ' + pp.detail.length + ' lines shown');
         var pohtml = poShown.map(function(x){
-          var region = ['AC','ACEXT','BAC'].indexOf(x.plant)>=0?'Luzon' : ['HOREB','ARGAO','ALAE'].indexOf(x.plant)>=0?'Visayas' : ['BUKID','CCPC'].indexOf(x.plant)>=0?'Mindanao' : 'Other';
+          var region = plantRegionOf(x.plant);
           var dateStr = x.date ? new Date(x.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
           return '<tr style="cursor:pointer" onclick="openCust(\''+esc(x.code||'')+'\')">'
             +'<td style="font-family:var(--mono);font-weight:600;color:var(--blue)">'+esc(String(x.doc_num||''))+'</td>'
@@ -5716,6 +5716,9 @@ async function loadCustDetail(){
     // Destroy & recreate pattern (same as speed chart) so categorical axis resets cleanly
     // between customer selections.
     (function(){
+      // Tear down the previous customer's chart FIRST — before any early return —
+      // so an empty/missing dataset can't leave the prior customer's bars ghosting.
+      if(charts.custVolBar){ try{charts.custVolBar.destroy();}catch(e){} charts.custVolBar=null; }
       var cv = d.cy_vs_ly;
       if(!cv) return;
       var months = Array.isArray(cv) ? cv.map(function(m){return m.month_label||m.month||''}) : (cv.months||[]);
@@ -5724,7 +5727,6 @@ async function loadCustDetail(){
       if(!months.length) return;
       var ctxCv = document.getElementById('custVolBarChart');
       if(!ctxCv) return;
-      if(charts.custVolBar){ try{charts.custVolBar.destroy();}catch(e){} charts.custVolBar=null; }
       charts.custVolBar = new Chart(ctxCv,{type:'bar',data:{
         labels:months,
         datasets:[
@@ -7761,8 +7763,10 @@ function initCharts(pageId){
       if(!charts.budgetHistory){
         const ctx = document.getElementById('budgetHistoryChart');
         if(ctx){
-          const yrs = ['2017','2018','2019','2020','2021','2022','2023','2024','2025','2026'];
-          const vols = [4,25,68,80,70,90,90,110,136,188];
+          // No seed data — loadBudget()'s real fetch is the only data source, so a
+          // first-load race can't leave hardcoded mock values on the chart.
+          const yrs = [];
+          const vols = [];
           const g = ctx.getContext('2d').createLinearGradient(0,0,0,220);
           g.addColorStop(0,'rgba(151,215,0,0.2)');g.addColorStop(1,'rgba(151,215,0,0)');
           charts.budgetHistory = new Chart(ctx,{type:'line',data:{
@@ -7789,11 +7793,13 @@ function initCharts(pageId){
       if(!charts.budgetMonthly){
         const ctx2 = document.getElementById('budgetMonthlyChart');
         if(ctx2){
+          // No seed data — loadBudget()'s real fetch is the only data source, so a
+          // first-load race can't leave hardcoded mock values on the chart.
           charts.budgetMonthly = new Chart(ctx2,{type:'bar',data:{
             labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
             datasets:[
-              {label:'Actual',data:[14010,12999,14791,15104,null,null,null,null,null,null,null,null],backgroundColor:'rgba(0,74,100,0.7)',borderRadius:3,borderSkipped:false},
-              {label:'Budget',data:[14010,12999,14791,15334,15536,15005,16735,16247,17097,18391,17211,16981],backgroundColor:'rgba(255,255,255,0.1)',borderRadius:3,borderSkipped:false}
+              {label:'Actual',data:[],backgroundColor:'rgba(0,74,100,0.7)',borderRadius:3,borderSkipped:false},
+              {label:'Budget',data:[],backgroundColor:'rgba(255,255,255,0.1)',borderRadius:3,borderSkipped:false}
             ]
           },options:{
             responsive:true,maintainAspectRatio:false,
@@ -8732,12 +8738,14 @@ function gsSelect(code){
 /* =================================================================
    INVENTORY DRILL-DOWN
    ================================================================= */
+// Canonical plant (WhsCode) → region map — MUST match api/lib/region-map.js.
+// Confirmed 2026-07-03: BAC = Bacolod (Visayas), ALAE = Mindanao.
 function plantRegionOf(wh){
   if(!wh) return 'Other';
   var w = String(wh).toUpperCase();
-  if(w === 'AC' || w === 'ACEXT' || w === 'BAC') return 'Luzon';
-  if(w === 'HOREB' || w === 'ARGAO' || w === 'ALAE') return 'Visayas';
-  if(w === 'BUKID' || w === 'CCPC') return 'Mindanao';
+  if(w === 'AC' || w === 'ACEXT' || w === 'PFMIS' || w === 'PFMCIS') return 'Luzon';
+  if(w === 'HOREB' || w === 'HBEXT' || w === 'HBEXT-QA' || w === 'BAC' || w === 'ARGAO') return 'Visayas';
+  if(w === 'BUKID' || w === 'SOUTH' || w === 'CAG' || w === 'ALAE' || w === 'CCPC') return 'Mindanao';
   return 'Other';
 }
 

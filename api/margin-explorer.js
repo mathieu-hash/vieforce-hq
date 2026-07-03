@@ -13,6 +13,7 @@
 // Spec: docs/superpowers/specs/2026-06-05-margin-explorer-design.md · SQL: margin-explorer-SQL.md
 
 const { query, queryH, queryDateRange, MIGRATION_CUTOFF } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const bridge = require('./lib/margin_bridge')
@@ -636,7 +637,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 120)
     res.json(result)
   } catch (err) {
-    console.error('API error [margin-explorer]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'margin-explorer')
   }
 }

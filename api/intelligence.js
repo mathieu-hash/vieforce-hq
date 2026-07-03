@@ -1,4 +1,5 @@
 const { query, queryH, queryBoth } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession } = require('./_auth')
 const { resolveRefMonthAnchor } = require('./lib/shipping_days')
 const cache = require('../lib/cache')
@@ -6,6 +7,7 @@ const { isNonCustomer, isNonCustomerRow, excludeNonCustomers } = require('./lib/
 const { getActiveSilences, buildSilenceIndex, applySilenceFilter } = require('./lib/silence')
 const { getCustomerMap } = require('./lib/customer-map')
 const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
+const { regionCaseSql } = require('./lib/region-map')
 
 // --- Scoring helpers (deterministic, explainable) ---
 function scoreRescue(ar_balance, days_silent) {
@@ -230,12 +232,7 @@ module.exports = async (req, res) => {
     const Q3_SQL = `
       SELECT
         T0.CardCode,
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
-          ELSE 'Other'
-        END AS region,
+        ${regionCaseSql('T1')} AS region,
         SUM(T1.LineTotal) AS region_rev
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
@@ -243,12 +240,7 @@ module.exports = async (req, res) => {
         AND T0.CANCELED = 'N'
       GROUP BY
         T0.CardCode,
-        CASE
-          WHEN T1.WhsCode IN ('AC','ACEXT','BAC')      THEN 'Luzon'
-          WHEN T1.WhsCode IN ('HOREB','ARGAO','ALAE')  THEN 'Visayas'
-          WHEN T1.WhsCode IN ('BUKID','CCPC')          THEN 'Mindanao'
-          ELSE 'Other'
-        END
+        ${regionCaseSql('T1')}
     `
     // Run explicitly on each DB so we can rekey historical rows before merging.
     const [regCur, regHistRaw] = await Promise.all([
@@ -772,8 +764,7 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 600)
     res.json(result)
   } catch (err) {
-    console.error('API error [intelligence]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'intelligence')
   }
 }
 

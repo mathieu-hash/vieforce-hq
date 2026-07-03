@@ -60,23 +60,10 @@
     if (v == null || isNaN(v)) return '—';
     return (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' t';
   }
-  function fmtDelta(v, isPct) {
-    if (v == null || isNaN(v)) return '—';
-    var n = +v;
-    var sign = n > 0 ? '+' : '';
-    return sign + n.toFixed(1) + (isPct ? '%' : '');
-  }
-
   // Green-ish positive / red negative color for a primary value.
   function valueColor(v) {
     if (v == null || isNaN(v)) return 'var(--text3)';
     return (+v) < 0 ? 'var(--red)' : 'var(--green)';
-  }
-  function deltaColor(v) {
-    if (v == null || isNaN(v)) return 'var(--text3)';
-    if (+v > 0) return 'var(--green)';
-    if (+v < 0) return 'var(--red)';
-    return 'var(--text3)';
   }
 
   // Inject scoped styles once.
@@ -183,14 +170,12 @@
       return p > m ? p : m;
     }, 0) || 1;
 
-    var isPctDelta = (unit === 'gp_pct' || unit === 'kg' || unit === 'ton');
-
     var table = document.createElement('table');
     table.className = 'mexp-matrix-table';
 
-    // colgroup: fixed label column + 5 even numeric columns
+    // colgroup: fixed label column + 4 even numeric columns
     var colg = document.createElement('colgroup');
-    colg.innerHTML = '<col class="mexp-col-dim">' + '<col><col><col><col><col>';
+    colg.innerHTML = '<col class="mexp-col-dim">' + '<col><col><col><col>';
     table.appendChild(colg);
 
     // Header
@@ -202,13 +187,12 @@
       '<th>GP ₱</th>' +
       '<th>% of GP</th>' +
       '<th>Vol (t)</th>' +
-      '<th>Δ</th>' +
       '</tr>';
     table.appendChild(thead);
 
     var tbody = document.createElement('tbody');
     rows.forEach(function (r) {
-      tbody.appendChild(buildRow(r, cfg, totalGp, maxShare, selectedDim, isPctDelta, opts.onRowClick));
+      tbody.appendChild(buildRow(r, cfg, totalGp, maxShare, selectedDim, opts.onRowClick));
     });
     table.appendChild(tbody);
 
@@ -226,7 +210,7 @@
     return key || 'Dimension';
   }
 
-  function buildRow(r, cfg, totalGp, maxShare, selectedDim, isPctDelta, onRowClick) {
+  function buildRow(r, cfg, totalGp, maxShare, selectedDim, onRowClick) {
     var tr = document.createElement('tr');
     tr.className = 'mexp-row' + (r.dim === selectedDim ? ' mexp-sel' : '');
 
@@ -240,11 +224,6 @@
       : (totalGp ? (+r.gp || 0) / totalGp * 100 : 0);
     var fillPct = Math.max(0, Math.min(100, (share / maxShare) * 100));
 
-    // delta
-    var deltaRaw = (r.delta != null) ? r.delta
-      : (r.delta_pct != null ? r.delta_pct
-      : (r.delta_pp != null ? r.delta_pp : null));
-
     var chevron = r.expandable ? '<span class="mexp-dim-chevron">›</span>' : '';
 
     tr.innerHTML =
@@ -253,8 +232,7 @@
         (primaryVal == null ? '—' : _esc(cfg.fmt(primaryVal))) + '</td>' +
       '<td>' + _esc(_fc(r.gp)) + '</td>' +
       '<td>' + share.toFixed(1) + '%</td>' +
-      '<td>' + _esc(fmtTons(r.tons)) + '</td>' +
-      '<td style="color:' + deltaColor(deltaRaw) + '">' + _esc(fmtDelta(deltaRaw, isPctDelta)) + '</td>';
+      '<td>' + _esc(fmtTons(r.tons)) + '</td>';
 
     tr.addEventListener('click', function () {
       if (typeof onRowClick === 'function') onRowClick(r.dim, r);
@@ -289,8 +267,7 @@
       '<td class="mexp-primary">' + _esc(primaryStr) + '</td>' +
       '<td>' + _esc(_fc(gpTotal)) + '</td>' +
       '<td>100.0%</td>' +
-      '<td>' + _esc(fmtTons(sumTons)) + '</td>' +
-      '<td></td>';
+      '<td>' + _esc(fmtTons(sumTons)) + '</td>';
     tfoot.appendChild(tr);
     return tfoot;
   }

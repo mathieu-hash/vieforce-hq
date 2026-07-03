@@ -1,10 +1,12 @@
 const { query, queryH } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
-const { scopeForUser, buildScopeWhere } = require('./_scope')
+const { resolveRequestScope, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
 const { rekeyHistoricalRows } = require('./lib/customer-map')
 const { normalizeRegion, normalizeSegment, filterMeta } = require('./lib/business_filters')
+const { regionCaseSql } = require('./lib/region-map')
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -24,21 +26,9 @@ module.exports = async (req, res) => {
   const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50))
   const offset   = (pageNum - 1) * limitNum
 
-  // Parse optional scope=user:<uuid>. Same pattern as /api/sales + /api/customer.
-  let scope = null
-  const scopeParam = req.query.scope
-  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
-    const uuid = scopeParam.slice(5).trim()
-    if (uuid) {
-      try {
-        scope = await scopeForUser(uuid)
-      } catch (err) {
-        console.error('[customers] scope resolve failed:', err.message)
-        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
-                  slpCodes: [], districtCodes: [] }
-      }
-    }
-  }
+  // Scope resolved centrally (service token → ?scope=user; user session → own
+  // identity when SCOPE_USER_SESSIONS is on; never the client param).
+  const scope = await resolveRequestScope(req, session)
 
   // EXISTS-based WHERE fragment that restricts to the caller's SlpCodes +
   // districts. '' when scope is 'ALL' or no scope param was passed.
@@ -65,7 +55,7 @@ module.exports = async (req, res) => {
 
   // Cache key includes scope so user A's cached rows can't leak to user B.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
-  const cacheKey = `customers_v2_${req.url}_${session.role}_${session.region || 'ALL'}${scopeKey}`
+  const cacheKey = `customers_v2_${cache.keyableUrl(req.url)}_${session.role}_${session.region || 'ALL'}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -108,23 +98,13 @@ module.exports = async (req, res) => {
           MAX(TI.DocDate)                                                      AS last_order_date,
           -- Dominant WhsCode (most-invoiced plant) → region
           (SELECT TOP 1
-            CASE
-              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-              ELSE 'Other'
-            END
+            ${regionCaseSql('T2')}
            FROM OINV TI2
            INNER JOIN INV1 T2 ON T2.DocEntry = TI2.DocEntry
            WHERE TI2.CardCode = T0.CardCode AND TI2.CANCELED = 'N'
              AND TI2.DocDate >= DATEADD(YEAR, -1, GETDATE())
            GROUP BY
-             CASE
-              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-              ELSE 'Other'
-             END
+             ${regionCaseSql('T2')}
            ORDER BY SUM(T2.LineTotal) DESC
           ) AS dom_region
         FROM OCRD T0
@@ -167,23 +147,13 @@ module.exports = async (req, res) => {
           T0.CardName,
           MAX(T0.SlpCode) AS slp_code,
           (SELECT TOP 1
-            CASE
-              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-              ELSE 'Other'
-            END
+            ${regionCaseSql('T2')}
            FROM OINV TI2
            INNER JOIN INV1 T2 ON T2.DocEntry = TI2.DocEntry
            WHERE TI2.CardCode = T0.CardCode AND TI2.CANCELED = 'N'
              AND TI2.DocDate >= DATEADD(YEAR, -1, GETDATE())
            GROUP BY
-             CASE
-              WHEN T2.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-              WHEN T2.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-              WHEN T2.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-              ELSE 'Other'
-             END
+             ${regionCaseSql('T2')}
            ORDER BY SUM(T2.LineTotal) DESC
           ) AS dom_region
         FROM OCRD T0
@@ -301,7 +271,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 600)
     res.json(result)
   } catch (err) {
-    console.error('API error [customers]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'customers')
   }
 }

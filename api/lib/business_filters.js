@@ -1,6 +1,8 @@
 // Shared commercial filters for HQ dashboards.
 // Region here means shipping/warehouse region unless an endpoint documents otherwise.
 
+const { regionCaseSql } = require('./region-map')
+
 const KA_SLPCODES = [2, 7, 24]
 const SEGMENTS = new Set(['ALL', 'DIST', 'KA', 'PET'])
 
@@ -21,14 +23,8 @@ function normalizeSegment(segment) {
   return SEGMENTS.has(s) ? s : 'ALL'
 }
 
-function regionCaseSql(lineAlias = 'T1') {
-  return `CASE
-    WHEN ${lineAlias}.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-    WHEN ${lineAlias}.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-    WHEN ${lineAlias}.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-    ELSE 'Other'
-  END`
-}
+// regionCaseSql now comes from the canonical ./region-map (re-exported below so
+// existing importers of business_filters keep working unchanged).
 
 function regionFilterSql(region, lineAlias = 'T1') {
   const r = normalizeRegion(region)

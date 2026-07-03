@@ -65,6 +65,7 @@ function buildHandler(gmRows) {
   })
   registerMock(salesPath, path.join(apiDir, '_scope.js'), {
     scopeForUser: async () => null,
+    resolveRequestScope: async () => null,
     buildScopeWhere: () => ({ sql: '', isEmpty: false }),
     emptySalesPayload: () => ({}),
     scopeResponseMeta: () => ({})
@@ -107,7 +108,7 @@ test('gm_by_group applies region + segment filters (Visayas + KA) like the rest 
   await run(handler, { period: 'MTD', region: 'Visayas', segment: 'KA' })
   const sql = gmSql(handler)
   // region: regionCaseSql on the INV1 line alias (T1) = @region
-  assert.ok(/T1\.WhsCode IN \('HOREB','ARGAO','ALAE'\)/.test(sql), 'region case on line alias present')
+  assert.ok(/T1\.WhsCode IN \('HOREB','HBEXT','HBEXT-QA','BAC','ARGAO'\)/.test(sql), 'region case on line alias present')
   assert.ok(sql.includes('= @region'), 'region predicate present')
   // segment: KA predicate on the doc alias T0
   assert.ok(/T0\.SlpCode IN \(/.test(sql), 'KA segment predicate present (SlpCode list)')

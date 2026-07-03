@@ -19,6 +19,7 @@
 //   }
 
 const { query } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, getPeriodDates } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
@@ -392,7 +393,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 120)     // 2 min — DSM home is high-touch
     res.json(result)
   } catch (err) {
-    console.error('API error [dsm-home]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'dsm-home')
   }
 }

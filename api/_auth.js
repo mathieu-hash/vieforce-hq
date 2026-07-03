@@ -47,7 +47,9 @@ async function verifyServiceToken(req) {
   )
   if (!ok) return null
 
-  console.log('[svc-auth] request authenticated:', req.url)
+  // Log the path only — the query string can carry scope/identifiers we don't
+  // want persisted in plaintext logs.
+  console.log('[svc-auth] request authenticated:', (req.url || '').split('?')[0])
 
   // Synthetic session — applyRoleFilter treats role='service' as full-scope.
   return {

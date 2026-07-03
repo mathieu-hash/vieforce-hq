@@ -104,9 +104,31 @@ app.delete('/api/admin/remove-user', adminRemoveUserHandler)
 
 // CORS preflight handled by cors() middleware above — no manual handler needed
 
+// Block static exposure of server-side source and dead artifacts. This origin
+// serves the repo root for local review; without this guard, requests like
+// /api/_db.js, /server.js, /api/auth/login.js, *.backup, or the retired mock
+// dashboard would be served as static files (real API routes are matched by the
+// app.get('/api/...') handlers above, so anything reaching here under /api/ is a
+// source-file fetch, not a live endpoint).
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase()
+  if (
+    p.startsWith('/api/') ||
+    p === '/server.js' ||
+    p.endsWith('.backup') ||
+    p === '/vieforce-hq-desktop.html' ||
+    p.startsWith('/scripts/') ||
+    p.startsWith('/migrations/') ||
+    p.startsWith('/tests/')
+  ) {
+    return res.status(404).end()
+  }
+  next()
+})
+
 // Local review: serve app.html and static assets from this repo so localhost uses
 // the same in-progress API handlers via js/api.js.
-app.use(express.static(__dirname, { index: false }))
+app.use(express.static(__dirname, { index: false, dotfiles: 'ignore' }))
 
 app.listen(PORT, () => {
   console.log(`VieForce HQ API running on port ${PORT}`)

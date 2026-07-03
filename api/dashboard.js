@@ -1,4 +1,5 @@
 const { query, queryBoth, queryDateRange } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const { isNonCustomerRow } = require('./lib/non-customer-codes')
@@ -640,7 +641,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [dashboard]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'dashboard')
   }
 }

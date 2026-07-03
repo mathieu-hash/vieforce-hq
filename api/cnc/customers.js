@@ -3,6 +3,7 @@
 // Auth: service-token only (HQ_SERVICE_TOKEN). Caller (cc-portal) is the
 // internal trust boundary; no user-scope filtering applied here.
 const { query } = require('../_db')
+const { serverError } = require('../lib/http')
 const { verifyServiceToken } = require('../_auth')
 const cache = require('../../lib/cache')
 
@@ -51,7 +52,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 60)
     res.json(result)
   } catch (err) {
-    console.error('API error [cnc/customers]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'cnc-customers')
   }
 }

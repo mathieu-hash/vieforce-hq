@@ -1,6 +1,7 @@
 const { query, queryH, queryBoth } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken, getPeriodDates } = require('./_auth')
-const { scopeForUser } = require('./_scope')
+const { resolveRequestScope } = require('./_scope')
 const { toHistoricalCode } = require('./lib/customer-map')
 const cache = require('../lib/cache')
 
@@ -32,22 +33,9 @@ module.exports = async (req, res) => {
   const period = ['7D', 'MTD', 'QTD', 'YTD'].includes(String(req.query.period || '').toUpperCase())
     ? String(req.query.period).toUpperCase() : 'YTD'
 
-  // Parse optional scope=user:<uuid>. When present, resolve to SlpCode / district
-  // whitelist and enforce access control BEFORE running the 360° query.
-  let scope = null
-  const scopeParam = req.query.scope
-  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
-    const uuid = scopeParam.slice(5).trim()
-    if (uuid) {
-      try {
-        scope = await scopeForUser(uuid)
-      } catch (err) {
-        console.error('[customer] scope resolve failed:', err.message)
-        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
-                  slpCodes: [], districtCodes: [] }
-      }
-    }
-  }
+  // Scope resolved centrally (service token → ?scope=user; user session → own
+  // identity when SCOPE_USER_SESSIONS is on; never the client param).
+  const scope = await resolveRequestScope(req, session)
 
   // Access control — short-circuit with 404 (privacy: never leak existence)
   if (scope) {
@@ -343,6 +331,7 @@ module.exports = async (req, res) => {
         INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
         LEFT JOIN OITM I ON T1.ItemCode = I.ItemCode
         WHERE T0.CANCELED = 'N' AND T0.DocDate >= DATEADD(YEAR, -1, GETDATE())
+          AND T0.CardCode NOT LIKE 'CE%' AND T0.SlpCode <> 1
         GROUP BY T0.CardCode
         HAVING SUM(T1.Quantity * ISNULL(I.NumInSale, 1) / 1000.0) > @custVol
       ) sub
@@ -418,7 +407,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [customer]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'customer')
   }
 }

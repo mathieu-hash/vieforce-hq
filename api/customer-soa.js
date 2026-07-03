@@ -1,4 +1,5 @@
 const { query } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
 const cache = require('../lib/cache')
 
@@ -178,7 +179,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 60)
     res.json(result)
   } catch (err) {
-    console.error('API error [customer-soa]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'customer-soa')
   }
 }

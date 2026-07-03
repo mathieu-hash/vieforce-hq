@@ -15,6 +15,7 @@
 //     total — 43, not 47).
 
 const { query } = require('../_db')
+const { serverError } = require('../lib/http')
 const { requireAdmin, getAdminSupabase, provisionalPhone, setCors, adminConfigError } = require('./_admin')
 
 module.exports = async (req, res) => {
@@ -97,7 +98,6 @@ module.exports = async (req, res) => {
       total_reps: reps.length
     })
   } catch (err) {
-    console.error('[admin/sap-reps] error:', err.message)
-    return res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'admin-sap-reps')
   }
 }

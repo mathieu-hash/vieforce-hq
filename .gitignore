@@ -9,3 +9,9 @@ node_modules
 _audit_snapshots/
 
 .superpowers/
+
+# scratch / debug artifacts
+_verify_*.png
+_mexp_*.png
+.playwright-mcp/
+_margin_audit/

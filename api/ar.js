@@ -1,6 +1,7 @@
 const { query, queryH } = require('./_db')
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
-const { scopeForUser, buildScopeWhere } = require('./_scope')
+const { resolveRequestScope, buildScopeWhere } = require('./_scope')
 const cache = require('../lib/cache')
 const { normalizeRegion, normalizeSegment, regionCaseSql, segmentFilterSql } = require('./lib/business_filters')
 
@@ -43,21 +44,9 @@ module.exports = async (req, res) => {
   const session = await verifyServiceToken(req) || await verifySession(req)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Parse optional scope=user:<uuid>. Same pattern as /api/sales + /api/customers.
-  let scope = null
-  const scopeParam = req.query.scope
-  if (scopeParam && typeof scopeParam === 'string' && scopeParam.startsWith('user:')) {
-    const uuid = scopeParam.slice(5).trim()
-    if (uuid) {
-      try {
-        scope = await scopeForUser(uuid)
-      } catch (err) {
-        console.error('[ar] scope resolve failed:', err.message)
-        scope = { userId: uuid, error: 'scope_resolve_failed', is_empty: true,
-                  slpCodes: [], districtCodes: [] }
-      }
-    }
-  }
+  // Scope resolved centrally (service token → ?scope=user; user session → own
+  // identity when SCOPE_USER_SESSIONS is on; never the client param).
+  const scope = await resolveRequestScope(req, session)
 
   // Zero-state short-circuit — caller has no SlpCodes/districts assigned yet.
   if (scope && scope.is_empty) {
@@ -90,7 +79,7 @@ module.exports = async (req, res) => {
   // Cache key includes the resolved scope so user A's rows can't leak to user B,
   // plus region+segment so scoped responses don't collide with national ones.
   const scopeKey = scope ? `_u:${scope.userId}:${scope.role || 'unknown'}` : ''
-  const cacheKey = `ar_v3_${req.url}_${session.role}_${session.region || 'ALL'}_${region}_${segment}${scopeKey}`
+  const cacheKey = `ar_v3_${cache.keyableUrl(req.url)}_${session.role}_${session.region || 'ALL'}_${region}_${segment}${scopeKey}`
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -190,11 +179,7 @@ module.exports = async (req, res) => {
     const byRegion = await query(`
       WITH ar_by_region AS (
         SELECT
-          CASE
-            WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-            WHEN INV.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-            WHEN INV.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-            ELSE 'Other' END AS region,
+          ${regionCaseSql('INV')} AS region,
           SUM(ISNULL(INV.LineTotal,0) * (O.DocTotal - O.PaidToDate) / NULLIF(O.DocTotal,0)) AS ar_share,
           COUNT(DISTINCT O.DocEntry) AS inv_count
         FROM OINV O
@@ -203,19 +188,11 @@ module.exports = async (req, res) => {
         WHERE O.CANCELED='N' AND O.DocTotal > O.PaidToDate AND ${ACTIVE}
           ${filterFor('O')}
         GROUP BY
-          CASE
-            WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-            WHEN INV.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-            WHEN INV.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-            ELSE 'Other' END
+          ${regionCaseSql('INV')}
       ),
       sales_by_region AS (
         SELECT
-          CASE
-            WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-            WHEN INV.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-            WHEN INV.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-            ELSE 'Other' END AS region,
+          ${regionCaseSql('INV')} AS region,
           SUM(INV.LineTotal) AS sales_90d
         FROM OINV O
         INNER JOIN OCRD C ON O.CardCode = C.CardCode
@@ -223,11 +200,7 @@ module.exports = async (req, res) => {
         WHERE O.CANCELED='N' AND O.DocDate >= DATEADD(DAY,-90,GETDATE()) AND ${ACTIVE}
           ${filterFor('O')}
         GROUP BY
-          CASE
-            WHEN INV.WhsCode IN ('AC','ACEXT','BAC') THEN 'Luzon'
-            WHEN INV.WhsCode IN ('HOREB','ARGAO','ALAE') THEN 'Visayas'
-            WHEN INV.WhsCode IN ('BUKID','CCPC') THEN 'Mindanao'
-            ELSE 'Other' END
+          ${regionCaseSql('INV')}
       )
       SELECT
         a.region,
@@ -404,7 +377,6 @@ module.exports = async (req, res) => {
     cache.set(cacheKey, result, 300)
     res.json(result)
   } catch (err) {
-    console.error('API error [ar]:', err.message)
-    res.status(500).json({ error: 'Database error', detail: err.message })
+    return serverError(res, err, 'ar')
   }
 }

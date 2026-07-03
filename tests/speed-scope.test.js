@@ -104,6 +104,10 @@ function buildEnv(scopeResolvedBy, queryStub, serviceAuth = true) {
 
   registerMock(speedPath, path.join(apiDir, '_scope.js'), {
     scopeForUser: async (uuid) => scopeResolvedBy(uuid),
+    resolveRequestScope: async (req) => {
+      const p = req && req.query && req.query.scope
+      return (typeof p === 'string' && p.startsWith('user:')) ? scopeResolvedBy(p.slice(5).trim()) : null
+    },
     buildScopeWhere: () => ({ sql: '', isEmpty: false })   // not used by speed
   })
 
@@ -111,7 +115,11 @@ function buildEnv(scopeResolvedBy, queryStub, serviceAuth = true) {
     query: queryStub,
     queryH: async () => [],
     queryBoth: async () => [],
-    queryDateRange: async () => []
+    // Delegate to the capturing queryStub so the LY pullout query (routed through
+    // queryDateRange for correct Vienovo_Old dispatch) is recorded and its scope
+    // filter can be asserted like every other ODLN query.
+    queryDateRange: async (sqlText, params, from, to) =>
+      queryStub(sqlText, { ...params, dateFrom: from, dateTo: to })
   })
 
   registerMock(speedPath, path.join(libDir, 'cache.js'), {

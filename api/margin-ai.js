@@ -2,6 +2,7 @@
 // Takes the ALREADY-COMPUTED dissection digest and asks Claude to interpret it.
 // The API key lives in ANTHROPIC_API_KEY (server env) and is NEVER exposed to the browser.
 
+const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken } = require('./_auth')
 
 module.exports = async (req, res) => {
@@ -42,7 +43,6 @@ module.exports = async (req, res) => {
     const text = (j.content || []).map(c => c.text || '').join('').trim()
     res.json({ text, model: 'claude-sonnet-4-6' })
   } catch (e) {
-    console.error('[margin-ai]', e.message)
-    res.status(500).json({ error: 'AI error', detail: e.message })
+    return serverError(res, e, 'margin-ai')
   }
 }

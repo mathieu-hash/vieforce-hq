@@ -31,15 +31,33 @@ const MIGRATION_CUTOFF = new Date(process.env.SAP_MIGRATION_CUTOFF || '2026-01-0
 let poolCurrent = null
 let poolHistorical = null
 
+// Memoize the CONNECT PROMISE (not the pool object) so that:
+//  1. Concurrent cold-start requests share one connect() instead of racing
+//     (mssql throws "Global connection already exists" on the second race).
+//  2. A failed connect does NOT leave a non-null, never-connected pool cached
+//     forever — we null the promise on rejection so the next call retries.
+// On pool-level errors after connect, we drop the cached pool so it rebuilds.
+function makePool(config, label, resetRef) {
+  const pool = new sql.ConnectionPool(config)
+  pool.on('error', err => {
+    console.error(`[_db] ${label} pool error, dropping cached pool:`, err.message)
+    resetRef()
+  })
+  return pool.connect()
+}
+
 async function getPool() {
-  if (!poolCurrent) poolCurrent = await sql.connect(configCurrent)
+  if (!poolCurrent) {
+    poolCurrent = makePool(configCurrent, 'current', () => { poolCurrent = null })
+      .catch(err => { poolCurrent = null; throw err })
+  }
   return poolCurrent
 }
 
 async function getHistoricalPool() {
   if (!poolHistorical) {
-    poolHistorical = new sql.ConnectionPool(configHistorical)
-    await poolHistorical.connect()
+    poolHistorical = makePool(configHistorical, 'historical', () => { poolHistorical = null })
+      .catch(err => { poolHistorical = null; throw err })
   }
   return poolHistorical
 }

@@ -145,6 +145,59 @@ async function scopeForUser(userId, supabaseClient) {
   return { ...ctx, slpCodes: [], districtCodes: [], is_empty: true }
 }
 
+// Roles that get filtered to their own book when session scoping is enabled.
+// Everyone else (exec/ceo/evp/director/admin/marketing/service) sees national.
+const SCOPED_ROLES = new Set(['rsm', 'dsm', 'tsr'])
+
+// Resolve the scope to apply for an incoming request. This is the single place
+// that decides "whose data does this caller see", and it closes two holes:
+//
+//   • Client scope tampering (was: any caller could pass ?scope=user:<uuid> and,
+//     once real filtering lands, widen to another user's book). Now a user
+//     session's scope is derived ONLY from its own session.id — the client
+//     param is honored solely for the Patrol service token.
+//
+//   • Role scoping being a no-op. When SCOPE_USER_SESSIONS=1, field roles
+//     (rsm/dsm/tsr) are scoped to their own SlpCodes/districts. It is OFF by
+//     default so nothing changes until every active field user has a
+//     sap_slpcode populated in Supabase — otherwise scopeForUser resolves to
+//     is_empty and they'd see a blank dashboard.
+//
+// Returns a scope object (see scopeForUser) or null (= national, no filter).
+async function resolveRequestScope(req, session, supabaseClient) {
+  const isService = !!(session && (session.is_service || session.role === 'service'))
+
+  if (isService) {
+    // Patrol S2S: honor an explicit ?scope=user:<uuid>.
+    const p = req && req.query ? req.query.scope : null
+    if (typeof p === 'string' && p.startsWith('user:')) {
+      const uuid = p.slice(5).trim()
+      if (uuid) {
+        try {
+          return await scopeForUser(uuid, supabaseClient)
+        } catch (e) {
+          console.warn('[scope] service scope resolve failed:', e.message)
+          return { userId: uuid, error: 'scope_resolve_failed', is_empty: true, slpCodes: [], districtCodes: [] }
+        }
+      }
+    }
+    return null
+  }
+
+  // User session: never trust a client-supplied scope param. Optionally derive
+  // scope from the caller's own identity (flag-gated).
+  if (process.env.SCOPE_USER_SESSIONS === '1' && session && SCOPED_ROLES.has(session.role)) {
+    try {
+      return await scopeForUser(session.id, supabaseClient)
+    } catch (e) {
+      console.warn('[scope] session scope resolve failed:', e.message)
+      return { userId: session.id, error: 'scope_resolve_failed', is_empty: true, slpCodes: [], districtCodes: [] }
+    }
+  }
+
+  return null
+}
+
 // Build a SQL fragment that scopes an OINV query by the resolved scope.
 // Always excludes SlpCode=1 (VPI house account) and CardCode LIKE 'CE%'
 // (employee self-invoicing). Scope-match uses EXISTS against OCRD so a
@@ -233,6 +286,8 @@ function scopeResponseMeta(scope) {
 
 module.exports = {
   scopeForUser,
+  resolveRequestScope,
+  SCOPED_ROLES,
   buildScopeWhere,
   emptySalesPayload,
   scopeResponseMeta,
