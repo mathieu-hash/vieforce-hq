@@ -224,6 +224,37 @@ module.exports = async (req, res) => {
         return kg > 0 ? { gm_per_kg: gp / kg, discount_per_kg: dc / kg, gm_per_kg_net: (gp - dc) / kg, discount_total: dc } : null
       }
       const a = mkNet(dCur[0]), b = compare === 'pp' ? mkNet(dCmp[0]) : null
+
+      // Monthly series so the front-end can render this as its OWN chart below the
+      // headline rather than folding it into the KPI. Three lines: reported GM/kg,
+      // the discount wedge, and realised GM/kg net of it. Live only — clamped to the
+      // migration cutoff, same as the trend panel.
+      let series = []
+      try {
+        const sTo = dateTo
+        let sFrom = new Date(sTo.getFullYear(), sTo.getMonth() - 11, 1)
+        if (sFrom < MIGRATION_CUTOFF) sFrom = new Date(MIGRATION_CUTOFF)
+        const sRows = await query(`
+          SELECT FORMAT(T0.DocDate,'yyyy-MM') AS ym,
+            ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.GrssProfit),0) AS gp,
+            ISNULL(SUM(T1.LineTotal / NULLIF(HD.lt,0) * ISNULL(T0.DiscSum,0)),0) AS disc
+          ${baseFrom} INNER JOIN (SELECT DocEntry, SUM(LineTotal) lt FROM INV1 GROUP BY DocEntry) HD ON HD.DocEntry=T0.DocEntry
+          ${scopeWhere}
+          GROUP BY FORMAT(T0.DocDate,'yyyy-MM') HAVING SUM(T1.InvQty) <> 0 ORDER BY ym ASC`,
+          { ...params, dateFrom: sFrom, dateTo: sTo })
+        const nowYM = mwin.fmt(dateTo).slice(0, 7)
+        series = sRows.map(r => {
+          const kg = Number(r.kg) || 0, gp = Number(r.gp) || 0, dc = Number(r.disc) || 0
+          return {
+            month: r.ym,
+            gm_per_kg_reported: kg > 0 ? Math.round(gp / kg * 1000) / 1000 : 0,
+            discount_per_kg: kg > 0 ? Math.round(dc / kg * 1000) / 1000 : 0,
+            gm_per_kg_net: kg > 0 ? Math.round((gp - dc) / kg * 1000) / 1000 : 0,
+            partial: r.ym === nowYM
+          }
+        })
+      } catch (e) { console.warn('[margin-explorer] discount series failed:', e.message) }
+
       if (a) {
         discountOverlay = {
           available: true,
@@ -234,6 +265,8 @@ module.exports = async (req, res) => {
           discount_pct_of_reported_gm: a.gm_per_kg > 0 ? Math.round(a.discount_per_kg / a.gm_per_kg * 1000) / 10 : null,
           delta_reported: b ? Math.round((a.gm_per_kg - b.gm_per_kg) * 1000) / 1000 : null,
           delta_net_of_discount: b ? Math.round((a.gm_per_kg_net - b.gm_per_kg_net) * 1000) / 1000 : null,
+          series,
+          chart_hint: 'Render as a SEPARATE panel below the headline, not folded into the GM/kg KPI: plot gm_per_kg_reported and gm_per_kg_net as two lines with discount_per_kg as the wedge between them. Points flagged partial are the running month.',
           basis: 'OINV.DiscSum allocated to lines pro-rata on LineTotal',
           note: 'Line-level GrssProfit excludes the document trade discount. The net figure is what was actually realised. A list-price cut paired with a rebate cut looks like margin loss on the reported basis and is flat on the net basis — compare delta_reported against delta_net_of_discount before concluding price erosion.'
         }
