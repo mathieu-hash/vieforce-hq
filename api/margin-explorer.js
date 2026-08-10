@@ -17,6 +17,8 @@ const { serverError } = require('./lib/http')
 const { verifySession, verifyServiceToken, getPeriodDates, applyRoleFilter } = require('./_auth')
 const cache = require('../lib/cache')
 const bridge = require('./lib/margin_bridge')
+const bridgeV2 = require('./lib/margin_bridge_v2')
+const mwin = require('./lib/margin_window')
 const cube = require('./lib/margin_cube')
 
 // group_by key -> validated SQL fragment (select expr + group expr + extra joins).
@@ -64,16 +66,21 @@ module.exports = async (req, res) => {
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v8', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v9', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
   try {
     const periodOpts = refMonthKey !== 'live' ? { refMonth: refMonthKey } : {}
     const { dateFrom, dateTo } = getPeriodDates(period, periodOpts)
-    // comparison windows
-    const ppFrom = new Date(dateFrom); ppFrom.setTime(ppFrom.getTime() - (dateTo - dateFrom))
-    const ppTo = new Date(dateFrom); ppTo.setDate(ppTo.getDate() - 1)
+    // Comparison windows. vs-PP is the SAME period one step back truncated to the same
+    // elapsed shipping days — NOT a trailing equal-length window. v1's trailing rule made
+    // MTD-on-10-Aug compare against 23–31 Jul (the month's best margin stretch) while the
+    // bridge below compared against all of July: two baselines, one "vs PP" label, and a
+    // ~50% swing in the headline delta. `ppWindow` is refined against MAX(DocDate) once
+    // the scope filters are known (see ppRefine below).
+    let ppWindow = mwin.priorPeriodWindow(period, dateFrom, dateTo)
+    let ppFrom = ppWindow.from, ppTo = ppWindow.to
     const lyFrom = new Date(dateFrom); lyFrom.setFullYear(lyFrom.getFullYear() - 1)
     const lyTo = new Date(dateTo); lyTo.setFullYear(lyTo.getFullYear() - 1)
 
@@ -94,6 +101,23 @@ module.exports = async (req, res) => {
     const dim = DIMS[groupBy]
     const baseFrom = `FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry=T1.DocEntry INNER JOIN OITM I ON T1.ItemCode=I.ItemCode ${dim.joins} ${buJoin}`
     const scopeWhere = `${roleWhere} AND I.ItmsGrpCod IN (103,105,102) ${f}`
+
+    // Refine vs-PP against the DATA. `dateTo` is today; the last invoice actually posted
+    // in scope is usually earlier (posting lag), and comparing an under-filled current
+    // window against a fully-elapsed prior one understates the current period. Re-derive
+    // the prior window from MAX(DocDate) so both sides carry equal elapsed shipping days.
+    if (compare === 'pp') {
+      try {
+        const mx = await query(`SELECT MAX(T0.DocDate) AS d ${baseFrom} ${scopeWhere}`, params)
+        const lastPosted = mx && mx[0] && mx[0].d ? new Date(mx[0].d) : null
+        if (lastPosted && !isNaN(lastPosted) && lastPosted >= dateFrom) {
+          const eff = lastPosted < dateTo ? lastPosted : dateTo
+          ppWindow = mwin.priorPeriodWindow(period, dateFrom, eff)
+          ppWindow.current_last_posted = mwin.fmt(eff)
+          ppFrom = ppWindow.from; ppTo = ppWindow.to
+        }
+      } catch (e) { console.warn('[margin-explorer] pp refine failed:', e.message) }
+    }
 
     // ---- matrix rows (current window, grouped) ----
     const rows = await query(`
@@ -157,6 +181,12 @@ module.exports = async (req, res) => {
       gp_pct: { value: Number(cur.sales) > 0 ? Math.round(Number(cur.gp) / Number(cur.sales) * 1000) / 10 : 0, delta_pp: (Number(cur.sales) > 0 && Number(cmp.sales) > 0) ? Math.round((Number(cur.gp) / Number(cur.sales) - Number(cmp.gp) / Number(cmp.sales)) * 1000) / 10 : null },
       gm_per_kg: { value: Math.round(curGpkg * 100) / 100, delta: cmpGpkg ? Math.round((curGpkg - cmpGpkg) * 100) / 100 : null },
       compare_basis: compare,
+      // Make the baseline explicit on the tile. The single most misleading thing the
+      // v1 payload did was show a delta without saying what it was measured against.
+      compare_window: compare === 'pp'
+        ? { from: mwin.fmt(ppFrom), to: mwin.fmt(ppTo), basis: ppWindow.basis, current_last_posted: ppWindow.current_last_posted || null }
+        : { from: mwin.fmt(lyFrom), to: mwin.fmt(lyTo), basis: 'same calendar window, prior year' },
+      scope: 'ItmsGrpCod IN (103,105,102) — finished feed + trading-import + basemix',
       ly_comparable: !(compare === 'ly' && cmpPreCutoff && sliceFilterActive),
       compare_note: (compare === 'ly' && cmpPreCutoff)
         ? (sliceFilterActive
@@ -164,6 +194,51 @@ module.exports = async (req, res) => {
             : 'vs-LY = national, finished-feed+trading+basemix at 2025 (Vienovo_Old) scope (feed 103+104). Aggregate only; not comparable at customer/SKU level across the Jan-2026 consolidation.')
         : null
     }
+
+    // ---- OFF-INVOICE DISCOUNT OVERLAY (additive — does NOT move the headline) ----
+    // INV1.GrssProfit is a LINE figure. OINV.DiscSum (document-level trade discount) is
+    // NOT in INV1.LineTotal: verified on 2026 data, DocTotal = SUM(LineTotal) - DiscSum
+    // + VatSum + TotalExpns reconciles on 10,555 of 10,555 discounted invoices, while the
+    // "discount already in lines" form matches only 63. So every GM/kg this endpoint has
+    // ever reported OVERSTATES realised margin by the discount per kg — PHP 15.3M in July
+    // 2026 alone, ~0.82 PHP/kg, ~12% of reported GM/kg, and it MOVES when discount policy
+    // changes (the 2026-08-01 distributor repricing cut list price 2.00/kg and the rebate
+    // 0.77/kg on the same day, which reads as margin loss on the line basis and is not).
+    //
+    // Reported alongside, never instead of: changing the headline is a CFO decision.
+    // TotalExpns (freight billed to the customer, PHP 5.3M in July) is deliberately NOT
+    // added back — it has an offsetting delivery cost that lives only in the GL, so
+    // crediting it here without the cost side would overstate margin the other way.
+    let discountOverlay = null
+    try {
+      const discSql = `SELECT ISNULL(SUM(T1.LineTotal / NULLIF(HD.lt,0) * ISNULL(T0.DiscSum,0)),0) AS disc,
+          ISNULL(SUM(T1.InvQty),0) AS kg, ISNULL(SUM(T1.GrssProfit),0) AS gp
+        ${baseFrom} INNER JOIN (SELECT DocEntry, SUM(LineTotal) lt FROM INV1 GROUP BY DocEntry) HD ON HD.DocEntry=T0.DocEntry
+        ${scopeWhere}`
+      const [dCur, dCmp] = await Promise.all([
+        query(discSql, params),
+        queryDateRange(discSql, params, cmpFrom, cmpTo)
+      ])
+      const mkNet = (r) => {
+        const kg = Number(r && r.kg) || 0, gp = Number(r && r.gp) || 0, dc = Number(r && r.disc) || 0
+        return kg > 0 ? { gm_per_kg: gp / kg, discount_per_kg: dc / kg, gm_per_kg_net: (gp - dc) / kg, discount_total: dc } : null
+      }
+      const a = mkNet(dCur[0]), b = compare === 'pp' ? mkNet(dCmp[0]) : null
+      if (a) {
+        discountOverlay = {
+          available: true,
+          discount_per_kg: Math.round(a.discount_per_kg * 1000) / 1000,
+          discount_total: Math.round(a.discount_total),
+          gm_per_kg_reported: Math.round(a.gm_per_kg * 1000) / 1000,
+          gm_per_kg_net_of_discount: Math.round(a.gm_per_kg_net * 1000) / 1000,
+          discount_pct_of_reported_gm: a.gm_per_kg > 0 ? Math.round(a.discount_per_kg / a.gm_per_kg * 1000) / 10 : null,
+          delta_reported: b ? Math.round((a.gm_per_kg - b.gm_per_kg) * 1000) / 1000 : null,
+          delta_net_of_discount: b ? Math.round((a.gm_per_kg_net - b.gm_per_kg_net) * 1000) / 1000 : null,
+          basis: 'OINV.DiscSum allocated to lines pro-rata on LineTotal',
+          note: 'Line-level GrssProfit excludes the document trade discount. The net figure is what was actually realised. A list-price cut paired with a rebate cut looks like margin loss on the reported basis and is flat on the net basis — compare delta_reported against delta_net_of_discount before concluding price erosion.'
+        }
+      }
+    } catch (e) { console.warn('[margin-explorer] discount overlay failed:', e.message) }
 
     // ---- bridge: GM/ton waterfall. Follows the selected compare basis (pp/ly). ----
     // Level dispatch:
@@ -496,14 +571,13 @@ module.exports = async (req, res) => {
           // The ONE canonical bridge (Bennet, exact): Price + Cost + Customer/BU Mix +
           // Product Mix, customer×SKU, feed 103, reconciles to the GM/ton delta.
           let canonicalBridge = { available: false, reason: 'pre-2026 anchor — customer/SKU codes not comparable across the Jan-2026 consolidation' }
+          let windowMeta = null
           if (baseMonth < '2026-01' || cmpMonth < '2026-01') {
             priceDrillOut = { available: false, reason: 'pre-2026 anchor' }
           } else {
             try {
-              const mb = (ym) => { const [y, m] = ym.split('-').map(Number); return [new Date(y, m - 1, 1), new Date(y, m, 1)] }
-              const [b0, b1] = mb(baseMonth), [c0, c1] = mb(cmpMonth)
-              const dp = { b0, b1, c0, c1 }
               // same region/bu/customer predicates the cube applies (Live branch)
+              const dp = {}
               let dw = ''
               if (region !== 'ALL') {
                 if (region === 'Other') dw += ` AND T1.OcrCode2 NOT LIKE 'L-%' AND T1.OcrCode2 NOT LIKE 'V-%' AND T1.OcrCode2 NOT LIKE 'M-%'`
@@ -511,10 +585,26 @@ module.exports = async (req, res) => {
               }
               if (bu !== 'ALL') { dw += ` AND G.GroupName=@bu`; dp.bu = bu }
               if (customer) { dw += ` AND (T0.CardCode=@cust OR T0.CardName LIKE @custl)`; dp.cust = customer; dp.custl = '%' + customer + '%' }
+
+              // LIKE-FOR-LIKE WINDOWS. v1 used full calendar months for BOTH sides, so a
+              // running compare month was 7 posted days against 23 — and a not-yet-ordered
+              // customer became a cell exit whose whole weight fell into Mix. Truncate the
+              // base month to the same elapsed SHIPPING days, measured from MAX(DocDate)
+              // in the data (not the server clock). Same scope + filters as the drill.
+              const probeSql = `SELECT MAX(T0.DocDate) AS d
+                FROM OINV T0 JOIN INV1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
+                LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
+                WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
+                  AND T0.DocDate>=@c0 AND T0.DocDate<@c1 ${dw}`
+              const W = await mwin.resolveLikeForLike(query, probeSql, dp, baseMonth, cmpMonth)
+              const b0 = W.b0, b1 = W.b1, c0 = W.c0, c1 = W.c1
+              dp.b0 = b0; dp.b1 = b1; dp.c0 = c0; dp.c1 = c1
+              windowMeta = W.meta
               const DRILL_SQL = `
-                SELECT ym, ssg, sku, name, cust, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp FROM (
+                SELECT ym, ssg, sku, name, cust, custname, bu, region, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp FROM (
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
-                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
+                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
+                    ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
                     T1.LineTotal rev, T1.InvQty kg, T1.GrssProfit gp
                   FROM OINV T0 JOIN INV1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
@@ -523,16 +613,17 @@ module.exports = async (req, res) => {
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
                   UNION ALL
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
-                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust,
+                    T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
+                    ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
                     -T1.LineTotal rev, -T1.InvQty kg, -T1.GrssProfit gp
                   FROM ORIN T0 JOIN RIN1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
                   WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
-                ) X GROUP BY ym, ssg, sku, name, cust`
+                ) X GROUP BY ym, ssg, sku, name, cust, custname, bu, region`
               const drillRaw = await query(DRILL_SQL, dp)
-              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0 })
+              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, custname: r.custname, bu: r.bu || 'UNSPEC', region: r.region || 'UNSPEC', rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0 })
               const baseRows = drillRaw.filter(r => r.ym === baseMonth).map(toRow)
               const cmpRows = drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
               const pd = cube.priceDrill(baseRows, cmpRows)
@@ -553,27 +644,104 @@ module.exports = async (req, res) => {
                 rr.forEach(r => { const t = Number(r.tot) || 1; costRatio[r.sku] = { pkg: Number(r.pkg) / t, ft: Number(r.ft) / t } })
               } catch (e) { console.warn('[margin-explorer] canonical cost-ratio failed:', e.message) }
 
-              // THE canonical bridge — same customer×SKU rows, Bennet exact decomposition,
-              // with reconciling drills (Cost→RM/Pkg/Feedtag, Product Mix→by SSG).
-              const cbk = bridge.bridgeCanonicalGMperTon(baseRows, cmpRows, { costRatio })
+              // THE canonical bridge — v2. Same Bennet core (exact), but the mix split is
+              // order-neutral, churn is separated from weight shift, and composition is
+              // reported as measured per-dimension lenses instead of an allocation.
+              const hasSplit = Object.keys(costRatio).length > 0
+              const cbk = bridgeV2.bridgeExactGMperTon(baseRows, cmpRows, { costRatio: hasSplit ? costRatio : null })
               if (cbk.available) {
-                const hasSplit = Object.keys(costRatio).length > 0
+                const R = (x) => Math.round(x)
+                const lens = (d, topN) => cbk.lenses[d] ? {
+                  total: R(cbk.lenses[d].total),
+                  rows: cbk.lenses[d].rows.slice(0, topN).map(r => ({
+                    key: r.key, value: R(r.value),
+                    share0_pct: Math.round(r.share0 * 1000) / 10,
+                    share1_pct: Math.round(r.share1 * 1000) / 10,
+                    share_shift_pp: Math.round(r.share_shift_pp * 100) / 100,
+                    gm_ton0: r.gm_ton0 == null ? null : R(r.gm_ton0),
+                    gm_ton1: r.gm_ton1 == null ? null : R(r.gm_ton1),
+                    tons0: Math.round(r.tons0), tons1: Math.round(r.tons1)
+                  }))
+                } : null
+
+                // Historical noise band: the same statistic over prior consecutive month
+                // pairs at the SAME shipping-day truncation. Without it a 0.5-sigma wiggle
+                // reads exactly like a finding.
+                let sig = { available: false, reason: 'not computed' }
+                try {
+                  const hist = cube.trajectory(C.rows, C.months)
+                    .filter(t => !t.partial && Number.isFinite(t.gm_per_ton))
+                    .map(t => t.gm_per_ton)
+                  const deltas = []
+                  for (let i = 1; i < hist.length; i++) deltas.push(hist[i] - hist[i - 1])
+                  sig = bridgeV2.significance(cbk.delta, deltas)
+                } catch (e) { /* band is advisory — never fail the bridge for it */ }
+
+                const oneSided = cbk.mix_detail.one_sided_share
+                const churny = cbk.mix_detail.churn_dominated
                 canonicalBridge = {
                   available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
-                  method: 'Bennet indicator · customer×SKU · exact',
-                  base_month: baseMonth, compare_month: cmpMonth, compare_partial: cmpPartial,
-                  prior_gm_ton: Math.round(cbk.gm0_per_ton), current_gm_ton: Math.round(cbk.gm1_per_ton),
-                  delta: Math.round(cbk.delta),
-                  price: Math.round(cbk.price), cost: Math.round(cbk.cost),
-                  customer_mix: Math.round(cbk.customer_mix), product_mix: Math.round(cbk.product_mix),
-                  cost_components: hasSplit ? {
-                    rm: Math.round(cbk.cost_components.rm),
-                    packaging: Math.round(cbk.cost_components.packaging),
-                    feedtag: Math.round(cbk.cost_components.feedtag)
+                  method: 'Bennet indicator · customer×SKU · exact · symmetric mix split',
+                  window: W.meta,
+                  base_month: baseMonth, compare_month: cmpMonth,
+                  compare_partial: W.meta.compare_partial, like_for_like: W.meta.like_for_like,
+                  prior_gm_ton: R(cbk.gm0_per_ton), current_gm_ton: R(cbk.gm1_per_ton),
+                  delta: R(cbk.delta),
+                  price: R(cbk.price), cost: R(cbk.cost),
+                  customer_mix: R(cbk.customer_mix), product_mix: R(cbk.product_mix),
+                  mix_total: R(cbk.mix_total),
+
+                  // How much of the customer-vs-product split is a modelling choice.
+                  mix_ordering: {
+                    customer_first: { customer: R(cbk.mix_ordering.customer_first.customer), product: R(cbk.mix_ordering.customer_first.product) },
+                    product_first: { customer: R(cbk.mix_ordering.product_first.customer), product: R(cbk.mix_ordering.product_first.product) },
+                    customer_range: cbk.mix_ordering.customer_range.map(R),
+                    product_range: cbk.mix_ordering.product_range.map(R),
+                    sign_stable: cbk.mix_ordering.sign_stable
+                  },
+
+                  // How much of the mix bar is churn (cells present in only one window).
+                  mix_detail: {
+                    continuing: R(cbk.mix_detail.continuing),
+                    entering: R(cbk.mix_detail.entering),
+                    exiting: R(cbk.mix_detail.exiting),
+                    one_sided_share_pct: Math.round(oneSided * 1000) / 10,
+                    matched_kg_share_pct: Math.round(cbk.mix_detail.matched_kg_share * 1000) / 10,
+                    cells_only_prior: cbk.mix_detail.cells_only_prior,
+                    cells_only_current: cbk.mix_detail.cells_only_current,
+                    churn_dominated: churny
+                  },
+
+                  // Composition lenses — each internally exact, none summing to another.
+                  lenses: {
+                    ssg: lens('ssg', 12), bu: lens('bu', 8), region: lens('region', 8),
+                    customer: lens('customer', 15), sku: lens('sku', 15),
+                    note: 'Each lens is a standalone one-dimensional Bennet share-shift: SUM(mbar × Δshare) over that dimension alone. Lenses are alternative views of the SAME composition effect — they do not sum to each other, nor to the Customer/Product Mix bars.'
+                  },
+
+                  cost_components: cbk.cost_components ? {
+                    rm: R(cbk.cost_components.rm),
+                    packaging: R(cbk.cost_components.packaging),
+                    feedtag: R(cbk.cost_components.feedtag),
+                    estimated: true,
+                    basis: cbk.cost_components.basis
                   } : null,
-                  product_mix_by_ssg: cbk.product_mix_by_ssg.map(x => ({ ssg: x.ssg, value: Math.round(x.value) })).filter(x => x.value !== 0),
-                  reconciles: Math.abs((cbk.price + cbk.cost + cbk.customer_mix + cbk.product_mix) - cbk.delta) < 1,
-                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth + (cmpPartial ? ' (compare month partial)' : '') + '. Price & Cost = SAME customer + SAME SKU; Customer/BU Mix & Product Mix = composition (who/what sold), not price action. Bennet decomposition — reconciles exactly. Cost splits into RM/Packaging/Feedtag and Product Mix splits by SSG — each ties back to its bar.'
+
+                  significance: sig,
+                  dropped_cells: cbk.dropped_cells,
+                  reconciles: cbk.reconciles,
+                  residual: cbk.residual,
+
+                  // Kept for backward compatibility with the current front-end panel.
+                  // Now a MEASURED SSG share-shift, not an allocation of customer mix.
+                  product_mix_by_ssg: (cbk.lenses.ssg ? cbk.lenses.ssg.rows : [])
+                    .map(x => ({ ssg: x.key === 'UNSPEC' ? 'Untagged' : x.key, value: R(x.value) }))
+                    .filter(x => x.value !== 0),
+
+                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth
+                    + (W.meta.compare_partial ? ` · LIKE-FOR-LIKE: both sides truncated to ${W.meta.compare_shipping_days} shipping days (month ${W.meta.month_progress_pct}% elapsed, last posted ${W.meta.last_posted_date})` : ' · both months complete')
+                    + '. Price & Cost = SAME customer + SAME SKU. Customer/BU Mix & Product Mix = composition; their split is the symmetric mean of both decomposition orderings — see mix_ordering for the range. Bennet decomposition, reconciles exactly.'
+                    + (churny ? ` WARNING: mix is churn-dominated (${Math.round(oneSided * 100)}% of the mix effect comes from customer×SKU cells present in only one window; matched cells cover only ${Math.round(cbk.mix_detail.matched_kg_share * 100)}% of current tonnage). That is timing, not a commercial shift — do not headline the mix split.` : '')
                 }
               } else {
                 canonicalBridge = { available: false, reason: cbk.reason || 'no feed rows in anchor months' }
@@ -603,8 +771,13 @@ module.exports = async (req, res) => {
 
           dissection = {
             available: true, scope: 'finished_feed', basis: 'Live 103 / Old 103+104 · ₱/ton',
-            base_month: baseMonth, compare_month: cmpMonth, compare_partial: cmpPartial,
-            compare_days: cmpPartial ? new Date().getDate() - 1 : null, months: C.months,
+            base_month: baseMonth, compare_month: cmpMonth,
+            // compare_partial / compare_days now come from the DATA (MAX(DocDate) + the
+            // PH shipping calendar), not the server clock. v1 used `new Date().getDate()-1`,
+            // which drifts with server TZ and ignores posting lag.
+            compare_partial: windowMeta ? windowMeta.compare_partial : cmpPartial,
+            compare_days: windowMeta ? windowMeta.compare_shipping_days : null,
+            window: windowMeta, months: C.months,
             trajectory: traj,
             bridge: cube.ssgBridge(C.rows, baseMonth, cmpMonth),
             mix_bridge: cube.mixBridge(C.rows, baseMonth, cmpMonth),
@@ -624,9 +797,23 @@ module.exports = async (req, res) => {
         endpoint: 'margin-explorer', sap_validated: true, data_source: 'sap_b1',
         window: { from: dateFrom.toISOString().slice(0, 10), to: dateTo.toISOString().slice(0, 10) },
         applied_filters: { period, ref_month: refMonthKey, region, bu, customer, group_by: groupBy, compare, include: [...include] },
-        data_quality: { volume_basis: 'INV1.InvQty (kg)', region_basis: 'OcrCode2 (sales dim-2)', bu_basis: 'OCRD.GroupCode->OCRG (real)', notes: ['Pre-rebate gross profit.', 'vs-LY at customer/SKU not comparable across Jan-2026 consolidation; bridge falls back to category (SSG) level when the comparison crosses the cutoff (national only).'] }
+        data_quality: {
+          volume_basis: 'INV1.InvQty (kg)', region_basis: 'OcrCode2 (sales dim-2)', bu_basis: 'OCRD.GroupCode->OCRG (real)',
+          // Hero and dissection bridge deliberately run on DIFFERENT scopes. Stated here so
+          // nobody reconciles a 6.87 tile against a 6,727 bridge and assumes one is broken.
+          scope_hero: '(103,105,102)', scope_dissection_bridge: '(103)',
+          snapshot_at: new Date().toISOString(),
+          notes: [
+            'Pre-rebate gross profit.',
+            'Hero KPIs cover finished feed + trading-import + basemix (103,105,102); the dissection bridge covers finished feed only (103). The two are different universes — GM/kg will not match exactly.',
+            'vs-PP = same period one step back, truncated to equal elapsed shipping days (Sundays and PH holidays excluded).',
+            'MTD figures move as invoices post; every number is a snapshot — see snapshot_at.',
+            'vs-LY at customer/SKU not comparable across Jan-2026 consolidation; bridge falls back to category (SSG) level when the comparison crosses the cutoff (national only).'
+          ]
+        }
       },
       hero,
+      discount_overlay: discountOverlay,
       matrix: { group_by: groupBy, rows: matrixRows, total_gp: Math.round(totGp) },
       bridge: bridgeOut,
       trend: trendOut,
