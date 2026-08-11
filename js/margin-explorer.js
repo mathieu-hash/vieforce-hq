@@ -299,6 +299,14 @@
         '<div class="mexp-panel mexp-ing-panel">' +
           '<div class="mexp-coming" id="mexp-movers">Movers &amp; gap analysis — coming in Phase 2</div>' +
         '</div>' +
+        // ---- NET bridge — same decomposition on margin net of off-invoice discount ----
+        '<div class="mexp-panel mexp-net-panel" id="mexp-net-panel" style="display:none">' +
+          '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
+            '<span class="mexp-panel-t">GM/ton Bridge — NET of off-invoice discount</span>' +
+            '<span class="mexp-panel-st" id="mexp-net-sub">Realised margin: line GP less the document trade discount (OINV.DiscSum), which is excluded from GrssProfit</span>' +
+          '</div></div>' +
+          '<div id="mexp-net-body"></div>' +
+        '</div>' +
       '</div>';
 
     root.innerHTML = html;
@@ -547,6 +555,12 @@
     }
     // The ONE authoritative bridge — fed by phase B's canonical_bridge.
     try { renderCanonicalBridge(data && data.dissection && data.dissection.canonical_bridge); } catch (e) { console.error('[MEXP] canonical bridge:', e); }
+    // NET bridge (bottom panel) — same decomposition net of off-invoice discount.
+    try {
+      if (typeof window.MEXP_renderNetBridge === 'function') {
+        window.MEXP_renderNetBridge(data && data.dissection && data.dissection.net_bridge);
+      }
+    } catch (e) { console.error('[MEXP] net bridge:', e); }
     try { window.MEXP_renderDissection(data && data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
   }
 

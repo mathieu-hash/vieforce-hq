@@ -96,6 +96,26 @@ console.log('\n  cost components:', cb.cost_components
   ? `RM ${money(cb.cost_components.rm)} Pkg ${money(cb.cost_components.packaging)} FT ${money(cb.cost_components.feedtag)} (estimated=${cb.cost_components.estimated})`
   : 'none')
 
-const okBars = Math.abs((cb.price + cb.cost + cb.customer_mix + cb.product_mix) - cb.delta) <= 2
+console.log('\n=== NET BRIDGE (net of off-invoice discount) ===')
+const nb = d.dissection && d.dissection.net_bridge
+let okNet = true
+if (!nb || !nb.available) { console.log('  unavailable:', nb && nb.reason); okNet = false }
+else {
+  console.log('  prior GM/t', nb.prior_gm_ton, ' current', nb.current_gm_ton, ' delta', money(nb.delta))
+  console.log('    Price            ', money(nb.price), '   (reported bridge:', money(nb.vs_reported.price_reported) + ', gap', money(nb.vs_reported.price_gap) + ')')
+  console.log('    Cost             ', money(nb.cost))
+  console.log('    Customer/BU Mix  ', money(nb.customer_mix))
+  console.log('    Product Mix      ', money(nb.product_mix))
+  console.log('    RECONCILES       ', nb.reconciles)
+  console.log('  discount wedge   ', money(nb.discount.prior_per_ton), '->', money(nb.discount.current_per_ton),
+    ' = ', money(nb.discount.delta_per_ton), '/t')
+  console.log('  delta reported', money(nb.vs_reported.delta_reported), ' vs delta net', money(nb.vs_reported.delta_net),
+    ' -> gap', money(nb.vs_reported.gap))
+  const s = nb.price + nb.cost + nb.customer_mix + nb.product_mix
+  okNet = nb.reconciles && Math.abs(s - nb.delta) <= 2
+  if (!okNet) console.log('  FAIL: net bars do not reconcile', s, 'vs', nb.delta)
+}
+
+const okBars = okNet && Math.abs((cb.price + cb.cost + cb.customer_mix + cb.product_mix) - cb.delta) <= 2
 console.log('\n' + (okBars && cb.reconciles ? 'SMOKE TEST PASSED' : 'SMOKE TEST FAILED'))
 process.exit(okBars && cb.reconciles ? 0 : 1)

@@ -19,6 +19,7 @@ const cache = require('../lib/cache')
 const bridge = require('./lib/margin_bridge')
 const bridgeV2 = require('./lib/margin_bridge_v2')
 const mwin = require('./lib/margin_window')
+const shipDays = require('./lib/shipping_days')
 const cube = require('./lib/margin_cube')
 
 // group_by key -> validated SQL fragment (select expr + group expr + extra joins).
@@ -581,8 +582,14 @@ module.exports = async (req, res) => {
       try {
         const C = await cube.buildCube({ query, queryH }, { region, bu, customer, ssg: null })
         if (C.months.length) {
-          const fromM = dateFrom.toISOString().slice(0, 7), toM = dateTo.toISOString().slice(0, 7)
-          const nowYM = new Date().toISOString().slice(0, 7)   // current (partial) calendar month
+          // TZ-STABLE MONTH KEYS. These were `toISOString().slice(0,7)`, which converts a
+          // LOCAL midnight to UTC and can shift the month back a day. On a PH machine
+          // (UTC+8) `new Date(2026,7,1)` stringifies as 2026-07-31, so MTD resolved its
+          // anchors to Jun->Jul and dropped August entirely, while the same code on a UTC
+          // Cloud Run instance resolved Jul->Aug. The bridge's anchor months literally
+          // depended on the server's timezone. Derive them in local/Manila terms instead.
+          const fromM = mwin.fmt(dateFrom).slice(0, 7), toM = mwin.fmt(dateTo).slice(0, 7)
+          const nowYM = mwin.fmt(shipDays.getManilaToday()).slice(0, 7)   // current (partial) calendar month, PH
           let inRange = C.months.filter(m => m >= fromM && m <= toM)
           if (!inRange.length) inRange = C.months.slice()
           // Bridge/mix/ingredient anchors must be COMPLETE months — exclude the running
@@ -604,6 +611,7 @@ module.exports = async (req, res) => {
           // The ONE canonical bridge (Bennet, exact): Price + Cost + Customer/BU Mix +
           // Product Mix, customer×SKU, feed 103, reconciles to the GM/ton delta.
           let canonicalBridge = { available: false, reason: 'pre-2026 anchor — customer/SKU codes not comparable across the Jan-2026 consolidation' }
+          let netBridge = { available: false, reason: 'pre-2026 anchor' }
           let windowMeta = null
           if (baseMonth < '2026-01' || cmpMonth < '2026-01') {
             priceDrillOut = { available: false, reason: 'pre-2026 anchor' }
@@ -633,13 +641,19 @@ module.exports = async (req, res) => {
               const b0 = W.b0, b1 = W.b1, c0 = W.c0, c1 = W.c1
               dp.b0 = b0; dp.b1 = b1; dp.c0 = c0; dp.c1 = c1
               windowMeta = W.meta
+              // `disc` = OINV.DiscSum allocated to the line pro-rata on LineTotal. It is NOT
+              // in LineTotal/GrssProfit (verified: DocTotal = SUM(LineTotal) - DiscSum + VatSum
+              // + TotalExpns reconciles on 10,555/10,555 discounted 2026 invoices), so carrying
+              // it here is what makes the NET bridge below possible.
               const DRILL_SQL = `
-                SELECT ym, ssg, sku, name, cust, custname, bu, region, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp FROM (
+                SELECT ym, ssg, sku, name, cust, custname, bu, region, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp, SUM(disc) disc FROM (
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
                     ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
-                    T1.LineTotal rev, T1.InvQty kg, T1.GrssProfit gp
+                    T1.LineTotal rev, T1.InvQty kg, T1.GrssProfit gp,
+                    T1.LineTotal / NULLIF(HD.lt,0) * ISNULL(T0.DiscSum,0) disc
                   FROM OINV T0 JOIN INV1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
+                  JOIN (SELECT DocEntry, SUM(LineTotal) lt FROM INV1 GROUP BY DocEntry) HD ON HD.DocEntry=T0.DocEntry
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
                   WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
@@ -648,15 +662,17 @@ module.exports = async (req, res) => {
                   SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
                     ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
-                    -T1.LineTotal rev, -T1.InvQty kg, -T1.GrssProfit gp
+                    -T1.LineTotal rev, -T1.InvQty kg, -T1.GrssProfit gp,
+                    -(T1.LineTotal / NULLIF(HR.lt,0) * ISNULL(T0.DiscSum,0)) disc
                   FROM ORIN T0 JOIN RIN1 T1 ON T1.DocEntry=T0.DocEntry JOIN OITM T2 ON T2.ItemCode=T1.ItemCode
+                  JOIN (SELECT DocEntry, SUM(LineTotal) lt FROM RIN1 GROUP BY DocEntry) HR ON HR.DocEntry=T0.DocEntry
                   LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
                   WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
                 ) X GROUP BY ym, ssg, sku, name, cust, custname, bu, region`
               const drillRaw = await query(DRILL_SQL, dp)
-              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, custname: r.custname, bu: r.bu || 'UNSPEC', region: r.region || 'UNSPEC', rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0 })
+              const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, custname: r.custname, bu: r.bu || 'UNSPEC', region: r.region || 'UNSPEC', rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0, disc: Number(r.disc) || 0 })
               const baseRows = drillRaw.filter(r => r.ym === baseMonth).map(toRow)
               const cmpRows = drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
               const pd = cube.priceDrill(baseRows, cmpRows)
@@ -684,9 +700,9 @@ module.exports = async (req, res) => {
               const cbk = bridgeV2.bridgeExactGMperTon(baseRows, cmpRows, { costRatio: hasSplit ? costRatio : null })
               if (cbk.available) {
                 const R = (x) => Math.round(x)
-                const lens = (d, topN) => cbk.lenses[d] ? {
-                  total: R(cbk.lenses[d].total),
-                  rows: cbk.lenses[d].rows.slice(0, topN).map(r => ({
+                const lensOf = (bk, d, topN) => bk.lenses[d] ? {
+                  total: R(bk.lenses[d].total),
+                  rows: bk.lenses[d].rows.slice(0, topN).map(r => ({
                     key: r.key, value: R(r.value),
                     share0_pct: Math.round(r.share0 * 1000) / 10,
                     share1_pct: Math.round(r.share1 * 1000) / 10,
@@ -747,8 +763,8 @@ module.exports = async (req, res) => {
 
                   // Composition lenses — each internally exact, none summing to another.
                   lenses: {
-                    ssg: lens('ssg', 12), bu: lens('bu', 8), region: lens('region', 8),
-                    customer: lens('customer', 15), sku: lens('sku', 15),
+                    ssg: lensOf(cbk, 'ssg', 12), bu: lensOf(cbk, 'bu', 8), region: lensOf(cbk, 'region', 8),
+                    customer: lensOf(cbk, 'customer', 15), sku: lensOf(cbk, 'sku', 15),
                     note: 'Each lens is a standalone one-dimensional Bennet share-shift: SUM(mbar × Δshare) over that dimension alone. Lenses are alternative views of the SAME composition effect — they do not sum to each other, nor to the Customer/Product Mix bars.'
                   },
 
@@ -776,6 +792,65 @@ module.exports = async (req, res) => {
                     + '. Price & Cost = SAME customer + SAME SKU. Customer/BU Mix & Product Mix = composition; their split is the symmetric mean of both decomposition orderings — see mix_ordering for the range. Bennet decomposition, reconciles exactly.'
                     + (churny ? ` WARNING: mix is churn-dominated (${Math.round(oneSided * 100)}% of the mix effect comes from customer×SKU cells present in only one window; matched cells cover only ${Math.round(cbk.mix_detail.matched_kg_share * 100)}% of current tonnage). That is timing, not a commercial shift — do not headline the mix split.` : '')
                 }
+                // ---- NET BRIDGE: the same decomposition on margin NET of off-invoice
+                // discount. Realised revenue = LineTotal - allocated DiscSum, realised
+                // margin = GrssProfit - allocated DiscSum, COGS unchanged. This is the
+                // bridge that tells the truth about price actions: a list-price cut paired
+                // with a rebate cut reads as pure price erosion on the reported bridge and
+                // nets out here. Built from the same rows, so the two are directly comparable.
+                try {
+                  const toNet = (r) => ({ ...r, revenue: r.revenue - r.disc, rev: r.rev - r.disc, gp: r.gp - r.disc })
+                  const nbk = bridgeV2.bridgeExactGMperTon(baseRows.map(toNet), cmpRows.map(toNet), { costRatio: hasSplit ? costRatio : null })
+                  if (nbk.available) {
+                    const sumT = (rows, f) => rows.reduce((s, r) => s + f(r), 0)
+                    const dB = sumT(baseRows, r => r.disc), dC = sumT(cmpRows, r => r.disc)
+                    const tB = sumT(baseRows, r => r.kg) / 1000, tC = sumT(cmpRows, r => r.kg) / 1000
+                    netBridge = {
+                      available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
+                      method: 'Bennet indicator · customer×SKU · exact · NET of off-invoice discount',
+                      window: W.meta,
+                      base_month: baseMonth, compare_month: cmpMonth,
+                      compare_partial: W.meta.compare_partial, like_for_like: W.meta.like_for_like,
+                      prior_gm_ton: R(nbk.gm0_per_ton), current_gm_ton: R(nbk.gm1_per_ton), delta: R(nbk.delta),
+                      price: R(nbk.price), cost: R(nbk.cost),
+                      customer_mix: R(nbk.customer_mix), product_mix: R(nbk.product_mix), mix_total: R(nbk.mix_total),
+                      mix_ordering: {
+                        customer_range: nbk.mix_ordering.customer_range.map(R),
+                        product_range: nbk.mix_ordering.product_range.map(R),
+                        sign_stable: nbk.mix_ordering.sign_stable
+                      },
+                      mix_detail: {
+                        continuing: R(nbk.mix_detail.continuing), entering: R(nbk.mix_detail.entering), exiting: R(nbk.mix_detail.exiting),
+                        one_sided_share_pct: Math.round(nbk.mix_detail.one_sided_share * 1000) / 10,
+                        matched_kg_share_pct: Math.round(nbk.mix_detail.matched_kg_share * 1000) / 10,
+                        churn_dominated: nbk.mix_detail.churn_dominated
+                      },
+                      lenses: {
+                        ssg: lensOf(nbk, 'ssg', 12), bu: lensOf(nbk, 'bu', 8), region: lensOf(nbk, 'region', 8),
+                        customer: lensOf(nbk, 'customer', 15), sku: lensOf(nbk, 'sku', 15)
+                      },
+                      // The wedge: what the reported bridge cannot see.
+                      discount: {
+                        prior_per_ton: tB > 0 ? R(dB / tB) : 0,
+                        current_per_ton: tC > 0 ? R(dC / tC) : 0,
+                        delta_per_ton: R((tC > 0 ? dC / tC : 0) - (tB > 0 ? dB / tB : 0)),
+                        prior_total: R(dB), current_total: R(dC)
+                      },
+                      vs_reported: {
+                        delta_reported: R(cbk.delta), delta_net: R(nbk.delta),
+                        gap: R(nbk.delta - cbk.delta),
+                        price_reported: R(cbk.price), price_net: R(nbk.price),
+                        price_gap: R(nbk.price - cbk.price)
+                      },
+                      product_mix_by_ssg: (nbk.lenses.ssg ? nbk.lenses.ssg.rows : [])
+                        .map(x => ({ ssg: x.key === 'UNSPEC' ? 'Untagged' : x.key, value: R(x.value) })).filter(x => x.value !== 0),
+                      reconciles: nbk.reconciles, residual: nbk.residual,
+                      note: 'GM/ton NET of off-invoice discount (OINV.DiscSum allocated pro-rata on LineTotal). '
+                        + 'Line-level GrssProfit excludes the document trade discount, so the reported bridge above overstates realised margin by ~12%. '
+                        + 'Compare the Price bars: a list-price cut paired with a rebate cut shows as erosion above and nets out here.'
+                    }
+                  }
+                } catch (e) { console.warn('[margin-explorer] net bridge failed:', e.message) }
               } else {
                 canonicalBridge = { available: false, reason: cbk.reason || 'no feed rows in anchor months' }
               }
@@ -817,6 +892,7 @@ module.exports = async (req, res) => {
             ingredients: cube.ingredientContribution(C.rows, C.intensity, C.basket, baseMonth, cmpMonth),
             price_drill: priceDrillOut,
             canonical_bridge: canonicalBridge,
+            net_bridge: netBridge,
             category_trend: cube.categoryTrend(C.rows, C.months)
           }
         } else {
