@@ -3,9 +3,23 @@
 **Date:** 2026-04-16
 **Recon by:** Claude (Deploy Recon Agent)
 
+> ## ⚠️ SUPERSEDED 2026-08-12 — SECTION 1 IS NO LONGER TRUE
+> **CI/CD now exists.** `.github/workflows/deploy-cloud-run.yml` deploys the API to
+> Cloud Run automatically **on every push to `master`** (and via `workflow_dispatch`),
+> authenticating with the `GCP_SA_KEY` repo secret. `.github/workflows/ci.yml` runs
+> tests on the same trigger. The Vercel front-end likewise auto-deploys from `master`.
+>
+> **You do not need `gcloud auth login` to ship.** Push to `master` and watch
+> `gh run list`. Local gcloud auth on the laptop is expired and cannot refresh
+> non-interactively — do not treat that as a deploy blocker.
+> `scripts/deploy-margin-bridge-v2.sh` remains available for a manual out-of-band
+> deploy, but it is the fallback, not the normal path.
+
 ---
 
 ## 1. Deploy Method
+
+**⚠️ OUT OF DATE — see the banner above. This described the April 2026 state.**
 
 **Manual `gcloud run deploy`** — no CI/CD pipeline exists.
 
