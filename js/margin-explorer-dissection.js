@@ -9,8 +9,14 @@
  *   5. Price bar decomposition (true price vs customer/SKU mix, from `price_drill`)
  * + a server-proxied "AI read" button (POST /api/margin-ai).
  *
- * Self-contained: injects its own <section> into #pg-margin-explorer on first render.
- * Exposes window.MEXP_renderDissection(dissection).
+ * Self-contained: injects its own <section> into the page's .mexp-wrap on first render.
+ * Exposes window.MEXP_renderDissection(dissection, scopeLabel) and
+ *         window.MEXP_resetDissection() — called by the controller on scope change.
+ *
+ * Staleness: a good render is kept only for the scope it was painted for. Same
+ * scope, refresh failed → dim + "source busy — showing <scope>". New scope with
+ * nothing → "No finished-feed dissection for <scope> — <reason>". Never hides.
+ * Charts are rebuilt from the cached payload when the shell flips data-theme.
  */
 (function () {
   'use strict';
@@ -20,7 +26,8 @@
       navy: cssVar('--blue', '#00AEEF'), green: cssVar('--green', '#7BB52E'),
       gold: cssVar('--gold', '#FFC72C'), teal: '#00A8CC', red: cssVar('--red', '#E53935'),
       text: cssVar('--text', '#F0F4FA'), text3: cssVar('--text3', 'rgba(240,244,250,0.4)'),
-      grid: 'rgba(255,255,255,0.05)', grey: 'rgba(240,244,250,0.28)'
+      // grid / grey from the theme tokens — hardcoded white-ish rgba vanished on light
+      grid: cssVar('--glass-border', 'rgba(255,255,255,0.07)'), grey: cssVar('--text4', 'rgba(240,244,250,0.42)')
     };
   }
   function esc(s) { return window.esc ? window.esc(s) : String(s == null ? '' : s); }
@@ -37,7 +44,9 @@
 
   // ---- one-time DOM ----
   function ensure() {
-    var host = document.getElementById('pg-margin-explorer'); if (!host) return null;
+    var page = document.getElementById('pg-margin-explorer'); if (!page) return null;
+    // mount inside .mexp-wrap so the block inherits the page padding
+    var host = page.querySelector('.mexp-wrap') || page;
     var sec = document.getElementById('mexp-diss'); if (sec) return sec;
     sec = document.createElement('div'); sec.id = 'mexp-diss';
     sec.innerHTML =
@@ -127,10 +136,20 @@
   }
 
   var LAST = null;
-  var HAD_GOOD = false;    // true once a good dissection has painted (guards against
-                           // a transient unavailable refresh wiping good charts)
-  var LAST_CT = null;      // cached category_trend payload (for toggle re-render)
+  var HAD_GOOD = false;    // true once a good dissection has painted FOR THE CURRENT SCOPE
+                           // (guards against a transient unavailable refresh wiping good charts;
+                           // reset by MEXP_resetDissection on every scope change)
+  var GOOD_SCOPE = '';     // label of the scope HAD_GOOD describes
+  var LAST_CT = null;      // cached category_trend payload (for toggle re-render); reset with scope
   var CAT_MODE = 'ton';    // 'ton' = GM ₱/ton (default) | 'pct' = GM%
+  var SCOPE_LABEL = 'this scope';
+
+  // Scope changed: nothing from the previous scope may survive as "last good".
+  window.MEXP_resetDissection = function () {
+    HAD_GOOD = false; GOOD_SCOPE = ''; LAST = null; LAST_CT = null;
+    var sec = document.getElementById('mexp-diss');
+    if (sec) sec.classList.remove('mexp-stale');
+  };
 
   // Subtle "updating" state for the dissection block during phase B (set by controller).
   window.MEXP_setDissectionUpdating = function (on) {
@@ -138,36 +157,58 @@
     if (on) sec.classList.add('mexp-dim'); else sec.classList.remove('mexp-dim');
   };
 
-  window.MEXP_renderDissection = function (d) {
+  window.MEXP_renderDissection = function (d, label) {
     var sec = ensure(); if (!sec) return;
-    // Category table: only re-render when the new payload actually carries one.
-    // A transient unavailable (SAP flap on a background refresh) must NOT wipe a
-    // good table — keep the last good render.
+    SCOPE_LABEL = label || SCOPE_LABEL;
+    var subEl = document.getElementById('diss-sub');
+    // Category table: re-render when the new payload carries one. A SAME-scope
+    // transient unavailable must not wipe a good table (LAST_CT survives); after a
+    // scope change LAST_CT is null, so an absent table is shown as absent.
     var newCT = (d && d.category_trend) || null;
     if (newCT) { LAST_CT = newCT; renderCategoryTable(LAST_CT); }
+    else if (!LAST_CT) renderCategoryTable(null);
 
     if (!d || d.available === false) {
-      // NON-DESTRUCTIVE: if we already painted a good dissection, keep the charts
-      // and just flag that the refresh couldn't complete (source busy / no rows
-      // this instant). Only show the empty state when we have nothing to preserve.
+      var reason = (d && d.reason) || 'No finished-feed data for this selection.';
       if (HAD_GOOD) {
-        var subEl = document.getElementById('diss-sub');
-        if (subEl) subEl.textContent = '⚠ couldn’t refresh just now (source busy) — showing last good data';
-        return; // charts + category table left intact
+        // same scope, refresh failed: keep charts + table, dim, name the scope shown
+        sec.classList.add('mexp-stale');
+        if (subEl) subEl.textContent = '⚠ source busy — could not refresh; showing ' + (GOOD_SCOPE || SCOPE_LABEL) + ' (' + reason + ')';
+        return;
       }
-      LAST = d || null;
-      document.getElementById('diss-sub').textContent = (d && d.reason) || 'No finished-feed data for this selection.';
+      // nothing to keep for this scope: an empty scope is an answer, not an outage
+      sec.classList.remove('mexp-stale');
+      LAST = null;
+      if (subEl) subEl.textContent = ((d && d.error) ? '⚠ Dissection could not be loaded for ' : 'ⓘ No finished-feed dissection for ') + SCOPE_LABEL + ' — ' + reason;
       ['diss-traj', 'diss-ing'].forEach(function (id) { kill(document.getElementById(id)); });
       return;
     }
+    sec.classList.remove('mexp-stale');
     LAST = d;
     HAD_GOOD = true;
+    GOOD_SCOPE = SCOPE_LABEL;
     var cmpLbl = d.compare_month + (d.compare_partial ? ' (' + (d.compare_days || '') + 'd partial — early read, noisy)' : '');
-    document.getElementById('diss-sub').textContent =
-      'Finished feed (Live 103 / Old 103+104) · ' + d.base_month + ' → ' + cmpLbl;
+    if (subEl) subEl.textContent =
+      'Finished feed (Live 103 / Old 103+104) · ' + d.base_month + ' → ' + cmpLbl + ' · ' + SCOPE_LABEL;
+    paintCharts(d);
+  };
+
+  function paintCharts(d) {
     renderTraj(d.trajectory || []);
     renderDiverging('diss-ing', (d.ingredients && d.ingredients.items) || [], 'name', false);
-  };
+  }
+
+  // Re-theme: colours are resolved from CSS variables at build time, so rebuild
+  // the charts from the cached payload when the shell flips <html data-theme>.
+  if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+    try {
+      new MutationObserver(function () {
+        if (!LAST || LAST.available === false) return;
+        if (!document.getElementById('diss-traj')) return;
+        try { paintCharts(LAST); } catch (e) {}
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    } catch (e) {}
+  }
 
   function baseOpts() {
     return { responsive: true, maintainAspectRatio: false, animation: { duration: 250 }, plugins: { legend: { display: false } } };
@@ -184,15 +225,16 @@
       type: 'line',
       data: {
         labels: labels, datasets: [
+          // Both series are ₱/ton — ONE shared axis, so the gap between them is
+          // the real COGS/ton and not an artefact of two auto-scaled axes.
           { label: 'GM/ton', data: gm, yAxisID: 'y', borderColor: p.green, backgroundColor: 'rgba(123,181,46,.12)', borderWidth: 3, fill: true, tension: .3, pointRadius: 3, pointBackgroundColor: p.green, segment: { borderDash: function (ctx) { return partIdx.indexOf(ctx.p1DataIndex) >= 0 ? [5, 4] : undefined; } } },
-          { label: 'Rev/ton', data: rev, yAxisID: 'y1', borderColor: p.navy, borderWidth: 2, borderDash: [4, 3], fill: false, tension: .3, pointRadius: 0 }
+          { label: 'Rev/ton', data: rev, yAxisID: 'y', borderColor: p.navy, borderWidth: 2, borderDash: [4, 3], fill: false, tension: .3, pointRadius: 0 }
         ]
       },
       options: Object.assign(baseOpts(), {
         plugins: { legend: { display: true, labels: { color: p.text3, font: { size: 10 }, boxWidth: 10 } }, tooltip: { callbacks: { label: function (i) { return i.dataset.label + ': ' + pt(i.parsed.y) + '/t'; } } } },
         scales: {
-          y: { position: 'left', grid: { color: p.grid }, ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return '₱' + (v / 1000).toFixed(0) + 'k'; } } },
-          y1: { position: 'right', grid: { display: false }, ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return '₱' + (v / 1000).toFixed(0) + 'k'; } } },
+          y: { position: 'left', beginAtZero: true, grid: { color: p.grid }, ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return '₱' + (v / 1000).toFixed(0) + 'k'; } } },
           x: { grid: { display: false }, ticks: { color: p.text3, font: { size: 9 } } }
         }
       })
@@ -234,11 +276,12 @@
     var panel = document.getElementById('diss-cat');
     if (!body) return;
     if (!ct || ct.available === false || !ct.months || !ct.months.length) {
-      if (panel) panel.style.display = (ct && ct.available === false) ? 'none' : panel.style.display;
+      // never hide: an unavailable table is an answer — print it, named to the scope
+      if (panel) panel.style.display = '';
       body.textContent = '';
       var m = document.createElement('div');
-      m.style.cssText = 'font-size:11px;color:var(--text3);font-weight:600;padding:10px 2px';
-      m.textContent = (ct && ct.note) || 'Category trend unavailable for this selection.';
+      m.style.cssText = 'font-size:11px;color:var(--text);font-weight:600;padding:10px 2px';
+      m.textContent = 'ⓘ No category trend for ' + SCOPE_LABEL + ((ct && ct.note) ? ' — ' + ct.note : '.');
       body.appendChild(m);
       if (noteEl) noteEl.textContent = '';
       return;
@@ -348,28 +391,31 @@
     }
   }
 
-  // ---- AI read (server-proxied) ----
-  async function runAi() {
+  // ---- AI read (server-proxied POST /api/margin-ai) ----
+  // Goes through the shell's API client (window.apiPost: session header, 401 →
+  // logout) instead of a bare fetch. apiFetch is GET-only, hence apiPost.
+  function runAi() {
     if (!LAST || LAST.available === false) return;
     var btn = document.getElementById('diss-ai'), out = document.getElementById('diss-aiout');
-    btn.disabled = true; var old = btn.textContent; btn.textContent = '✦ reading…'; out.textContent = '';
-    try {
-      var sess = JSON.parse(localStorage.getItem('vf_session') || '{}');
-      var base = window.API_BASE || '';
-      var digest = {
-        scope: LAST.scope, base_month: LAST.base_month, compare_month: LAST.compare_month,
-        trajectory: LAST.trajectory, bridge: LAST.bridge, mix_bridge: LAST.mix_bridge, ingredients: LAST.ingredients,
-        price_drill: LAST.price_drill
-      };
-      var r = await fetch(base + '/margin-ai', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-session-id': sess.id || '' },
-        body: JSON.stringify({ digest: digest })
-      });
-      if (!r.ok) { out.textContent = 'AI read unavailable (' + r.status + ').'; return; }
-      var j = await r.json();
-      out.textContent = j.text || 'No response.';
-    } catch (e) { out.textContent = 'AI read failed: ' + e.message; }
-    finally { btn.disabled = false; btn.textContent = old; }
+    var old = btn.textContent;
+    btn.disabled = true; btn.textContent = '✦ reading…'; out.textContent = '';
+    function done() { btn.disabled = false; btn.textContent = old; }
+    if (typeof window.apiPost !== 'function') { out.textContent = 'AI read unavailable (API client not loaded).'; done(); return; }
+    var digest = {
+      scope: LAST.scope, base_month: LAST.base_month, compare_month: LAST.compare_month,
+      trajectory: LAST.trajectory, bridge: LAST.bridge, mix_bridge: LAST.mix_bridge, ingredients: LAST.ingredients,
+      price_drill: LAST.price_drill
+    };
+    var p;
+    try { p = Promise.resolve(window.apiPost('margin-ai', { digest: digest })); }
+    catch (e) { p = Promise.reject(e); }
+    p.then(function (j) {
+      // null = 401 handled by the client (logout already triggered)
+      out.textContent = j ? (j.text || 'No response.') : 'AI read unavailable (session expired).';
+      done();
+    }, function (e) {
+      out.textContent = 'AI read failed: ' + ((e && e.message) || 'request failed');
+      done();
+    });
   }
 })();

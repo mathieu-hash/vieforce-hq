@@ -10,10 +10,32 @@
 // net Price +31/t. Without this panel the dashboard cannot tell the two apart.
 //
 // Renders into #mexp-net-body. Read-only; no fetches of its own.
+//
+// Staleness: same policy as the headline bridge and the dissection. A good render
+// is kept only for the scope it was painted for (the controller calls
+// MEXP_resetNetBridge on every scope change). Same scope, refresh failed → the
+// panel dims and names the scope it is showing. Nothing to keep → the panel
+// stays visible and prints the server's reason. It never hides itself.
 (function () {
   'use strict';
 
   var esc = window.esc || function (s) { return String(s == null ? '' : s); };
+
+  var NET_GOOD = false;    // a real net bridge has painted for the CURRENT scope
+  var NET_SCOPE = '';      // label of the scope that render describes
+  window.MEXP_resetNetBridge = function () { NET_GOOD = false; NET_SCOPE = ''; };
+
+  function staleNote(panel, body, text) {
+    var n = document.getElementById('mexp-net-stale');
+    if (!text) { if (n && n.parentNode) n.parentNode.removeChild(n); return; }
+    if (!n) {
+      n = document.createElement('div');
+      n.id = 'mexp-net-stale';
+      n.className = 'mexp-stale-note';
+      panel.insertBefore(n, body);
+    }
+    n.textContent = text;
+  }
 
   function pt(n) {
     n = Math.round(+n || 0);
@@ -133,10 +155,10 @@
       '.mnb-track{position:relative;height:18px;background:var(--surface2,rgba(255,255,255,.04));border-radius:4px;overflow:hidden}',
       '.mnb-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--glass-border,rgba(255,255,255,.18))}',
       '.mnb-bar{position:absolute;top:3px;bottom:3px;border-radius:3px}',
-      '.mnb-bar.pos{background:#22c55e}.mnb-bar.neg{background:#ef4444}',
+      '.mnb-bar.pos{background:var(--green)}.mnb-bar.neg{background:var(--red)}',
       '.mnb-val{font-size:12px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}',
-      '.mnb-val.pos,.mnb-v.pos,.mnb-lh b.pos,.mnb-wedge b.pos{color:#22c55e}',
-      '.mnb-val.neg,.mnb-v.neg,.mnb-lh b.neg,.mnb-wedge b.neg{color:#ef4444}',
+      '.mnb-val.pos,.mnb-v.pos,.mnb-lh b.pos,.mnb-wedge b.pos{color:var(--green)}',
+      '.mnb-val.neg,.mnb-v.neg,.mnb-lh b.neg,.mnb-wedge b.neg{color:var(--red)}',
       '.mnb-end{display:flex;align-items:baseline;gap:8px;font-size:11px;color:var(--text2);padding:4px 0}',
       '.mnb-end b{font-size:15px;color:var(--text);font-variant-numeric:tabular-nums}',
       '.mnb-end.tot{border-top:1px solid var(--glass-border,rgba(255,255,255,.14));margin-top:4px;padding-top:8px}',
@@ -155,24 +177,41 @@
       '.mnb-trust{display:flex;flex-direction:column;gap:5px;margin-top:14px}',
       '.mnb-ti{display:flex;gap:7px;font-size:11px;line-height:1.45;color:var(--text2)}',
       '.mnb-ti span{flex:0 0 12px}',
-      '.mnb-ti.ok span{color:#22c55e}.mnb-ti.warn span{color:#f1b11d}.mnb-ti.info span{color:var(--text3)}',
+      '.mnb-ti.ok span{color:var(--green)}.mnb-ti.warn span{color:var(--gold)}.mnb-ti.info span{color:var(--text3)}',
       '.mnb-lenses{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}',
       '@media(max-width:900px){.mexp-net-panel .mnb-lenses{grid-template-columns:1fr}}',
       '.mnb-lh{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:3px;display:flex;justify-content:space-between}',
-      '.mnb-foot{margin-top:14px;font-size:10.5px;line-height:1.55;color:var(--text3)}'
+      '.mnb-foot{margin-top:14px;font-size:10.5px;line-height:1.55;color:var(--text3)}',
+      '.mnb-unavail{font-size:12px;font-weight:600;color:var(--text);padding:14px 2px;line-height:1.5}'
     ].join('');
     document.head.appendChild(s);
   }
 
-  window.MEXP_renderNetBridge = function (nb) {
+  window.MEXP_renderNetBridge = function (nb, label) {
     var panel = document.getElementById('mexp-net-panel');
     var body = document.getElementById('mexp-net-body');
     if (!panel || !body) return;
+    styles();
+    label = label || 'this scope';
     if (!nb || nb.available === false) {
-      panel.style.display = 'none';
+      var reason = (nb && nb.reason) || 'not available for this anchor.';
+      if (NET_GOOD) {
+        // same scope, refresh failed: keep the render, dim it, name the scope shown
+        panel.classList.add('mexp-stale');
+        staleNote(panel, body, '⚠ source busy — could not refresh; showing ' + (NET_SCOPE || label) + ' (' + reason + ')');
+      } else {
+        // nothing to keep: an unsupported / empty scope is an answer — print it
+        panel.classList.remove('mexp-stale');
+        staleNote(panel, body, '');
+        body.innerHTML = '<div class="mnb-unavail">' +
+          ((nb && nb.error) ? '⚠ Net bridge could not be loaded for ' : 'ⓘ No net bridge for ') +
+          esc(label) + ' — ' + esc(reason) + '</div>';
+      }
+      panel.style.display = '';
       return;
     }
-    styles();
+    panel.classList.remove('mexp-stale');
+    staleNote(panel, body, '');
     var recon = nb.reconciles ? '<span class="mexp-recon">reconciles ✓</span>' : '';
     body.innerHTML =
       '<div class="mnb-grid">' +
@@ -188,5 +227,7 @@
       '<div class="mnb-foot">' + esc(nb.note || '') + ' ' + recon +
         '<br>Lenses are standalone one-dimensional share-shifts valued against the average margin — each is internally exact, but they do not sum to each other or to the Mix bars.</div>';
     panel.style.display = '';
+    NET_GOOD = true;
+    NET_SCOPE = label;
   };
 })();
