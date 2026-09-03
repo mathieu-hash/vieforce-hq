@@ -1394,3 +1394,113 @@
 @media (max-width: 980px) {
   .mx2-in-grid { grid-template-columns: 1fr; }
 }
+
+
+/* ==========================================================================
+   19. CATEGORY MARGIN BY MONTH — mexp2-panel-trendmatrix.js (phase B, THE HERO)
+   One .mx2-panel: filter rail (Region / BU / Customer re-scope the server;
+   DSM and Categories are tagged client-side), a view strip (unit, window,
+   export), then the month grid: sticky first column AND sticky header,
+   horizontal scroll inside the panel, the running month dashed, the
+   requested anchor month railed in the accent, the payload's AVG row pinned
+   at the bottom. Tokens only; no new colour.
+   ========================================================================== */
+
+.mx2-body > .mx2-panel.mx2-panel-trendmatrix,
+.mx2-stack > .mx2-panel.mx2-panel-trendmatrix { grid-column: 1 / -1; }
+
+.mx2-tm-anchors { color: var(--mx2-text2); }
+.mx2-tm-rail, .mx2-tm-tools { padding: 8px 10px; gap: var(--mx2-gap-sm); background: var(--mx2-surface2); }
+.mx2-tm-tools { background: transparent; border-style: dashed; }
+.mx2-tm-fgroup .mx2-flabel { display: inline-flex; align-items: center; gap: 5px; }
+.mx2-tm-input { min-width: 150px; padding: 6px 9px; font-size: 11.5px; }
+.mx2-tm-dsm { border-style: dashed; }
+.mx2-tm-cats { display: inline-flex; align-items: center; gap: var(--mx2-gap-xs); flex-wrap: wrap; }
+.mx2-tm-catchip { font-weight: 700; }
+.mx2-tm-catchip[aria-pressed="false"] { text-decoration: line-through; color: var(--mx2-text4); border-style: dashed; }
+.mx2-tm-export { margin-left: auto; }
+
+.mx2-tm-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-tm-notes { display: flex; flex-direction: column; gap: 4px; }
+.mx2-tm-note { display: flex; align-items: baseline; }
+.mx2-tm-glyph { color: var(--mx2-accent); font-weight: 900; margin-right: 4px; }
+.mx2-tm-foot { display: flex; flex-direction: column; gap: 3px; }
+.mx2-tm-withheld { color: var(--mx2-text2); }
+.mx2-tm-basis { border-top: 1px solid var(--mx2-divider); padding-top: 8px; color: var(--mx2-text2); }
+
+/* The grid. The wrap owns the scroll in BOTH axes; the page never scrolls sideways. */
+.mx2-tm-wrap { border: 1px solid var(--mx2-divider); max-height: var(--mx2-table-max-h); }
+.mx2-tm-tbl { table-layout: auto; min-width: 100%; }
+.mx2-tm-tbl th { vertical-align: bottom; z-index: 2; }
+.mx2-tm-tbl th.mx2-tm-cat,
+.mx2-tm-tbl td.mx2-tm-cat {
+  position: sticky; left: 0;
+  background: var(--mx2-surface-solid);
+  text-align: left;
+  min-width: 150px;
+  box-shadow: inset -1px 0 0 0 var(--mx2-divider);
+}
+.mx2-tm-tbl th.mx2-tm-cat { z-index: 3; }
+.mx2-tm-tbl td.mx2-tm-cat { z-index: 1; }
+.mx2-tm-tbl tbody tr:hover td.mx2-tm-cat { background: var(--mx2-surface3); }
+.mx2-tm-tbl tbody tr.is-selected td.mx2-tm-cat { background: var(--mx2-surface-solid); box-shadow: inset 3px 0 0 0 var(--mx2-accent), inset -1px 0 0 0 var(--mx2-divider); color: var(--mx2-accent); }
+.mx2-tm-name { display: block; color: var(--mx2-text); font-weight: 800; }
+.mx2-tm-tons { display: block; font: 700 9px/1.3 var(--mx2-mono); color: var(--mx2-text3); letter-spacing: 0; margin-top: 1px; }
+.mx2-tm-tbl tr.mx2-tm-zero td.mx2-tm-cat .mx2-tm-name { color: var(--mx2-text3); font-style: italic; font-weight: 600; }
+.mx2-tm-tbl tr.mx2-tm-zero td.mx2-tm-m { color: var(--mx2-text4); }
+
+.mx2-tm-tbl td.mx2-tm-m { color: var(--mx2-text); font-weight: 700; cursor: pointer; }
+.mx2-tm-tbl td.mx2-neg { color: var(--mx2-neg); }
+.mx2-tm-tbl td.mx2-null { color: var(--mx2-text4); font-weight: 700; }
+.mx2-tm-tbl td.mx2-tm-withheld { cursor: help; }
+
+/* Month header: a button in the header type; the tags sit beside it. */
+.mx2-tm-mbtn {
+  all: unset;
+  display: inline; cursor: pointer;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit;
+}
+.mx2-tm-mbtn:focus-visible { outline: 2px solid var(--mx2-focus); outline-offset: 2px; border-radius: 3px; }
+.mx2-tm-tbl th.mx2-tm-m:hover .mx2-tm-mbtn { color: var(--mx2-text); }
+.mx2-tm-tag {
+  display: inline-block; margin-left: 4px;
+  font: 900 8px/1 var(--mx2-font); letter-spacing: 0.4px; text-transform: uppercase;
+  padding: 2px 4px; border-radius: 999px;
+}
+.mx2-tm-tag-partial { border: 1px dashed var(--mx2-resid-border); background: var(--mx2-resid-soft); color: var(--mx2-resid); }
+.mx2-tm-tag-anchor { border: 1px solid var(--mx2-accent-border); background: var(--mx2-accent-soft); color: var(--mx2-accent); }
+
+/* Partial (running) month: dashed left rule, muted head. Anchor: accent rule. */
+.mx2-tm-tbl th.mx2-tm-partial, .mx2-tm-tbl td.mx2-tm-partial { border-left: 1px dashed var(--mx2-border-strong); }
+.mx2-tm-tbl th.mx2-tm-partial .mx2-tm-mbtn { color: var(--mx2-text3); }
+.mx2-tm-tbl th.mx2-tm-anchor, .mx2-tm-tbl td.mx2-tm-anchor { box-shadow: inset 2px 0 0 0 var(--mx2-accent); background: var(--mx2-accent-soft); }
+.mx2-tm-tbl th.mx2-tm-anchor .mx2-tm-mbtn { color: var(--mx2-text); }
+
+/* AVG row from the payload, pinned. */
+.mx2-tm-tbl tfoot td { position: sticky; bottom: 0; z-index: 1; background: var(--mx2-surface-solid); white-space: nowrap; }
+.mx2-tm-tbl tfoot td.mx2-tm-cat { z-index: 3; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; }
+.mx2-tm-tbl tfoot td.mx2-neg { color: var(--mx2-neg); }
+.mx2-tm-tbl tfoot td.mx2-null { color: var(--mx2-text4); }
+
+/* loading-first skeleton: the month spine, then shimmer rows. Never a number. */
+.mx2-tm-skel { display: flex; flex-direction: column; gap: 9px; }
+.mx2-tm-skel-head {
+  display: flex; align-items: center; gap: 10px; overflow: hidden;
+  padding: 8px 10px; border-radius: var(--mx2-r-sm);
+  background: var(--mx2-surface2);
+  font-size: 9px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--mx2-text3); white-space: nowrap;
+}
+.mx2-tm-skel-cat { min-width: 150px; }
+.mx2-tm-skel-m { flex: 1 1 0; text-align: right; }
+.mx2-tm-skel-rows .mx2-skel { height: 22px; }
+
+/* unavailable-for-scope: the reason IS the answer; no empty grid under it. */
+.mx2-panel.mx2-panel-trendmatrix[data-mx2-status="unavailable-for-scope"] .mx2-tm-wrap,
+.mx2-panel.mx2-panel-trendmatrix[data-mx2-status="unavailable-for-scope"] .mx2-tm-foot { display: none; }
+
+@media (max-width: 720px) {
+  .mx2-tm-rail, .mx2-tm-tools { padding: 8px; }
+  .mx2-tm-tbl th.mx2-tm-cat, .mx2-tm-tbl td.mx2-tm-cat, .mx2-tm-skel-cat { min-width: 110px; }
+  .mx2-tm-export { margin-left: 0; }
+}
