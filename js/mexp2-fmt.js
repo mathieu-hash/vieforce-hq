@@ -186,6 +186,15 @@
     return "₱" + n.toFixed(0);
   }
 
+  // Pesos, zero decimals: "₱12,345,678". For MONEY ON CARDS — a peso total on a
+  // KPI tile is read at a glance and the centavos are noise there; php() keeps
+  // the two decimals for tables and tooltips.
+  function php0(n) {
+    var v = toNum(n);
+    if (v === null) return NULL_TEXT;
+    return (isNeg(v) ? "-" : "") + PESO + groupAbs(v, 0, 0);
+  }
+
   // Pesos per ton, zero decimals: "₱5,248". A per-ton figure is a ~4-digit
   // number; decimals on it are noise well below C.MATERIALITY_PHP_T (25/ton).
   function perTon(n) {
@@ -355,6 +364,7 @@
     gmPerTon: gmPerTon,
     // money
     php: php,
+    php0: php0,
     phpAbbrShellCompat: phpAbbrShellCompat,
     perTon: perTon,
     perKg: perKg,

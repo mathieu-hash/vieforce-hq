@@ -207,7 +207,7 @@
         value: v === null ? null : f.perKg(v), unit: PER_KG,
         delta: pct === null ? COPY.pctUndefined : f.pct(pct) + COPY.ofReported,
         tone: pct === null ? "flat" : "neg",
-        note: (t === null ? "" : f.php(t) + COPY.totalInWindow + " · ") + "OINV.DiscSum"
+        note: (t === null ? "" : f.php0(t) + COPY.totalInWindow + " · ") + "OINV.DiscSum"
       };
     } else {
       // Overlay null (query threw / window kg<=0) or empty scope: the reported
@@ -227,11 +227,11 @@
 
     v = (!empty && hero) ? num(hero.net_sales && hero.net_sales.value) : null;
     d = deltaText(v === null ? null : num(hero.net_sales.delta_pct), pctSigned, base);
-    S.netSales = { value: v === null ? null : f.php(v), unit: "", delta: blank ? "" : d.text, tone: d.tone, note: repBasis };
+    S.netSales = { value: v === null ? null : f.php0(v), unit: "", delta: blank ? "" : d.text, tone: d.tone, note: repBasis };
 
     v = (!empty && hero) ? num(hero.gross_profit && hero.gross_profit.value) : null;
     d = deltaText(v === null ? null : num(hero.gross_profit.delta_pct), pctSigned, base);
-    S.gp = { value: v === null ? null : f.php(v), unit: "", delta: blank ? "" : d.text, tone: d.tone, note: repBasis + " · " + COPY.gpNote };
+    S.gp = { value: v === null ? null : f.php0(v), unit: "", delta: blank ? "" : d.text, tone: d.tone, note: repBasis + " · " + COPY.gpNote };
 
     v = (!empty && hero) ? num(hero.gp_pct && hero.gp_pct.value) : null;
     d = deltaText(v === null ? null : num(hero.gp_pct.delta_pp), function (x) { return f.pp(x); }, base);

@@ -60,12 +60,12 @@
   }
   function fmtTons(v) {
     if (v == null || isNaN(v)) return '—';
-    return (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' t';
+    return (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' MT';
   }
   // Green-ish positive / red negative color for a primary value.
   function valueColor(v) {
     if (v == null || isNaN(v)) return 'var(--text3)';
-    return (+v) < 0 ? 'var(--red)' : 'var(--green)';
+    return (+v) < 0 ? 'var(--mx2-neg,var(--red))' : 'var(--mx2-pos,var(--green))';
   }
 
   // Inject scoped styles once.
@@ -82,7 +82,7 @@
         'background-repeat:no-repeat;background-position:right 11px center}' +
       '.mexp-groupby:hover{border-color:var(--glass-border-hover)}' +
       // table-layout:fixed → even, professional columns (no content-driven jitter)
-      '.mexp-matrix-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}' +
+      '.mexp-matrix-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;font-variant-numeric:tabular-nums}' +
       '.mexp-matrix-table th{text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;' +
         'letter-spacing:.04em;color:var(--text3);padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '.mexp-matrix-table th.mexp-c-dim{text-align:left}' +
@@ -93,13 +93,13 @@
       '.mexp-matrix-table td.mexp-c-dim{text-align:left;color:var(--text);font-weight:700}' +
       '.mexp-row{cursor:pointer;transition:background .12s}' +
       '.mexp-row:hover{background:rgba(255,255,255,0.03)}' +
-      '.mexp-row.mexp-sel{background:rgba(0,196,232,0.10);box-shadow:inset 3px 0 0 var(--cyan)}' +
-      '.mexp-row.mexp-sel td.mexp-c-dim{color:var(--cyan)}' +
+      '.mexp-row.mexp-sel{background:var(--mx2-accent-soft,rgba(0,196,232,0.10));box-shadow:inset 3px 0 0 var(--mx2-accent,var(--cyan))}' +
+      '.mexp-row.mexp-sel td.mexp-c-dim{color:var(--mx2-accent,var(--cyan))}' +
       '.mexp-dim-chevron{color:var(--text3);margin-left:6px;font-size:11px;opacity:.7}' +
       '.mexp-primary{font-weight:700}' +
       '.mexp-share{display:flex;align-items:center;gap:8px;justify-content:flex-end}' +
       '.mexp-share-bar{position:relative;width:64px;height:6px;border-radius:4px;background:var(--glass-border);overflow:hidden;flex:0 0 auto}' +
-      '.mexp-share-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--cyan)}' +
+      '.mexp-share-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--mx2-accent,var(--cyan))}' +
       '.mexp-share-num{color:var(--text3);font-size:12px;min-width:42px;text-align:right}' +
       '.mexp-foot td{border-top:2px solid var(--border);border-bottom:none;font-weight:700;color:var(--text);' +
         'padding-top:11px;font-variant-numeric:tabular-nums}' +
@@ -188,7 +188,7 @@
       '<th>' + _esc(cfg.header) + '</th>' +
       '<th>GP ₱</th>' +
       '<th>% of GP</th>' +
-      '<th>Vol (t)</th>' +
+      '<th>MT</th>' +
       '</tr>';
     table.appendChild(thead);
 
@@ -271,7 +271,7 @@
     }
 
     tr.innerHTML =
-      '<td class="mexp-c-dim" title="Sum of the ' + rows.length + ' rows shown">Visible rows (' + rows.length + ')</td>' +
+      '<td class="mexp-c-dim" title="Sum of the ' + rows.length + ' rows shown — one base: primary, GP, share and MT all describe these rows">Visible rows (' + rows.length + ')</td>' +
       '<td class="mexp-primary">' + _esc(primaryStr) + '</td>' +
       '<td>' + _esc(_fc(sumGp)) + '</td>' +
       '<td>100.0%</td>' +

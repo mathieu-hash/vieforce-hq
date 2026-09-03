@@ -1,20 +1,32 @@
 /* ============================================================================
- * mexp2-panel-bridge.js — Margin Explorer v2 · THE GM/TON BRIDGE (MEXP2.panel "bridge")
+ * mexp2-panel-bridge.js — Margin Explorer v2 · THE GM/TON BRIDGES
+ *   MEXP2.panel "bridge"     — REPORTED: diss.canonical_bridge (gross of the
+ *                              off-invoice discount)
+ *   MEXP2.panel "netbridge"  — REALISED: diss.net_bridge (net of the off-invoice
+ *                              discount)
  * ----------------------------------------------------------------------------
- * WHAT THIS PANEL SHOWS
- *   diss.canonical_bridge (phase B, WIRE.CANONICAL_BRIDGE): the exact Bennet
- *   decomposition of GM/ton between a MONTH PAIR — prior_gm_ton -> current_gm_ton
- *   through price, cost, customer_mix, product_mix — drawn by MEXP2.svg.waterfall
- *   (delta-framed axis, numeral-only anchor strip, hatched estimates), with the
- *   backend's three trust signals as badges INLINE at the top-right of the chart.
+ * ONE implementation, two registrations: makeBridge(opts) closes over its own
+ * host / refs, so the reported and the realised bridge are the same code with
+ * a different source block. Both draw MEXP2.svg.waterfall (delta-framed axis,
+ * numeral-only anchor strip) with the backend's trust signals as badges INLINE
+ * at the top-right of the chart.
  *
- * TRUST BADGES (T1-T3, C.TRUST_GATES)
+ * ONE SCALE (the owner's ask)
+ *   Each variant computes its own spec AND the other variant's spec from the
+ *   same dissection, unions the two cumulative-delta extents through
+ *   MEXP2.svg.waterfallDomain and passes the union as spec.domain. Both panels
+ *   therefore draw on the identical axis, and the subtitle says so. When the
+ *   other bridge is unavailable for the scope the panel says "own scale".
+ *   The reported->realised walk (mexp2-panel-g2n.js) is a level gap, not a
+ *   month-pair move, and keeps its own axis.
+ *
+ * TRUST BADGES (T1-T3, C.TRUST_GATES) — both variants
  *   - mix_ordering.sign_stable === false  -> "mix split unstable": the customer /
  *     product bars are MERGED into one "Mix" bar valued at mix_total. The split
  *     is not quoted anywhere, not even greyed; the two ranges are the reason.
  *   - mix_detail.churn_dominated === true -> "churn-dominated", the backend's
  *     WARNING sentence (appended to canonical_bridge.note) in the tooltip.
- *   - significance.available === true     -> the verdict word (noise / weak /
+ *   - significance (canonical only)       -> the verdict word (noise / weak /
  *     signal), z in the tooltip. No badge at all when unavailable.
  *
  * CLOSURE (C13)
@@ -24,10 +36,15 @@
  *   role resid, so the label names it honestly. The server's `reconciles` flag
  *   is printed ONLY when it disagrees with the client closure.
  *
- * COST SPLIT (C12)
- *   cost_components (rm / packaging / feedtag) are ALWAYS an estimate. They are
- *   the Cost bar's drill (tooltip) AND a hatched sub-strip under the chart —
- *   role "est" on every step, the basis string in the sub-strip's tooltip.
+ * RECONCILING DRILLS (reported variant only, under the chart)
+ *   Two small tables tied to their parent bar: Cost -> RM / Packaging / Feedtag
+ *   (cost_components: ALWAYS an estimate — production-order class ratio, RM is
+ *   the remainder; labelled "estimated", basis in the tooltip) and Product mix
+ *   -> by category (product_mix_by_ssg, the ssg lens with zero rows dropped).
+ *   Each footer prints the parent bar; when the rows do not re-sum to it within
+ *   rounding (max(1.5, N) PHP/ton for N rounded rows) the footer says by how
+ *   much. A passing tie draws nothing (C13). The product-mix drill is withheld
+ *   when the split is merged (T1) — there is no Product mix bar to tie to.
  *
  * ANCHOR HONESTY (C.ANCHORS)
  *   The anchors are base_month -> compare_month — the first and last COMPLETE
@@ -43,12 +60,13 @@
  *   - Lifecycle per C.PANEL_LIFECYCLE. render() reads only its vm; renderStale()
  *     paints prev.diss and PRINTS prev.label (header + gold banner).
  *   - phase "diss": the controller reads store.statusFor("diss") for this
- *     panel. A canonical_bridge that is itself {available:false, reason} inside
+ *     panel. A bridge block that is itself {available:false, reason} inside
  *     an available dissection is surfaced by this panel as unavailable-for-
  *     scope with the reason verbatim (the store cannot see inside the block).
  *   - Every number through MEXP2.fmt; every colour via --mx2-* inside the svg
- *     primitive; status chrome is CSS off [data-mx2-status]; show/hide by DOM
- *     membership. All classes .mx2-*. No console.*, no fetch, no store mutation.
+ *     primitive or CSS; status chrome is CSS off [data-mx2-status]; show/hide
+ *     by DOM membership. All classes .mx2-*. No console.*, no fetch, no store
+ *     mutation.
  * ========================================================================= */
 (function () {
   "use strict";
@@ -57,7 +75,6 @@
   var C = NS.C;
   if (!C) throw new Error("mexp2-panel-bridge: mexp2-contract.js must load before this file.");
 
-  var PANEL_ID = "bridge";
   var UNIT = "php_per_ton";
   var DASH = (C.NUM && C.NUM.NULL_TEXT) || "—";
   var PER_TON = (C.NUM && C.NUM.PER_TON) || "/t";
@@ -66,8 +83,6 @@
   var GATES = C.TRUST_GATES || {};
 
   var COPY = {
-    title: "GM/ton bridge",
-    subtitle: "Exact Bennet at customer×SKU · Price and Cost are levers, Mix is composition",
     universe: "Finished feed (103) only; nets credit notes. Does not tie to the hero.",
     anchorsPrefix: "Anchors ",
     completeOnly: "complete months only",
@@ -81,10 +96,7 @@
     mixMergedNote: "customer + product merged — the split is not determinate for this window",
     unexplained: "Unexplained (rounding drift)",
     rm: "Raw materials", packaging: "Packaging", feedtag: "Feedtag",
-    costSplitTitle: "Cost bar split — estimated",
-    costSplitSub: "production-order class ratio; RM is the remainder and absorbs every error",
-    afterCost: "After Cost",
-    costFoot: "Cost split is an estimate",
+    costEst: "(est.)",
     badgeMix: "mix split unstable",
     badgeChurn: "churn-dominated",
     prodDrillNote: "top " + DRILL_TOP + " by |value| · ssg lens, does not sum to the bar",
@@ -97,7 +109,18 @@
     noPrevBridge: "No bridge had loaded for the previous scope.",
     loadingNote: "Phase B (dissection) still in flight — the hero above is already current.",
     stalePrefix: "Showing previous scope: ",
-    methodPrefix: "Method: "
+    methodPrefix: "Method: ",
+    scaleShared: "Scale shared with the ", scaleOwn: "Own scale — the ", scaleOwnB: " bridge is unavailable for this scope",
+    reportedName: "reported", realisedName: "realised",
+    drillCostH: "Cost", drillCostSub: "→ RM / Packaging / Feedtag · estimated",
+    drillCostTip: "cost_components: production-order class ratio priced at OITM.LastPurPrc (YTD average) — always an estimate; RM is the remainder and absorbs every error in the other two.",
+    drillMixH: "Product mix", drillMixSub: "→ by category (SSG)",
+    drillMixTip: "product_mix_by_ssg: the ssg lens rows with zero values dropped; 'UNSPEC' is Untagged.",
+    drillMixMerged: "Product mix by category is withheld: the customer / product split is not determinate for this window (T1).",
+    drillFootA: "= ", drillFootB: " bar",
+    drillOff: " · rows differ from the bar by ",
+    drillShare: "share of |Σ|",
+    wedgeA: "Discount wedge ", wedgeB: " (Δ ", wedgeC: ")"
   };
 
   /* -------------------------------------------------------------------------
@@ -143,14 +166,21 @@
     if (!r || r.length !== 2) return DASH;
     return f.signed(r[0], 0) + "…" + f.signed(r[1], 0) + PER_TON;
   }
+  function signedTon(v) { var f = F(); return v === null ? DASH : f.signed(v, 0) + PER_TON; }
   // The WARNING sentence the backend appends to note when churn-dominated (T2).
   function warningOf(note) {
     var s = (note == null) ? "" : String(note), i = s.indexOf("WARNING:");
     return i >= 0 ? s.slice(i) : "";
   }
+  function stateBlock(state, title, hint) {
+    var b = el("div", "mx2-msg"); b.setAttribute("data-mx2-for", state);
+    b.appendChild(el("div", "mx2-msg-t", title));
+    b.appendChild(el("div", "mx2-msg-h", hint || ""));
+    return b;
+  }
 
   /* -------------------------------------------------------------------------
-   * model — pure: reads one canonical bridge, returns everything to paint
+   * model — pure: reads one bridge block, returns everything to paint
    * ---------------------------------------------------------------------- */
 
   // The anchors sentence (C.ANCHORS.panel_rule): base -> compare, verbatim,
@@ -186,8 +216,11 @@
     return out;
   }
 
-  function modelFor(cb) {
-    var f = F(), M = { ok: false, spec: null, cost: null, badges: [], notes: [], anchors: anchorsOf(cb), method: "", note: "", unavailableReason: null };
+  // `source` "canonical" | "net". Both blocks share the bridge core (WIRE.
+  // NET_BRIDGE.SAME_AS_CANONICAL); significance and cost_components are
+  // canonical-only and simply absent on the net block.
+  function modelFor(cb, source) {
+    var f = F(), M = { ok: false, spec: null, drills: null, badges: [], notes: [], anchors: anchorsOf(cb), method: "", note: "", unavailableReason: null, wedge: "" };
     if (!isObj(cb)) return M;
     if (cb.available !== true) { M.unavailableReason = (cb.reason == null) ? "" : String(cb.reason); return M; }
     M.ok = true;
@@ -196,7 +229,7 @@
 
     var prior = num(cb.prior_gm_ton), current = num(cb.current_gm_ton);
     var price = num(cb.price), cost = num(cb.cost), cm = num(cb.customer_mix), pm = num(cb.product_mix), mixTotal = num(cb.mix_total);
-    var mo = cb.mix_ordering, md = cb.mix_detail, cc = cb.cost_components, sig = significanceOf(cb.significance);
+    var mo = cb.mix_ordering, md = cb.mix_detail, cc = cb.cost_components, sig = (source === "net") ? { badge: null, note: "" } : significanceOf(cb.significance);
     var unstable = !!(isObj(mo) && mo.sign_stable === false);
     var churn = !!(isObj(md) && md.churn_dominated === true);
     var steps = [], sum = 0, i, drill, rows;
@@ -238,7 +271,7 @@
         COPY.churnA + f.pct(md.one_sided_share_pct) + COPY.churnB + f.pct(md.matched_kg_share_pct) + "." });
     }
     if (sig.badge) M.badges.push(sig.badge);
-    M.notes.push({ kind: "sig", text: sig.note });
+    if (source !== "net") M.notes.push({ kind: "sig", text: sig.note });
 
     // closure (C13): our own residual against the rounding-drift bound
     for (i = 0; i < steps.length; i++) if (steps[i].value !== null) sum += steps[i].value;
@@ -267,248 +300,328 @@
       residual: residual === null ? 0 : residual,
       tolerance: bound,
       toleranceKind: "canonical",
-      basisNote: C.BASIS_SUFFIX.reported,
+      basisNote: (source === "net") ? C.BASIS_SUFFIX.net : C.BASIS_SUFFIX.reported,
       anchorsNote: M.anchors.line || null,
-      footnote: isObj(cc) ? COPY.costFoot : null,
-      badges: null                                       // T1-T3 badges are DOM pills in the chart's top band (paintBadges), never dropped for width
+      footnote: null,
+      badges: null,                                      // T1-T3 badges are DOM pills in the chart's top band (paintBadges), never dropped for width
+      domain: null                                       // filled by the paint with the union of both bridges
     };
 
-    // C12: the hatched sub-strip — a walk from the prior level through the
-    // three estimated components to prior + cost. rm is the remainder, so it
-    // closes by construction; the svg's own drift gate covers any rounding.
-    if (isObj(cc) && cost !== null && prior !== null) {
-      M.cost = {
-        basis: cc.basis == null ? "" : String(cc.basis),
-        spec: {
-          title: COPY.costSplitTitle,
-          subtitle: COPY.costSplitSub,
-          unit: UNIT,
-          orientation: "horizontal",
-          anchorStart: { label: COPY.prior, value: prior },
-          anchorEnd: { label: COPY.afterCost, value: prior + cost },
-          steps: [
-            { label: COPY.rm, value: num(cc.rm), role: "est", drill: null },
-            { label: COPY.packaging, value: num(cc.packaging), role: "est", drill: null },
-            { label: COPY.feedtag, value: num(cc.feedtag), role: "est", drill: null }
+    // The realised bridge carries the discount wedge it walked through.
+    if (source === "net" && isObj(cb.discount)) {
+      var dp = num(cb.discount.prior_per_ton), dc = num(cb.discount.current_per_ton), dd = num(cb.discount.delta_per_ton);
+      if (dp !== null || dc !== null) {
+        M.wedge = COPY.wedgeA + (dp === null ? DASH : f.perTon(dp) + PER_TON) + ARROW + (dc === null ? DASH : f.perTon(dc) + PER_TON) +
+          COPY.wedgeB + signedTon(dd) + COPY.wedgeC;
+      }
+    }
+
+    // Reconciling drills (reported variant): each table tied to its parent bar.
+    if (source !== "net") {
+      M.drills = [];
+      if (isObj(cc)) {
+        M.drills.push({
+          kind: "cost", head: COPY.drillCostH, sub: COPY.drillCostSub, tip: (cc.basis == null ? COPY.drillCostTip : String(cc.basis)),
+          rows: [
+            { label: COPY.rm + " " + COPY.costEst, value: num(cc.rm) },
+            { label: COPY.packaging + " " + COPY.costEst, value: num(cc.packaging) },
+            { label: COPY.feedtag + " " + COPY.costEst, value: num(cc.feedtag) }
           ],
-          toleranceKind: "canonical",
-          basisNote: C.BASIS_SUFFIX.reported,
-          anchorsNote: M.anchors.pair || null,
-          footnote: cc.basis == null ? null : String(cc.basis)
-        }
-      };
+          bar: cost, barLabel: COPY.cost
+        });
+      }
+      rows = cb.product_mix_by_ssg;
+      if (unstable) {
+        M.drills.push({ kind: "mix", head: COPY.drillMixH, sub: COPY.drillMixSub, tip: COPY.drillMixTip, rows: [], bar: pm, barLabel: COPY.prodMix, withheld: COPY.drillMixMerged });
+      } else if (rows && rows.length) {
+        var mrows = [];
+        for (i = 0; i < rows.length; i++) mrows.push({ label: rows[i].ssg == null ? "" : String(rows[i].ssg), value: num(rows[i].value) });
+        M.drills.push({ kind: "mix", head: COPY.drillMixH, sub: COPY.drillMixSub, tip: COPY.drillMixTip, rows: mrows, bar: pm, barLabel: COPY.prodMix });
+      }
     }
     return M;
   }
 
+  // The union of two waterfall extents — the sanctioned way to put the reported
+  // and the realised bridge on ONE scale (mexp2-svg.js waterfallDomain).
+  function unionDomain(specA, specB) {
+    if (!NS.svg || typeof NS.svg.waterfallDomain !== "function") return null;
+    var a, b;
+    try { a = NS.svg.waterfallDomain(specA); b = NS.svg.waterfallDomain(specB); } catch (e) { return null; }
+    if (!a || !b) return null;
+    return { min: Math.min(a.min, b.min), max: Math.max(a.max, b.max) };
+  }
+
   /* -------------------------------------------------------------------------
-   * the panel
+   * the panel factory
    * ---------------------------------------------------------------------- */
-  var host = null, R = null;
+  function makeBridge(opts) {
+    var PANEL_ID = opts.id, SOURCE = opts.source, OTHER = (SOURCE === "net") ? "canonical" : "net";
+    var host = null, R = null, def;
 
-  function build(hostEl) {
-    var head = el("div", "mx2-panel-h"), col = el("div", "mx2-panel-hcol");
-    R = {};
-    R.title = el("div", "mx2-panel-t", COPY.title);
-    R.sub = el("div", "mx2-panel-st", "");
-    R.anchors = el("div", "mx2-panel-st mx2-br-anchors", "");
-    R.anchors.setAttribute("title", COPY.anchorsWhy);
-    R.basis = el("div", "mx2-panel-st", C.BASIS_SUFFIX.reported + " · " + C.UNIVERSES.dissection);
-    col.appendChild(R.title); col.appendChild(R.sub); col.appendChild(R.anchors); col.appendChild(R.basis);
-    R.pill = el("span", "mx2-pill");
-    R.pill.appendChild(el("span", "mx2-pill-dot"));
-    R.pillText = el("span", "", "");
-    R.pill.appendChild(R.pillText);
-    head.appendChild(col); head.appendChild(R.pill);
-
-    R.banner = el("div", "mx2-stale-banner", COPY.stalePrefix);
-    R.bannerLabel = el("span", "mx2-stale-label", "");
-    R.banner.appendChild(R.bannerLabel);
-
-    R.body = el("div", "mx2-dimmable mx2-br-body");
-    // The svg primitive clears its host on every paint, so the badge band is a
-    // sibling above the host inside one wrapper: pills top-right, never dropped.
-    R.chartWrap = el("div", "mx2-br-chartwrap");
-    R.badges = el("div", "mx2-br-badges");
-    R.badges.setAttribute("aria-label", "Trust signals");
-    R.chart = el("div", "mx2-br-chart");
-    R.chart.setAttribute("aria-label", "GM per ton bridge waterfall");
-    R.chartWrap.appendChild(R.chart);
-    R.notes = el("div", "mx2-br-notes");
-    R.costWrap = el("div", "mx2-br-cost");
-    R.costHost = el("div", "mx2-br-cost-chart");
-    R.costWrap.appendChild(R.costHost);
-    R.noPrev = el("div", "mx2-note", COPY.noPrevBridge);
-    R.method = el("div", "mx2-note mx2-br-method", "");
-    R.wireNote = el("div", "mx2-note mx2-br-wirenote", "");
-    R.body.appendChild(R.chartWrap);
-    R.body.appendChild(R.method);
-    R.body.appendChild(R.wireNote);
-
-    R.universe = el("div", "mx2-note mx2-br-universe", COPY.universe + " " + COPY.anchorsWhy);
-
-    R.skel = el("div", "mx2-br-skel mx2-skel-rows"); R.skel.setAttribute("data-mx2-for", C.STATE.LOADING_FIRST);
-    R.skel.appendChild(el("div", "mx2-skel mx2-skel-lg"));
-    R.skel.appendChild(el("div", "mx2-skel mx2-skel-block"));
-    R.skel.appendChild(el("div", "mx2-note", C.STATE_COPY[C.STATE.LOADING_FIRST] + " " + COPY.loadingNote));
-    R.empty = stateBlock(C.STATE.EMPTY_SCOPE, C.STATE_COPY[C.STATE.EMPTY_SCOPE], C.STATE_COPY["empty-scope-hint"]);
-    R.unavail = stateBlock(C.STATE.UNAVAILABLE_FOR_SCOPE, C.STATE_COPY[C.STATE.UNAVAILABLE_FOR_SCOPE], "");
-    R.unavailHint = R.unavail.lastChild;
-    R.errored = stateBlock(C.STATE.ERRORED, C.STATE_COPY[C.STATE.ERRORED], "");
-    R.erroredTitle = R.errored.firstChild;
-
-    hostEl.appendChild(head);
-    hostEl.appendChild(R.body);
-    hostEl.appendChild(R.universe);
-    hostEl.appendChild(R.skel);
-    hostEl.appendChild(R.empty);
-    hostEl.appendChild(R.unavail);
-    hostEl.appendChild(R.errored);
-    R.head = head;
-  }
-  function stateBlock(state, title, hint) {
-    var b = el("div", "mx2-msg"); b.setAttribute("data-mx2-for", state);
-    b.appendChild(el("div", "mx2-msg-t", title));
-    b.appendChild(el("div", "mx2-msg-h", hint || ""));
-    return b;
-  }
-
-  function dropSvg() {
-    if (!R || !NS.svg || typeof NS.svg.destroy !== "function") return;
-    try { NS.svg.destroy(R.chart); } catch (e) { /* silent */ }
-    try { NS.svg.destroy(R.costHost); } catch (e2) { /* silent */ }
-  }
-
-  // T1-T3 pills, top-right of the chart, by DOM membership. Tone and colour
-  // are CSS off [data-mx2-tone]; the tooltip is the native title.
-  function paintBadges(M) {
-    var i, b, p;
-    R.badges.innerHTML = "";
-    for (i = 0; i < M.badges.length; i++) {
-      b = M.badges[i];
-      p = el("span", "mx2-br-badge", b.text);
-      p.setAttribute("data-mx2-tone", b.tone === "warn" ? "warn" : "neutral");
-      p.setAttribute("title", b.title || b.text);
-      R.badges.appendChild(p);
+    function blockOf(diss, source) {
+      if (!isObj(diss) || diss.available !== true) return null;
+      return (source === "net") ? diss.net_bridge : diss.canonical_bridge;
     }
-    cls(R.chartWrap, "mx2-has-badges", M.badges.length > 0);
-    show(R.chartWrap, R.badges, M.badges.length > 0, R.chart);
-  }
 
-  function paintNotes(M) {
-    var i, n;
-    R.notes.innerHTML = "";
-    for (i = 0; i < M.notes.length; i++) {
-      if (!M.notes[i].text) continue;
-      n = el("div", "mx2-note mx2-br-note");
-      n.setAttribute("data-mx2-note", M.notes[i].kind);
-      if (M.notes[i].kind !== "sig") n.appendChild(el("span", "mx2-warnglyph", "⚠"));
-      n.appendChild(el("span", "", M.notes[i].text));
-      R.notes.appendChild(n);
+    function build(hostEl) {
+      var head = el("div", "mx2-panel-h"), col = el("div", "mx2-panel-hcol");
+      R = {};
+      R.title = el("div", "mx2-panel-t", opts.title);
+      R.sub = el("div", "mx2-panel-st", "");
+      R.anchors = el("div", "mx2-panel-st mx2-br-anchors", "");
+      R.anchors.setAttribute("title", COPY.anchorsWhy);
+      R.basis = el("div", "mx2-panel-st", opts.basis + " · " + C.UNIVERSES.dissection);
+      R.scale = el("div", "mx2-panel-st mx2-br-scale", "");
+      col.appendChild(R.title); col.appendChild(R.sub); col.appendChild(R.anchors); col.appendChild(R.basis); col.appendChild(R.scale);
+      R.pill = el("span", "mx2-pill");
+      R.pill.appendChild(el("span", "mx2-pill-dot"));
+      R.pillText = el("span", "", "");
+      R.pill.appendChild(R.pillText);
+      head.appendChild(col); head.appendChild(R.pill);
+
+      R.banner = el("div", "mx2-stale-banner", COPY.stalePrefix);
+      R.bannerLabel = el("span", "mx2-stale-label", "");
+      R.banner.appendChild(R.bannerLabel);
+
+      R.body = el("div", "mx2-dimmable mx2-br-body");
+      // The svg primitive clears its host on every paint, so the badge band is a
+      // sibling above the host inside one wrapper: pills top-right, never dropped.
+      R.chartWrap = el("div", "mx2-br-chartwrap");
+      R.badges = el("div", "mx2-br-badges");
+      R.badges.setAttribute("aria-label", "Trust signals");
+      R.chart = el("div", "mx2-br-chart");
+      R.chart.setAttribute("aria-label", opts.title + " waterfall");
+      R.chartWrap.appendChild(R.chart);
+      R.notes = el("div", "mx2-br-notes");
+      R.wedge = el("div", "mx2-note mx2-note-strong mx2-br-wedge", "");
+      R.drills = el("div", "mx2-duo mx2-br-drills");
+      R.noPrev = el("div", "mx2-note", COPY.noPrevBridge);
+      R.method = el("div", "mx2-note mx2-br-method", "");
+      R.wireNote = el("div", "mx2-note mx2-br-wirenote", "");
+      R.body.appendChild(R.chartWrap);
+      R.body.appendChild(R.method);
+      R.body.appendChild(R.wireNote);
+
+      R.universe = el("div", "mx2-note mx2-br-universe", COPY.universe + " " + COPY.anchorsWhy);
+
+      R.skel = el("div", "mx2-br-skel mx2-skel-rows"); R.skel.setAttribute("data-mx2-for", C.STATE.LOADING_FIRST);
+      R.skel.appendChild(el("div", "mx2-skel mx2-skel-lg"));
+      R.skel.appendChild(el("div", "mx2-skel mx2-skel-block"));
+      R.skel.appendChild(el("div", "mx2-note", C.STATE_COPY[C.STATE.LOADING_FIRST] + " " + COPY.loadingNote));
+      R.empty = stateBlock(C.STATE.EMPTY_SCOPE, C.STATE_COPY[C.STATE.EMPTY_SCOPE], C.STATE_COPY["empty-scope-hint"]);
+      R.unavail = stateBlock(C.STATE.UNAVAILABLE_FOR_SCOPE, C.STATE_COPY[C.STATE.UNAVAILABLE_FOR_SCOPE], "");
+      R.unavailHint = R.unavail.lastChild;
+      R.errored = stateBlock(C.STATE.ERRORED, C.STATE_COPY[C.STATE.ERRORED], "");
+      R.erroredTitle = R.errored.firstChild;
+
+      hostEl.appendChild(head);
+      hostEl.appendChild(R.body);
+      hostEl.appendChild(R.universe);
+      hostEl.appendChild(R.skel);
+      hostEl.appendChild(R.empty);
+      hostEl.appendChild(R.unavail);
+      hostEl.appendChild(R.errored);
+      R.head = head;
     }
-    show(R.body, R.notes, R.notes.childNodes.length > 0, R.method);
-  }
 
-  // Paint one dissection block. `label` is vm.label, or prev.label when stale.
-  // Idempotent: every node is rewritten from `diss`; the svg instances are
-  // torn down and re-attached (the primitive does the same on its own host).
-  function paint(diss, label, stale, status) {
-    if (!R || !host) return;
-    var cb = (isObj(diss) && diss.available === true) ? diss.canonical_bridge : null;
-    var M = modelFor(cb), A = M.anchors.pair ? M.anchors : anchorsOf(isObj(diss) ? diss : null);
-    var effective = status;
-
-    // header
-    setText(R.sub, stale ? COPY.stalePrefix + label : label);
-    setText(R.anchors, A.line ? COPY.anchorsPrefix + A.line : "");
-    cls(host, "mx2-is-stale", stale);
-    setText(R.bannerLabel, stale ? label : "");
-    show(host, R.banner, stale, R.body);
-
-    // chart + notes + cost sub-strip. The optional blocks are detached, then
-    // re-attached in ONE fixed order ahead of R.method (always in the DOM), so
-    // the layout is identical whichever blocks a payload switches on.
-    dropSvg();
-    show(R.body, R.noPrev, false); show(R.body, R.chartWrap, false); show(R.body, R.notes, false); show(R.body, R.costWrap, false);
-    show(R.body, R.noPrev, stale && !isObj(diss), R.method);
-    show(R.body, R.chartWrap, M.ok, R.method);
-    paintBadges(M);
-    if (M.ok && NS.svg && typeof NS.svg.waterfall === "function") NS.svg.waterfall(R.chart, M.spec);
-    paintNotes(M);
-    show(R.body, R.costWrap, !!M.cost, R.method);
-    if (M.cost) {
-      R.costWrap.setAttribute("title", M.cost.basis);
-      if (NS.svg && typeof NS.svg.waterfall === "function") NS.svg.waterfall(R.costHost, M.cost.spec);
-    } else {
-      R.costWrap.removeAttribute("title");
+    function dropSvg() {
+      if (!R || !NS.svg || typeof NS.svg.destroy !== "function") return;
+      try { NS.svg.destroy(R.chart); } catch (e) { /* silent */ }
     }
-    setText(R.method, M.method ? COPY.methodPrefix + M.method : "");
-    setText(R.wireNote, M.note);
 
-    // state-block copy that depends on the payload
-    setText(R.erroredTitle, (stale || isObj(diss)) ? C.STATE_COPY["errored-stale"] : C.STATE_COPY[C.STATE.ERRORED]);
-    setText(R.unavailHint, "");
-    if (isObj(diss) && diss.available === false) setText(R.unavailHint, diss.reason == null ? "" : String(diss.reason));
-    // A canonical_bridge that is itself the two-key unavailable form inside an
-    // available dissection (C5): the store reports FRESH because the block is
-    // present; this panel is the only place that can see inside it, so it
-    // surfaces the state itself and prints the reason verbatim.
-    if (M.unavailableReason !== null && (status === C.STATE.FRESH || status == null)) {
-      effective = C.STATE.UNAVAILABLE_FOR_SCOPE;
-      setText(R.unavailHint, M.unavailableReason);
-    }
-    if (effective && effective !== status) def.setStatus(effective);
-  }
-
-  var def = {
-    slot: "body",
-    phase: "diss",
-
-    mount: function (hostEl) {
-      if (!hostEl) return;
-      if (host && host !== hostEl) def.destroy();
-      host = hostEl;
-      cls(host, "mx2-panel-bridge", true);
-      build(host);
-      dbg("info", "mounted");
-    },
-
-    render: function (vm) {
-      if (!R || !host) return;
-      vm = vm || {};
-      paint(vm.diss || null, vm.label || "", false, host.getAttribute("data-mx2-status") || null);
-    },
-
-    renderStale: function (prev, vm) {
-      if (!R || !host) return;
-      vm = vm || {};
-      if (!prev) { def.render(vm); return; }   // contract says never call with null; degrade honestly
-      paint(prev.diss || null, prev.label || "", true, host.getAttribute("data-mx2-status") || null);
-    },
-
-    setStatus: function (state) {
-      if (!R || !host) return;
-      if (!C.STATE_RULES[state]) state = C.STATE.FRESH;
-      host.setAttribute("data-mx2-status", state);   // CSS does every treatment off this attribute
-      setText(R.pillText, C.pillText(state));
-    },
-
-    destroy: function () {
-      dropSvg();
-      if (host) {
-        cls(host, "mx2-is-stale", false);
-        cls(host, "mx2-panel-bridge", false);
-        host.innerHTML = "";
+    // T1-T3 pills, top-right of the chart, by DOM membership. Tone and colour
+    // are CSS off [data-mx2-tone]; the tooltip is the native title.
+    function paintBadges(M) {
+      var i, b, p;
+      R.badges.innerHTML = "";
+      for (i = 0; i < M.badges.length; i++) {
+        b = M.badges[i];
+        p = el("span", "mx2-br-badge", b.text);
+        p.setAttribute("data-mx2-tone", b.tone === "warn" ? "warn" : "neutral");
+        p.setAttribute("title", b.title || b.text);
+        R.badges.appendChild(p);
       }
-      host = null; R = null;
-    },
+      cls(R.chartWrap, "mx2-has-badges", M.badges.length > 0);
+      show(R.chartWrap, R.badges, M.badges.length > 0, R.chart);
+    }
 
-    // test probes — not used by the controller
-    _model: modelFor,
-    _anchors: anchorsOf,
-    _significance: significanceOf,
-    COPY: COPY
-  };
+    function paintNotes(M) {
+      var i, n;
+      R.notes.innerHTML = "";
+      for (i = 0; i < M.notes.length; i++) {
+        if (!M.notes[i].text) continue;
+        n = el("div", "mx2-note mx2-br-note");
+        n.setAttribute("data-mx2-note", M.notes[i].kind);
+        if (M.notes[i].kind !== "sig") n.appendChild(el("span", "mx2-warnglyph", "⚠"));
+        n.appendChild(el("span", "", M.notes[i].text));
+        R.notes.appendChild(n);
+      }
+      show(R.body, R.notes, R.notes.childNodes.length > 0, R.method);
+    }
 
-  NS.panel(PANEL_ID, def);
+    // One reconciling drill table: rows (value, share of |Σ|) and a footer that
+    // prints the parent bar. A tie within rounding draws nothing extra (C13);
+    // a miss says by how much.
+    function drillTable(D) {
+      var f = F(), box = el("div", "mx2-br-drill"), h = el("div", "mx2-br-drill-h"), t, tb, tr, td, i, r, gross = 0, sum = 0, n = 0, share, tie, off, foot;
+      h.appendChild(el("b", "", D.head));
+      h.appendChild(document.createTextNode(" " + D.sub));
+      h.setAttribute("title", D.tip || "");
+      box.appendChild(h);
+      if (D.withheld) { box.appendChild(el("div", "mx2-note", D.withheld)); return box; }
+      for (i = 0; i < D.rows.length; i++) { r = D.rows[i]; if (r.value === null) continue; gross += Math.abs(r.value); sum += r.value; n++; }
+      t = el("table", "mx2-tbl mx2-br-drill-tbl"); tb = el("tbody");
+      t.appendChild(el("caption", "mx2-sr", D.head + " " + D.sub));
+      for (i = 0; i < D.rows.length; i++) {
+        r = D.rows[i];
+        if (r.value === null || Math.round(r.value) === 0) continue;
+        tr = el("tr");
+        td = el("td", "mx2-dim-col", r.label); td.setAttribute("title", r.label); tr.appendChild(td);
+        td = el("td", "mx2-num", signedTon(r.value)); cls(td, "mx2-neg", r.value < 0); cls(td, "mx2-pos", r.value > 0); tr.appendChild(td);
+        share = gross > 0 ? f.pct(Math.abs(r.value) / gross * 100) : DASH;
+        td = el("td", "mx2-num mx2-br-drill-share", share); td.setAttribute("title", COPY.drillShare); tr.appendChild(td);
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb);
+      // footer: the parent bar, and the miss when the rows do not re-sum to it
+      tie = (D.bar === null) ? null : (Math.abs(sum - D.bar) <= Math.max(1.5, n));
+      off = (D.bar === null) ? null : sum - D.bar;
+      foot = el("tfoot"); tr = el("tr", "mx2-br-drill-foot");
+      td = el("td", "mx2-dim-col", COPY.drillFootA + D.barLabel + COPY.drillFootB); tr.appendChild(td);
+      td = el("td", "mx2-num", signedTon(D.bar)); cls(td, "mx2-neg", D.bar !== null && D.bar < 0); cls(td, "mx2-pos", D.bar !== null && D.bar > 0); tr.appendChild(td);
+      td = el("td", "mx2-num mx2-br-drill-share", (tie === false) ? (COPY.drillOff.replace(/^ · /, "") + signedTon(off)) : ""); tr.appendChild(td);
+      foot.appendChild(tr); t.appendChild(foot);
+      box.appendChild(t);
+      return box;
+    }
+    function paintDrills(M) {
+      var i;
+      R.drills.innerHTML = "";
+      if (!M.drills || !M.drills.length) { show(R.body, R.drills, false); return; }
+      for (i = 0; i < M.drills.length; i++) R.drills.appendChild(drillTable(M.drills[i]));
+      show(R.body, R.drills, true, R.method);
+    }
+
+    // Paint one dissection block. `label` is vm.label, or prev.label when stale.
+    // Idempotent: every node is rewritten from `diss`; the svg instance is torn
+    // down and re-attached (the primitive does the same on its own host).
+    function paint(diss, label, stale, status) {
+      if (!R || !host) return;
+      var mine = blockOf(diss, SOURCE), other = blockOf(diss, OTHER);
+      var M = modelFor(mine, SOURCE), A = M.anchors.pair ? M.anchors : anchorsOf(isObj(diss) ? diss : null);
+      var effective = status, O = null, dom = null, otherName = (SOURCE === "net") ? COPY.reportedName : COPY.realisedName;
+
+      // ONE SCALE: union this bridge's extents with the other bridge's.
+      if (M.ok) {
+        O = modelFor(other, OTHER);
+        if (O.ok) dom = unionDomain(M.spec, O.spec);
+        if (dom) M.spec.domain = dom;
+      }
+
+      // header
+      setText(R.sub, stale ? COPY.stalePrefix + label : label);
+      setText(R.anchors, A.line ? COPY.anchorsPrefix + A.line : "");
+      setText(R.scale, M.ok ? (dom ? COPY.scaleShared + otherName + " bridge" : COPY.scaleOwn + otherName + COPY.scaleOwnB) : "");
+      cls(host, "mx2-is-stale", stale);
+      setText(R.bannerLabel, stale ? label : "");
+      show(host, R.banner, stale, R.body);
+
+      // chart + notes + wedge + drills. The optional blocks are detached, then
+      // re-attached in ONE fixed order ahead of R.method (always in the DOM), so
+      // the layout is identical whichever blocks a payload switches on.
+      dropSvg();
+      show(R.body, R.noPrev, false); show(R.body, R.chartWrap, false); show(R.body, R.notes, false); show(R.body, R.wedge, false); show(R.body, R.drills, false);
+      show(R.body, R.noPrev, stale && !isObj(diss), R.method);
+      show(R.body, R.chartWrap, M.ok, R.method);
+      paintBadges(M);
+      if (M.ok && NS.svg && typeof NS.svg.waterfall === "function") NS.svg.waterfall(R.chart, M.spec);
+      paintNotes(M);
+      show(R.body, R.wedge, !!M.wedge, R.method);
+      setText(R.wedge, M.wedge);
+      paintDrills(M);
+      setText(R.method, M.method ? COPY.methodPrefix + M.method : "");
+      setText(R.wireNote, M.note);
+
+      // state-block copy that depends on the payload
+      setText(R.erroredTitle, (stale || isObj(diss)) ? C.STATE_COPY["errored-stale"] : C.STATE_COPY[C.STATE.ERRORED]);
+      setText(R.unavailHint, "");
+      if (isObj(diss) && diss.available === false) setText(R.unavailHint, diss.reason == null ? "" : String(diss.reason));
+      // A bridge block that is itself the two-key unavailable form inside an
+      // available dissection (C5): the store reports FRESH because the block is
+      // present; this panel is the only place that can see inside it, so it
+      // surfaces the state itself and prints the reason verbatim.
+      if (M.unavailableReason !== null && (status === C.STATE.FRESH || status == null)) {
+        effective = C.STATE.UNAVAILABLE_FOR_SCOPE;
+        setText(R.unavailHint, M.unavailableReason);
+      }
+      if (effective && effective !== status) def.setStatus(effective);
+    }
+
+    def = {
+      slot: "body",
+      phase: "diss",
+
+      mount: function (hostEl) {
+        if (!hostEl) return;
+        if (host && host !== hostEl) def.destroy();
+        host = hostEl;
+        cls(host, "mx2-panel-bridge", true);
+        cls(host, "mx2-panel-" + PANEL_ID, true);
+        build(host);
+        dbg("info", "mounted " + PANEL_ID);
+      },
+
+      render: function (vm) {
+        if (!R || !host) return;
+        vm = vm || {};
+        paint(vm.diss || null, vm.label || "", false, host.getAttribute("data-mx2-status") || null);
+      },
+
+      renderStale: function (prev, vm) {
+        if (!R || !host) return;
+        vm = vm || {};
+        if (!prev) { def.render(vm); return; }   // contract says never call with null; degrade honestly
+        paint(prev.diss || null, prev.label || "", true, host.getAttribute("data-mx2-status") || null);
+      },
+
+      setStatus: function (state) {
+        if (!R || !host) return;
+        if (!C.STATE_RULES[state]) state = C.STATE.FRESH;
+        host.setAttribute("data-mx2-status", state);   // CSS does every treatment off this attribute
+        setText(R.pillText, C.pillText(state));
+      },
+
+      destroy: function () {
+        dropSvg();
+        if (host) {
+          cls(host, "mx2-is-stale", false);
+          cls(host, "mx2-panel-bridge", false);
+          cls(host, "mx2-panel-" + PANEL_ID, false);
+          host.innerHTML = "";
+        }
+        host = null; R = null;
+      },
+
+      // test probes — not used by the controller
+      _model: function (cb) { return modelFor(cb, SOURCE); },
+      _anchors: anchorsOf,
+      _significance: significanceOf,
+      _union: unionDomain,
+      SOURCE: SOURCE,
+      COPY: COPY
+    };
+    return def;
+  }
+
+  NS.panel("bridge", makeBridge({
+    id: "bridge", source: "canonical",
+    title: "GM/ton bridge — reported",
+    basis: C.BASIS_SUFFIX.reported + " · exact Bennet at customer×SKU · Price and Cost are levers, Mix is composition"
+  }));
+  NS.panel("netbridge", makeBridge({
+    id: "netbridge", source: "net",
+    title: "GM/ton bridge — realised",
+    basis: C.BASIS_SUFFIX.net + " · same decomposition on rows with OINV.DiscSum subtracted from revenue and GP"
+  }));
 })();

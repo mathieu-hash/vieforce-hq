@@ -34,8 +34,10 @@
   if (!C) throw new Error("mexp2-adapter: mexp2-contract.js must load before this file.");
 
   var S = C.STATE;
-  // Display order on the v1 page: hero KPI, reported->realised walk, bridge, insight.
-  var DEFAULT_ORDER = ["kpi", "g2n", "bridge", "insight"];
+  // Display order on the v1 page: the category-by-month hero, the headline KPI,
+  // the three bridges on one scale (reported | reported->realised | realised),
+  // then the insight prose.
+  var DEFAULT_ORDER = ["trendmatrix", "kpi", "bridge", "g2n", "netbridge", "insight"];
 
   function dbg(level, msg, data) {
     try { var d = NS.debug; if (d && typeof d[level] === "function") d[level]("adapter: " + msg, data); } catch (e) { /* silent */ }
@@ -50,7 +52,16 @@
    * scope: v1 STATE -> contract scope (C.DEFAULT_SCOPE shape, deep-copied)
    * ---------------------------------------------------------------------- */
   function scopeFromV1(s) {
-    var d = C.DEFAULT_SCOPE; s = s || {};
+    var d = C.DEFAULT_SCOPE, drill = [], i, c; s = s || {};
+    // v1's drill path (margin-explorer.js STATE.drill): copied crumb by crumb,
+    // never shared, so a panel cannot mutate the controller's path.
+    if (s.drill && typeof s.drill.length === "number") {
+      for (i = 0; i < s.drill.length; i++) {
+        c = s.drill[i];
+        if (!c || c.dim == null || c.value == null) continue;
+        drill.push({ dim: String(c.dim), value: String(c.value), label: c.label == null ? String(c.value) : String(c.label) });
+      }
+    }
     return {
       period: s.period || d.period,
       refMonth: s.ref_month || null,
@@ -60,7 +71,7 @@
       groupBy: s.group_by || d.groupBy,
       unit: s.unit || d.unit,
       compare: s.compare || d.compare,
-      drill: [],                                   // v1 has no drill path
+      drill: drill,
       sort: { col: d.sort.col, dir: d.sort.dir }
     };
   }
@@ -163,10 +174,14 @@
 
   // Full paint: each panel gets its own phase's status; a panel whose live data
   // is null in a preservePrior state paints vm.prev through renderStale instead.
-  function renderAll(vm, hints) {
+  // `phase` ("core" | "diss") limits the paint to that phase's panels — the v1
+  // controller paints core panels when phase A lands and leaves the dissection
+  // panels in their stale / loading state until phase B lands.
+  function renderAll(vm, hints, phase) {
     var i, p, status, rule, live, stale;
     for (i = 0; i < mounted.length; i++) {
       p = mounted[i];
+      if (phase && p.phase !== phase) continue;
       try {
         status = phaseStatus(vm, hints, p.phase);
         rule = C.STATE_RULES[status] || C.STATE_RULES.fresh;
@@ -192,10 +207,12 @@
     }
   }
 
-  function setStatusAll(state) {
+  // Status chrome only (never touches data). `phase` limits it as in renderAll.
+  function setStatusAll(state, phase) {
     var i;
     if (!C.STATE_RULES[state]) state = S.FRESH;
     for (i = 0; i < mounted.length; i++) {
+      if (phase && mounted[i].phase !== phase) continue;
       try { setOne(mounted[i], state); }
       catch (e) { dbg("fail", "panel setStatus threw", { id: mounted[i].id, message: e && e.message }); }
     }
@@ -214,6 +231,10 @@
   NS.adapter = {
     VERSION: C.VERSION,
     DEFAULT_ORDER: DEFAULT_ORDER,
+    // THE scope mechanism on the v1 page. Installed by js/margin-explorer.js at
+    // build (applyScope(patch) with the contract's scope names); the panels
+    // resolve it at call time and never keep a reference. Null until installed.
+    applyScope: null,
     vmFromV1: vmFromV1,
     phaseStatus: phaseStatus,
     scopeFromV1: scopeFromV1,

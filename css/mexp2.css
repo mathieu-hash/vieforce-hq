@@ -1504,3 +1504,39 @@
   .mx2-tm-tbl th.mx2-tm-cat, .mx2-tm-tbl td.mx2-tm-cat, .mx2-tm-skel-cat { min-width: 110px; }
   .mx2-tm-export { margin-left: 0; }
 }
+
+
+/* ==========================================================================
+   20. BRIDGES ON ONE SCALE — mexp2-panel-bridge.js ("bridge" reported and
+   "netbridge" realised share this file and these rules). The v1 page puts
+   the two bridges and the reported->realised walk side by side in one
+   three-column grid; each column is one .mx2-panel. The scale line under the
+   header says whether the axis is shared. Under the reported bridge the two
+   reconciling drills (cost components — estimated; product mix by SSG) are
+   small tables in the two-up grid. Tokens only; no new colour.
+   ========================================================================== */
+
+.mx2-br-scale { color: var(--mx2-text2); }
+.mx2-br-wedge { border-top: 1px solid var(--mx2-divider); padding-top: 6px; }
+
+.mx2-br-drills { padding-top: 10px; border-top: 1px solid var(--mx2-divider); }
+.mx2-br-drill { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.mx2-br-drill-h {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;
+  color: var(--mx2-text3); cursor: help;
+}
+.mx2-br-drill-h b { color: var(--mx2-text2); font-weight: 900; }
+.mx2-br-drill-tbl { font-size: 10.5px; }
+.mx2-br-drill-tbl td, .mx2-br-drill-tbl th { padding: 3px 6px; }
+.mx2-br-drill-tbl td.mx2-dim-col { font-weight: 600; color: var(--mx2-text2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx2-br-drill-tbl td.mx2-num.mx2-pos { color: var(--mx2-pos); }
+.mx2-br-drill-tbl td.mx2-num.mx2-neg { color: var(--mx2-neg); }
+.mx2-br-drill-tbl td.mx2-br-drill-share { color: var(--mx2-text3); font-weight: 600; width: 46px; }
+.mx2-br-drill-tbl tfoot td { border-top: 1px solid var(--mx2-border); border-bottom: none; font-weight: 900; color: var(--mx2-text); padding-top: 5px; }
+.mx2-br-drill-tbl tfoot td.mx2-dim-col { text-transform: uppercase; letter-spacing: 0.3px; font-size: 9px; color: var(--mx2-text2); }
+.mx2-br-drill-tbl tfoot td.mx2-br-drill-share { width: auto; white-space: nowrap; font-size: 9.5px; color: var(--mx2-resid); }
+
+/* In a narrow column (the three-up grid) the drills stack. */
+@media (max-width: 1500px) {
+  .mx2-panel-bridge .mx2-br-drills { grid-template-columns: 1fr; }
+}
