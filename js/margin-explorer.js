@@ -5,12 +5,18 @@
 // Contract (per build brief):
 //   - Data via apiFetch('margin-explorer', state)  (global, async, parsed JSON)
 //   - Matrix rendered by window.MEXP_renderMatrix(el, matrix, opts)
-//   - Bridge rendered by window.MEXP_renderBridge(canvas, bridge)
-//   - Trend  rendered by window.MEXP_renderTrend(canvas, trend)
+//   - Bridge rendered by window.MEXP_renderCanonicalBridge(canvas, canonical_bridge)
+//   - Net bridge / dissection rendered by MEXP_renderNetBridge / MEXP_renderDissection
 //   - Helpers fc/fcn/esc are global (guarded if absent).
 //
 // This file builds ONLY the page shell + filter state + orchestration.
-// Matrix/bridge/trend rendering lives in their own sibling files.
+// Matrix/bridge/dissection rendering lives in their own sibling files.
+//
+// Staleness policy (shared by bridge, net bridge, dissection): a panel keeps its
+// last good render ONLY for the scope it was painted for. When the scope changes
+// every "had good" flag is reset, so an empty or unavailable scope is shown as
+// exactly that — never as "source busy". When the SAME scope fails to refresh,
+// the panel dims and its label names the scope it is still showing.
 // ============================================================================
 
 (function () {
@@ -56,7 +62,10 @@
   // hasCore = at least one successful phase-A render has painted (controls first-load
   // vs. non-destructive refresh). coreSig = param signature of the in-flight/last phase-A
   // fetch, used to suppress duplicate invocations for identical params.
-  var LAST = { matrix: null, fetchSeq: 0, hasCore: false, coreSig: null, coreInFlight: false };
+  // bridgeGood = a real canonical bridge has painted FOR THE CURRENT SCOPE (reset on
+  // scope change); bridgeScope = the human label of the scope that bridge shows.
+  var LAST = { matrix: null, fetchSeq: 0, hasCore: false, coreSig: null, coreInFlight: false,
+               bridgeGood: false, bridgeScope: '' };
   var built = false;
 
   // --- Config tables for chips ----------------------------------------------
@@ -124,6 +133,10 @@
     '.mexp-pill .mexp-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:mexppulse 1s infinite}',
     '@keyframes mexppulse{0%,100%{opacity:.35}50%{opacity:1}}',
     '#pg-margin-explorer .mexp-dim{opacity:.6;transition:opacity .15s;pointer-events:none}',
+    // stale state (same scope failed to refresh): dimmed but still readable/clickable;
+    // the panel's own label names the scope it is showing.
+    '#pg-margin-explorer .mexp-stale{opacity:.55;transition:opacity .15s}',
+    '#pg-margin-explorer .mexp-stale-note{font-size:10px;font-weight:700;color:var(--gold);line-height:1.5}',
     '.mexp-clear{border:1px solid var(--glass-border);background:rgba(255,255,255,.035);color:var(--text2);font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:6px 11px;border-radius:8px;cursor:pointer}',
     '.mexp-clear:hover{border-color:var(--glass-border-hover);color:var(--text)}',
     // filter bar
@@ -433,9 +446,12 @@
     if (STATE.customer)  p.customer = STATE.customer;
     return p;
   }
+  // "bridge" stays in the include list: the phase-A bridge is not drawn, but its
+  // ingredients / ingredients_meta feed the Ingredient Cost table. "trend" has
+  // no renderer on this page, so it is not requested.
   function coreParams() {
     var p = baseParams();
-    p.include = 'bridge,trend,movers,gap';
+    p.include = 'bridge,movers,gap';
     return p;
   }
   function dissectionParams() {
@@ -449,6 +465,23 @@
     var b = baseParams();
     return [b.period, b.region, b.bu, b.group_by, b.compare, b.ref_month || '', b.customer || ''].join('|');
   }
+  // Human label of the current scope — printed by every panel that keeps a stale
+  // render, so "showing X" always names X. e.g. "QTD · Luzon · Distribution".
+  function scopeLabel() {
+    var bits = [STATE.period];
+    if (STATE.ref_month) bits.push('as of ' + STATE.ref_month);
+    bits.push(STATE.region !== 'ALL' ? STATE.region : 'All regions');
+    if (STATE.bu !== 'ALL') bits.push(STATE.bu);
+    if (STATE.customer) bits.push('customer "' + STATE.customer + '"');
+    return bits.join(' · ');
+  }
+  // Scope changed: forget every "last good" so the new scope is judged on its own.
+  function resetStaleGuards() {
+    LAST.bridgeGood = false;
+    LAST.bridgeScope = '';
+    if (typeof window.MEXP_resetDissection === 'function') { try { window.MEXP_resetDissection(); } catch (e) {} }
+    if (typeof window.MEXP_resetNetBridge === 'function') { try { window.MEXP_resetNetBridge(); } catch (e) {} }
+  }
 
   // -- Loading-state helpers (non-destructive) -------------------------------
   // First load (no prior render): show the big loader in the matrix slot.
@@ -458,7 +491,12 @@
     var pill = $('mexp-updating');
     var body = $('pg-margin-explorer') && $('pg-margin-explorer').querySelector('.mexp-body');
     var diss = $('mexp-diss');
-    if (pill) pill.style.display = on ? 'inline-flex' : 'none';
+    if (pill) {
+      // showError() may have replaced the pill text with "⚠ update failed" (and
+      // destroyed the dot) — rebuild the markup every time it goes back on.
+      if (on) pill.innerHTML = '<span class="mexp-dot"></span>Updating';
+      pill.style.display = on ? 'inline-flex' : 'none';
+    }
     [body, diss].forEach(function (el) {
       if (!el) return;
       if (on) { el.classList.add('mexp-dim'); }
@@ -488,6 +526,9 @@
     // Double-invocation guard: identical scope already fetching phase A → no-op.
     if (LAST.coreInFlight && LAST.coreSig === sig) return;
 
+    // Scope changed → no panel may keep a "last good" from the previous scope.
+    if (LAST.coreSig !== null && LAST.coreSig !== sig) resetStaleGuards();
+
     var seq = ++LAST.fetchSeq;     // supersedes any older phase A AND phase B
     LAST.coreSig = sig;
     LAST.coreInFlight = true;
@@ -499,69 +540,86 @@
   }
 
   // ---- Phase A: fast core (hero, window, matrix, bridge, ingredient movers) ----
-  async function fetchCore(seq) {
-    var data;
-    try {
-      data = await window.apiFetch('margin-explorer', coreParams());
-    } catch (err) {
+  // (promise chains, not async/await — the page is ES5 like the shell.)
+  function fetchCore(seq) {
+    var p;
+    try { p = Promise.resolve(window.apiFetch('margin-explorer', coreParams())); }
+    catch (e) { p = Promise.reject(e); }
+    p.then(function (data) {
+      if (seq !== LAST.fetchSeq) return;              // stale — abandon silently
+      LAST.coreInFlight = false;
+      if (!data) { setUpdating(false); showError('Empty response.'); return; }
+
+      LAST.matrix = data.matrix || null;
+
+      try { renderWindow(data.meta); } catch (e) { console.error('[MEXP] window:', e); }
+      try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
+      try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
+      // The ONE bridge is canonical_bridge (phase B). Phase A no longer paints a
+      // competing bridge — just keep the "loading bridge…" hint until phase B lands.
+      try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
+
+      LAST.hasCore = true;
+      setUpdating(false);
+
+      // Chain phase B (slow) under the SAME seq, so a newer phase A abandons it.
+      fetchDissection(seq);
+    }, function (err) {
       if (seq !== LAST.fetchSeq) return;            // a newer action superseded us
       LAST.coreInFlight = false;
       console.error('[MEXP] core fetch error:', err);
       setUpdating(false);
       showError((err && err.message) ? err.message : 'Request failed.');
-      return;
-    }
-    if (seq !== LAST.fetchSeq) return;              // stale — abandon silently
-    LAST.coreInFlight = false;
-    if (!data) { setUpdating(false); showError('Empty response.'); return; }
-
-    LAST.matrix = data.matrix || null;
-
-    try { renderWindow(data.meta); } catch (e) { console.error('[MEXP] window:', e); }
-    try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
-    try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
-    // The ONE bridge is canonical_bridge (phase B). Phase A no longer paints a
-    // competing bridge — just keep the "loading bridge…" hint until phase B lands.
-    try { renderMovers(data.movers, data.gap, data.bridge && data.bridge.ingredients, data.bridge && data.bridge.ingredients_meta); } catch (e) { console.error('[MEXP] movers:', e); }
-
-    LAST.hasCore = true;
-    setUpdating(false);
-
-    // Chain phase B (slow) under the SAME seq, so a newer phase A abandons it.
-    fetchDissection(seq);
+    });
   }
 
-  // ---- Phase B: lazy dissection (5 panels + 12-month category table) ----
-  async function fetchDissection(seq) {
+  // ---- Phase B: lazy dissection (bridge, net bridge, category table, panels) ----
+  function fetchDissection(seq) {
     if (typeof window.MEXP_renderDissection !== 'function') return;
     // subtle updating state on the dissection block only (core already painted)
     if (typeof window.MEXP_setDissectionUpdating === 'function') {
       try { window.MEXP_setDissectionUpdating(true); } catch (e) {}
     }
-    var data;
-    try {
-      data = await window.apiFetch('margin-explorer', dissectionParams());
-    } catch (err) {
+    var p;
+    try { p = Promise.resolve(window.apiFetch('margin-explorer', dissectionParams())); }
+    catch (e) { p = Promise.reject(e); }
+    p.then(function (data) {
+      if (seq !== LAST.fetchSeq) return;              // a newer phase A started — abandon
+      if (typeof window.MEXP_setDissectionUpdating === 'function') {
+        try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
+      }
+      renderPhaseB(data && data.dissection, null);
+    }, function (err) {
       if (seq !== LAST.fetchSeq) return;            // superseded
       console.error('[MEXP] dissection fetch error:', err);
       if (typeof window.MEXP_setDissectionUpdating === 'function') {
         try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
       }
-      return;
-    }
-    if (seq !== LAST.fetchSeq) return;              // a newer phase A started — abandon
-    if (typeof window.MEXP_setDissectionUpdating === 'function') {
-      try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
-    }
+      // A failed request is a real outage: every phase-B panel gets to say so
+      // (dim + "source busy — showing <scope>" if it has this scope, else the error).
+      renderPhaseB(null, (err && err.message) ? err.message : 'Request failed.');
+    });
+  }
+
+  // Fan phase B out to the three panels. `diss` may be null (fetch failed → errMsg
+  // set, or the server returned no dissection block) or { available:false, reason }.
+  function renderPhaseB(diss, errMsg) {
+    var label = scopeLabel();
+    var unavailable = null;
+    if (errMsg) unavailable = { available: false, reason: errMsg, error: true };
+    else if (!diss) unavailable = { available: false, reason: 'No dissection block returned for this scope.' };
+    else if (diss.available === false) unavailable = { available: false, reason: diss.reason || 'No finished-feed data for this selection.' };
+
     // The ONE authoritative bridge — fed by phase B's canonical_bridge.
-    try { renderCanonicalBridge(data && data.dissection && data.dissection.canonical_bridge); } catch (e) { console.error('[MEXP] canonical bridge:', e); }
+    try { renderCanonicalBridge(unavailable || diss.canonical_bridge || { available: false, reason: 'No exact bridge returned for this scope.' }, label); }
+    catch (e) { console.error('[MEXP] canonical bridge:', e); }
     // NET bridge (bottom panel) — same decomposition net of off-invoice discount.
     try {
       if (typeof window.MEXP_renderNetBridge === 'function') {
-        window.MEXP_renderNetBridge(data && data.dissection && data.dissection.net_bridge);
+        window.MEXP_renderNetBridge(unavailable || diss.net_bridge || { available: false, reason: 'No net bridge returned for this scope.' }, label);
       }
     } catch (e) { console.error('[MEXP] net bridge:', e); }
-    try { window.MEXP_renderDissection(data && data.dissection); } catch (e) { console.error('[MEXP] dissection:', e); }
+    try { window.MEXP_renderDissection(unavailable || diss, label); } catch (e) { console.error('[MEXP] dissection:', e); }
   }
 
   function renderWindow(meta) {
@@ -674,32 +732,40 @@
     fetchAndRender();
   }
 
-  // ---- THE ONE canonical bridge (phase B). Non-destructive: keep last good
-  // render if a refresh hands back nothing, and only clear the "loading bridge…"
-  // hint once we've drawn a real bridge. ----
-  function renderCanonicalBridge(cb) {
+  // ---- THE ONE canonical bridge (phase B). Staleness policy: a good bridge is
+  // kept only for the scope it was drawn for (LAST.bridgeGood is reset on every
+  // scope change). Same scope, refresh failed → dim + name the scope shown.
+  // New scope, nothing → say "no exact bridge for this scope" with the reason. ----
+  function renderCanonicalBridge(cb, label) {
     var c = $('mexp-bridge');
     if (!c) return;
     var load = $('mexp-bridge-load');
     var note = $('mexp-bridge-note');
     var title = $('mexp-bridge-title');
+    var panel = c.closest ? c.closest('.mexp-panel') : null;
+    label = label || scopeLabel();
 
-    // No canonical block on this refresh (e.g. SAP flap) — keep last good.
-    if (!cb) return;
-    // Transient unavailable (flap mid-query) AFTER we've drawn a good bridge —
-    // keep the last good chart, never blank it. Only render the unavailable
-    // state on the very first paint when there's nothing to preserve.
+    if (!cb) cb = { available: false, reason: 'No exact bridge returned for this scope.' };
+
+    // Same scope failed to refresh AFTER a good bridge painted for it — keep the
+    // chart, dim it, and say which scope it is showing.
     if (cb.available === false && LAST.bridgeGood) {
-      if (note) { note.textContent = '⚠ couldn’t refresh the bridge just now (source busy) — showing last good'; note.style.display = 'block'; }
+      if (panel) panel.classList.add('mexp-stale');
+      if (note) {
+        note.textContent = '⚠ source busy — could not refresh; showing ' + (LAST.bridgeScope || label) +
+          (cb.reason ? ' (' + cb.reason + ')' : '');
+        note.style.display = 'block';
+      }
       return;
     }
+    if (panel) panel.classList.remove('mexp-stale');
 
     if (typeof window.MEXP_renderCanonicalBridge === 'function') {
       window.MEXP_renderCanonicalBridge(c, cb);
     } else {
       placeholderCanvas(c, 'Bridge renderer unavailable');
     }
-    if (cb.available !== false) LAST.bridgeGood = true;   // a real bridge has painted
+    if (cb.available !== false) { LAST.bridgeGood = true; LAST.bridgeScope = label; }   // a real bridge has painted
     if (load) load.style.display = 'none';
 
     // Header: "GM/ton Bridge — <base> → <compare>" (+ partial flag).
@@ -713,7 +779,9 @@
 
     if (note) {
       if (cb.available === false) {
-        note.textContent = 'ⓘ ' + (cb.reason || cb.note || 'Exact bridge not available for this anchor.');
+        // An empty / unsupported scope is an ANSWER, not an outage: name the scope.
+        note.textContent = (cb.error ? '⚠ Bridge could not be loaded for ' : 'ⓘ No exact bridge for ') + label +
+          ' — ' + (cb.reason || cb.note || 'not available for this anchor.');
         note.style.display = 'block';
       } else {
         var html = '';
