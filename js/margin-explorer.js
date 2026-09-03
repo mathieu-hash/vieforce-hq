@@ -584,7 +584,14 @@
     var ns = M2();
     if (!ns || !ns.adapter || !VM) return;
     buildVm({ coreLoading: LAST.coreInFlight, dissLoading: LAST.dissInFlight, coreError: LAST.coreErr, dissError: LAST.dissErr });
-    try { ns.adapter.renderAll(VM, VM_HINTS); } catch (e) { console.error('[MEXP] renderAll (view):', e); }
+    // Only a phase whose data for THIS scope has landed is repainted: a phase
+    // still in flight keeps its stale render (or skeleton) untouched.
+    var hasCore = VM.core != null, hasDiss = VM.diss != null;
+    try {
+      if (hasCore && hasDiss) ns.adapter.renderAll(VM, VM_HINTS);
+      else if (hasCore) ns.adapter.renderAll(VM, VM_HINTS, 'core');
+      else if (hasDiss) ns.adapter.renderAll(VM, VM_HINTS, 'diss');
+    } catch (e) { console.error('[MEXP] renderAll (view):', e); }
     badgePanels();
   }
 
