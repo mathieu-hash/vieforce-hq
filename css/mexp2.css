@@ -1,0 +1,1396 @@
+/* ============================================================================
+ * mexp2.css — Margin Explorer v2 · THE TOKEN + PRESENTATION LAYER
+ * ----------------------------------------------------------------------------
+ * WHAT THIS FILE OWNS
+ *   Every colour, spacing, radius, layout rule and status treatment used by
+ *   Margin Explorer v2. It is the single source of visual truth for v2: no v2
+ *   JavaScript file may write an inline colour, an inline opacity, or a
+ *   hardcoded rgba() into the DOM. If a value is visual, it lives here as a
+ *   --mx2-* custom property and is consumed through var().
+ *
+ *   It also owns the two local backfills --mx2-border and --mx2-surface2. The
+ *   v1 app references the GLOBAL tokens --border and --surface2 in several
+ *   places (js/margin-explorer.js:136 and :823) and app.html defines neither,
+ *   anywhere. Those two globals resolve to nothing and silently drop the
+ *   declaration. v2 therefore carries its own namespaced equivalents.
+ *
+ * WHAT THIS FILE MUST NEVER DO
+ *   - Never define the global tokens --border or --surface2. Defining them
+ *     here would retroactively change how the v1 page paints. v1 stays exactly
+ *     as it is.
+ *   - Never use @media (prefers-color-scheme: ...). The shell does not use the
+ *     OS preference at all; it toggles an attribute.
+ *   - Never use [data-theme="dark"]. That selector CAN NEVER MATCH.
+ *   - Never style anything outside #pg-margin-explorer-2 / the .mx2- prefix.
+ *     The two Margin Explorer pages are live at the same time in the same
+ *     document; a bare element selector here would repaint v1.
+ *   - Never set pointer-events:none for a loading state. v1 does this
+ *     (js/margin-explorer.js: `.mexp-dim{opacity:.6;...;pointer-events:none}`)
+ *     and it makes a dimmed-but-readable panel un-scrollable and un-copyable
+ *     while a refresh is in flight. Dimming is a contrast signal, not a lock.
+ *
+ * THEME CONVENTION — VERIFIED, NOT ASSUMED
+ *   app.html:7822-7824
+ *       currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+ *       document.documentElement.setAttribute('data-theme',
+ *         currentTheme === 'dark' ? '' : 'light');
+ *   app.html:24  ->  :root { ...full dark palette... }
+ *   app.html:69  ->  [data-theme="light"] { ...light overrides... }
+ *
+ *   DARK IS THE EMPTY STRING. The attribute is always present; only the value
+ *   "light" is ever truthy. So:
+ *       :root                     -> FULL DARK PALETTE (the default ground)
+ *       :root[data-theme="light"] -> LIGHT OVERRIDES ONLY
+ *   matching MEXP2.C.THEME.BASE_SELECTOR / LIGHT_SELECTOR exactly.
+ *
+ * CHART COLOUR BUG THIS FILE FIXES
+ *   v1 hardcodes grid rgba(255,255,255,0.03..0.05) and ticks
+ *   rgba(240,244,250,0.25..0.35) directly into the Chart.js options
+ *   (app.html:7809-7812). On the light ground those are white-on-near-white and
+ *   effectively invisible; the shell then tries to patch them at toggle time by
+ *   walking every chart object (app.html:7830-7846), which misses any chart
+ *   built after the toggle. v2 exposes --mx2-grid / --mx2-axis / --mx2-legend /
+ *   --mx2-tooltip-* as tokens with real contrast on BOTH grounds, and the v2
+ *   chart files read them from the computed style at draw time. Nothing to
+ *   re-walk, nothing to miss.
+ *
+ * SEMANTIC COLOUR RULE
+ *   Vienovo brand green is #97D700 (a lime). It is used for brand furniture all
+ *   over the shell. A "good" margin bar painted in the brand lime is
+ *   indistinguishable from a brand accent, so v2's positive tone is a distinctly
+ *   cooler emerald and the brand lime is exposed only as --mx2-brand-green,
+ *   which is reserved for brand furniture and MUST NOT be used for a value sign.
+ *   Mix / composition is a NON-SEMANTIC slate: per the contract, mix is
+ *   composition, not a commercial action, and must never read as good or bad.
+ * ========================================================================= */
+
+
+/* ==========================================================================
+   1. TOKENS — FULL DARK PALETTE ON BARE :root
+   ========================================================================== */
+:root {
+
+  /* -- ground + surfaces ------------------------------------------------- */
+  --mx2-bg:            #00293A;   /* page ground, matches shell --bg        */
+  --mx2-surface:       rgba(0,50,72,0.55);    /* panel fill                 */
+  --mx2-surface2:      rgba(0,64,88,0.42);    /* LOCAL BACKFILL for --surface2 */
+  --mx2-surface3:      rgba(0,64,90,0.72);    /* hover / raised             */
+  --mx2-surface-solid: #003248;               /* opaque, for drawers        */
+  --mx2-sunken:        rgba(0,20,30,0.30);    /* table head, inset strips   */
+
+  /* -- lines ------------------------------------------------------------- */
+  --mx2-border:        rgba(255,255,255,0.11); /* LOCAL BACKFILL for --border */
+  --mx2-border-strong: rgba(255,255,255,0.20);
+  --mx2-divider:       rgba(255,255,255,0.07); /* in-table hairlines        */
+
+  /* -- type -------------------------------------------------------------- */
+  --mx2-text:  #F0F4FA;
+  --mx2-text2: rgba(240,244,250,0.76);
+  --mx2-text3: rgba(240,244,250,0.58);
+  --mx2-text4: rgba(240,244,250,0.42);
+
+  /* -- interactive accent ------------------------------------------------ */
+  --mx2-accent:        #00AEEF;
+  --mx2-accent-fg:     #001824;                /* text ON the accent fill   */
+  --mx2-accent-soft:   rgba(0,174,239,0.16);
+  --mx2-accent-border: rgba(0,174,239,0.45);
+
+  /* -- brand (furniture only — NEVER a value sign) ----------------------- */
+  --mx2-brand-green: #97D700;
+
+  /* -- semantic value signs ---------------------------------------------
+     Emerald, not the brand lime, so a good bar cannot be misread as brand
+     furniture. Coral-red, not the shell's flat #EF4444, so a negative bar in
+     a chart is distinguishable from a shell error chrome sitting beside it. */
+  --mx2-pos:        #22C58B;
+  --mx2-pos-soft:   rgba(34,197,139,0.16);
+  --mx2-pos-border: rgba(34,197,139,0.42);
+  --mx2-neg:        #FF6F61;
+  --mx2-neg-soft:   rgba(255,111,97,0.16);
+  --mx2-neg-border: rgba(255,111,97,0.42);
+
+  /* -- composition / mix — deliberately NON-semantic slate ---------------- */
+  --mx2-mix:        #8CA3BC;
+  --mx2-mix-soft:   rgba(140,163,188,0.18);
+  --mx2-mix-border: rgba(140,163,188,0.40);
+
+  /* -- residual ("Unexplained") — gold, per the waterfall spec ------------ */
+  --mx2-resid:        #FFC72C;
+  --mx2-resid-soft:   rgba(255,199,44,0.15);
+  --mx2-resid-border: rgba(255,199,44,0.42);
+
+  /* -- stale / carryover gold — prev-scope data on screen ----------------- */
+  --mx2-stale:        #E8B23A;
+  --mx2-stale-soft:   rgba(232,178,58,0.13);
+  --mx2-stale-border: rgba(232,178,58,0.38);
+
+  /* -- bullet chart ------------------------------------------------------ */
+  --mx2-bullet-track:  rgba(255,255,255,0.06); /* the un-banded remainder   */
+  --mx2-bullet-value:  #00AEEF;                /* the actual-value bar      */
+  --mx2-bullet-marker: #F0F4FA;                /* comparator tick           */
+  --mx2-band-good:     rgba(34,197,139,0.20);
+  --mx2-band-warn:     rgba(255,199,44,0.18);
+  --mx2-band-bad:      rgba(255,111,97,0.16);
+  --mx2-band-rel:      rgba(140,163,188,0.16); /* bands === null: "relative" */
+
+  /* -- chart chrome — MUST be legible on BOTH grounds -------------------- */
+  --mx2-grid:           rgba(240,244,250,0.13);
+  --mx2-grid-zero:      rgba(240,244,250,0.30); /* the zero/anchor rule     */
+  --mx2-axis:           rgba(240,244,250,0.64);
+  --mx2-axis-title:     rgba(240,244,250,0.52);
+  --mx2-legend:         rgba(240,244,250,0.74);
+  --mx2-tooltip-bg:     rgba(0,26,38,0.96);
+  --mx2-tooltip-fg:     #F0F4FA;
+  --mx2-tooltip-border: rgba(255,255,255,0.18);
+
+  /* -- error chrome ------------------------------------------------------ */
+  --mx2-error:        #FF6F61;
+  --mx2-error-soft:   rgba(255,111,97,0.09);
+  --mx2-error-border: rgba(255,111,97,0.40);
+
+  /* -- focus ring — one token, used by every interactive element --------- */
+  --mx2-focus:        #61D8FF;
+  --mx2-focus-shadow: rgba(97,216,255,0.28);
+
+  /* -- skeleton shimmer -------------------------------------------------- */
+  --mx2-skel-a: rgba(255,255,255,0.05);
+  --mx2-skel-b: rgba(255,255,255,0.14);
+
+  /* -- geometry / motion / type scale ------------------------------------ */
+  --mx2-r:     12px;
+  --mx2-r-sm:   8px;
+  --mx2-r-lg:  16px;
+  --mx2-gap:      16px;
+  --mx2-gap-sm:   10px;
+  --mx2-gap-xs:    6px;
+  --mx2-pad:   14px 16px;
+  --mx2-font: 'Montserrat', system-ui, -apple-system, sans-serif;
+  --mx2-mono: 'Source Code Pro', ui-monospace, monospace;
+  --mx2-ease: 0.14s cubic-bezier(0.22,1,0.36,1);
+
+  /* Dim factor for LOADING_REFRESH. Lives here, never written from JS. */
+  --mx2-dim: 0.58;
+  /* C.TABLE_MAX_H — mirrored so the table body cap is a CSS fact too. */
+  --mx2-table-max-h: 520px;
+  --mx2-z-drawer: 60;
+}
+
+
+/* ==========================================================================
+   2. LIGHT OVERRIDES — :root[data-theme="light"] ONLY
+   Overrides token values, nothing else. No layout, no new selectors.
+   ========================================================================== */
+:root[data-theme="light"] {
+
+  --mx2-bg:            #F5F5F5;
+  --mx2-surface:       #FFFFFF;
+  --mx2-surface2:      #EDF1F5;
+  --mx2-surface3:      #E3E9F0;
+  --mx2-surface-solid: #FFFFFF;
+  --mx2-sunken:        rgba(0,41,58,0.04);
+
+  --mx2-border:        rgba(0,41,58,0.15);
+  --mx2-border-strong: rgba(0,41,58,0.28);
+  --mx2-divider:       rgba(0,41,58,0.09);
+
+  --mx2-text:  #10222E;
+  --mx2-text2: #3B4C58;
+  --mx2-text3: rgba(16,34,46,0.68);
+  --mx2-text4: rgba(16,34,46,0.50);
+
+  --mx2-accent:        #0089C4;   /* darkened: #00AEEF fails AA on white */
+  --mx2-accent-fg:     #FFFFFF;
+  --mx2-accent-soft:   rgba(0,137,196,0.12);
+  --mx2-accent-border: rgba(0,137,196,0.40);
+
+  --mx2-brand-green: #7AB800;     /* shell's own light-mode brand green */
+
+  --mx2-pos:        #067A55;
+  --mx2-pos-soft:   rgba(6,122,85,0.12);
+  --mx2-pos-border: rgba(6,122,85,0.38);
+  --mx2-neg:        #C1362A;
+  --mx2-neg-soft:   rgba(193,54,42,0.10);
+  --mx2-neg-border: rgba(193,54,42,0.38);
+
+  --mx2-mix:        #55697C;
+  --mx2-mix-soft:   rgba(85,105,124,0.13);
+  --mx2-mix-border: rgba(85,105,124,0.36);
+
+  --mx2-resid:        #8A6100;
+  --mx2-resid-soft:   rgba(138,97,0,0.11);
+  --mx2-resid-border: rgba(138,97,0,0.36);
+
+  --mx2-stale:        #8A6100;
+  --mx2-stale-soft:   rgba(138,97,0,0.09);
+  --mx2-stale-border: rgba(138,97,0,0.34);
+
+  --mx2-bullet-track:  rgba(0,41,58,0.07);
+  --mx2-bullet-value:  #0089C4;
+  --mx2-bullet-marker: #10222E;
+  --mx2-band-good:     rgba(6,122,85,0.18);
+  --mx2-band-warn:     rgba(199,141,0,0.20);
+  --mx2-band-bad:      rgba(193,54,42,0.14);
+  --mx2-band-rel:      rgba(85,105,124,0.15);
+
+  /* The bug fix, restated for light: these are DARK on a light ground. */
+  --mx2-grid:           rgba(0,41,58,0.14);
+  --mx2-grid-zero:      rgba(0,41,58,0.34);
+  --mx2-axis:           rgba(16,34,46,0.72);
+  --mx2-axis-title:     rgba(16,34,46,0.56);
+  --mx2-legend:         rgba(16,34,46,0.78);
+  --mx2-tooltip-bg:     rgba(255,255,255,0.98);
+  --mx2-tooltip-fg:     #10222E;
+  --mx2-tooltip-border: rgba(0,41,58,0.18);
+
+  --mx2-error:        #C1362A;
+  --mx2-error-soft:   rgba(193,54,42,0.07);
+  --mx2-error-border: rgba(193,54,42,0.34);
+
+  --mx2-focus:        #005E87;
+  --mx2-focus-shadow: rgba(0,94,135,0.22);
+
+  --mx2-skel-a: rgba(0,41,58,0.05);
+  --mx2-skel-b: rgba(0,41,58,0.12);
+
+  --mx2-dim: 0.52;   /* light needs a slightly harder dim to read as dimmed */
+}
+
+
+/* ==========================================================================
+   3. ROOT + LAYOUT
+   Desktop-first. All spacing is grid/flex `gap`; no per-element margins are
+   used for layout rhythm (margins appear only for optical text spacing).
+   ========================================================================== */
+
+#pg-margin-explorer-2 {
+  color: var(--mx2-text);
+  font-family: var(--mx2-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mx2-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mx2-gap);
+  padding: 18px 20px 44px;
+}
+
+/* Page header: title block left, live status chrome right. */
+.mx2-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mx2-gap);
+  flex-wrap: wrap;
+}
+.mx2-head-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mx2-head-r { display: flex; align-items: center; gap: var(--mx2-gap-sm); flex-wrap: wrap; }
+
+.mx2-title {
+  display: flex; align-items: center; gap: var(--mx2-gap-sm);
+  font-size: 20px; font-weight: 900; letter-spacing: -0.3px;
+  color: var(--mx2-text);
+}
+.mx2-sub { font-size: 11px; font-weight: 600; color: var(--mx2-text3); }
+
+/* Scope label — the human string for the cut currently on screen. */
+.mx2-scope-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.2px;
+  color: var(--mx2-text2);
+}
+
+/* Breadcrumb / drill trail. Oldest first; Escape pops exactly one. */
+.mx2-crumbs { display: flex; align-items: center; gap: var(--mx2-gap-xs); flex-wrap: wrap; }
+.mx2-crumb {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--mx2-border);
+  background: var(--mx2-surface2);
+  color: var(--mx2-text2);
+  font: 800 10.5px/1 var(--mx2-font);
+  padding: 5px 9px; border-radius: 999px; cursor: pointer;
+  transition: color var(--mx2-ease), border-color var(--mx2-ease), background var(--mx2-ease);
+}
+.mx2-crumb:hover { color: var(--mx2-text); border-color: var(--mx2-border-strong); }
+.mx2-crumb-sep { color: var(--mx2-text4); font-size: 10px; font-weight: 900; }
+
+/* Filter bar. */
+.mx2-filters {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--mx2-gap);
+  padding: 12px 14px;
+  border: 1px solid var(--mx2-border);
+  border-radius: var(--mx2-r-lg);
+  background: var(--mx2-surface);
+}
+.mx2-fgroup { display: flex; align-items: center; gap: var(--mx2-gap-xs); flex-wrap: wrap; min-width: 0; }
+.mx2-flabel {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--mx2-text3); white-space: nowrap;
+}
+.mx2-fdivider { align-self: stretch; width: 1px; background: var(--mx2-border); }
+
+/* KPI hero row. */
+.mx2-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--mx2-gap);
+}
+
+/* Main body: matrix column + bridge column, equal height. */
+.mx2-body {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  align-items: stretch;
+  gap: var(--mx2-gap);
+}
+.mx2-body > .mx2-panel { display: flex; flex-direction: column; min-width: 0; }
+
+/* Full-width stack under the two-column body. */
+.mx2-stack { display: flex; flex-direction: column; gap: var(--mx2-gap); }
+
+/* Generic two-up drill grid (cost components | product mix by SSG). */
+.mx2-duo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--mx2-gap); min-width: 0; }
+
+
+/* ==========================================================================
+   4. PANEL
+   The panel root carries [data-mx2-status]; section 9 keys every status
+   treatment off that attribute.
+   ========================================================================== */
+
+.mx2-panel {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--mx2-gap-sm);
+  padding: var(--mx2-pad);
+  border: 1px solid var(--mx2-border);
+  border-radius: var(--mx2-r-lg);
+  background: var(--mx2-surface);
+  min-width: 0;
+}
+.mx2-panel-h {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--mx2-gap-sm); flex-wrap: wrap;
+}
+.mx2-panel-hcol { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mx2-panel-t {
+  font-size: 12px; font-weight: 900; letter-spacing: 0.3px; text-transform: uppercase;
+  color: var(--mx2-text2);
+}
+.mx2-panel-st { font-size: 9.5px; font-weight: 700; line-height: 1.45; color: var(--mx2-text3); }
+
+/* .mx2-dimmable wraps only the DATA-BEARING part of a panel. Chrome (title,
+   pill, status message) sits outside it and never dims — that is what lets
+   LOADING_REFRESH stay readable while announcing itself. */
+.mx2-dimmable { transition: opacity var(--mx2-ease); }
+
+.mx2-note { font-size: 10px; font-weight: 600; line-height: 1.5; color: var(--mx2-text3); }
+.mx2-note-strong { color: var(--mx2-text2); }
+
+/* The DOM fallback mexp2-charts.js appends beside a <canvas> that has no 2d
+   context (no Chart.js, or a canvas the browser refused): the same note it
+   would otherwise paint on the canvas, centred in the chart's slot. */
+.mx2-chart-note {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 72px; padding: var(--mx2-pad);
+  font: 600 11px/1.5 var(--mx2-font);
+  color: var(--mx2-text3);
+  text-align: center;
+}
+
+
+/* ==========================================================================
+   5. CONTROLS — chips, buttons, inputs, selects
+   ========================================================================== */
+
+.mx2-chip,
+.mx2-btn {
+  border: 1px solid var(--mx2-border);
+  background: var(--mx2-surface2);
+  color: var(--mx2-text2);
+  font: 800 11px/1 var(--mx2-font);
+  padding: 6px 11px;
+  border-radius: var(--mx2-r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--mx2-ease), background var(--mx2-ease), border-color var(--mx2-ease);
+}
+.mx2-chip:hover,
+.mx2-btn:hover { color: var(--mx2-text); border-color: var(--mx2-border-strong); background: var(--mx2-surface3); }
+
+.mx2-chip[aria-pressed="true"],
+.mx2-chip.is-active {
+  background: var(--mx2-accent);
+  border-color: var(--mx2-accent);
+  color: var(--mx2-accent-fg);
+}
+
+.mx2-btn-ghost { background: transparent; }
+.mx2-btn-quiet {
+  background: transparent; border-color: transparent; color: var(--mx2-text3);
+  font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase;
+}
+.mx2-btn-quiet:hover { color: var(--mx2-text); background: var(--mx2-surface2); border-color: var(--mx2-border); }
+
+/* Uses --mx2-border, not the app-wide undefined --border that v1's
+   `.mexp-search` reaches for and never gets. */
+.mx2-input,
+.mx2-select {
+  border: 1px solid var(--mx2-border);
+  background: var(--mx2-surface2);
+  color: var(--mx2-text);
+  font: 600 12px/1.2 var(--mx2-font);
+  padding: 7px 10px;
+  border-radius: var(--mx2-r-sm);
+  min-width: 170px;
+}
+.mx2-input::placeholder { color: var(--mx2-text4); }
+.mx2-select { min-width: 130px; cursor: pointer; }
+
+.mx2-chip:disabled,
+.mx2-btn:disabled,
+.mx2-input:disabled,
+.mx2-select:disabled { color: var(--mx2-text4); cursor: not-allowed; }
+
+
+/* ==========================================================================
+   6. KPI TILE
+   ========================================================================== */
+
+.mx2-kpi {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--mx2-pad);
+  border: 1px solid var(--mx2-border);
+  border-radius: var(--mx2-r-lg);
+  background: var(--mx2-surface);
+  min-width: 0;
+}
+.mx2-kpi-l {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--mx2-text3);
+}
+.mx2-kpi-v {
+  font: 900 26px/1 var(--mx2-mono);
+  letter-spacing: -0.5px;
+  color: var(--mx2-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.mx2-kpi-d { font-size: 11px; font-weight: 800; }
+.mx2-kpi-note { font-size: 9.5px; font-weight: 700; line-height: 1.4; color: var(--mx2-text3); }
+
+/* Value-sign classes. The ONLY place a v2 number gets a colour. */
+.mx2-pos { color: var(--mx2-pos); }
+.mx2-neg { color: var(--mx2-neg); }
+.mx2-flat { color: var(--mx2-text3); }
+.mx2-muted { color: var(--mx2-text3); }
+.mx2-mixtone { color: var(--mx2-mix); }
+.mx2-residtone { color: var(--mx2-resid); }
+
+/* A value the reader must not read as a real zero (see status EMPTY_SCOPE). */
+.mx2-null { color: var(--mx2-text4); font-weight: 700; }
+
+/* ly_comparable === false: the compare note carries a warning glyph. */
+.mx2-warnglyph { color: var(--mx2-resid); font-weight: 900; margin-right: 4px; }
+
+
+/* ==========================================================================
+   7. TABLES
+   Wide content gets its own overflow-x container; the page body never scrolls
+   sideways.
+   ========================================================================== */
+
+.mx2-tablewrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: var(--mx2-table-max-h);
+  border-radius: var(--mx2-r-sm);
+  -webkit-overflow-scrolling: touch;
+}
+/* Horizontal-only variant for a chart or a wide legend strip. */
+.mx2-scrollx { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+
+.mx2-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.mx2-tbl th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--mx2-surface2);
+  color: var(--mx2-text3);
+  font-size: 9px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--mx2-border);
+  white-space: nowrap;
+}
+.mx2-tbl th.mx2-num,
+.mx2-tbl td.mx2-num { text-align: right; }
+.mx2-tbl td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--mx2-divider);
+  color: var(--mx2-text2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mx2-tbl td.mx2-dim-col { color: var(--mx2-text); font-weight: 800; }
+.mx2-tbl tbody tr { transition: background var(--mx2-ease); }
+.mx2-tbl tbody tr:hover { background: var(--mx2-surface2); }
+.mx2-tbl tbody tr.is-clickable { cursor: pointer; }
+.mx2-tbl tbody tr.is-selected {
+  background: var(--mx2-accent-soft);
+  box-shadow: inset 3px 0 0 0 var(--mx2-accent);
+}
+.mx2-tbl tfoot td,
+.mx2-tbl tr.mx2-tbl-foot td {
+  border-top: 1px solid var(--mx2-border);
+  border-bottom: none;
+  padding-top: 8px;
+  color: var(--mx2-text);
+  font-weight: 900;
+}
+/* The "+N more" row that stands in for everything past C.ROW_CAP. */
+.mx2-tbl tr.mx2-tbl-overflow td {
+  color: var(--mx2-text3);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: var(--mx2-sunken);
+}
+/* Sortable header affordance. */
+.mx2-tbl th.is-sortable { cursor: pointer; }
+.mx2-tbl th.is-sortable:hover { color: var(--mx2-text); }
+.mx2-tbl th[aria-sort="ascending"],
+.mx2-tbl th[aria-sort="descending"] { color: var(--mx2-text); }
+.mx2-sort-arrow { margin-left: 4px; color: var(--mx2-accent); font-size: 8px; }
+
+
+/* ==========================================================================
+   8. CHARTS, WATERFALL LEGEND, BULLET STRIP
+   ========================================================================== */
+
+.mx2-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 240px;
+}
+.mx2-canvas-wrap > canvas { display: block; width: 100% !important; }
+
+/* Waterfall role legend. Roles come straight from C.WATERFALL_SPEC_SHAPE. */
+.mx2-legend { display: flex; flex-wrap: wrap; gap: var(--mx2-gap-sm) var(--mx2-gap); }
+.mx2-legend-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.3px;
+  color: var(--mx2-legend);
+}
+.mx2-swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.mx2-swatch-lever-pos { background: var(--mx2-pos); }
+.mx2-swatch-lever-neg { background: var(--mx2-neg); }
+.mx2-swatch-mix       { background: var(--mx2-mix); }
+.mx2-swatch-resid     { background: var(--mx2-resid); }
+.mx2-swatch-anchor    { background: var(--mx2-text3); }
+
+/* Reconciliation footer. reconciles === true is a quiet tick, not a trophy. */
+.mx2-recon { font-size: 10px; font-weight: 800; color: var(--mx2-pos); white-space: nowrap; }
+.mx2-recon-off { color: var(--mx2-resid); }
+.mx2-partial { font-size: 10px; font-weight: 800; color: var(--mx2-resid); }
+
+/* --- bullet strip ------------------------------------------------------ */
+.mx2-bullets { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); }
+.mx2-bullet {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) 1fr minmax(72px, auto) minmax(58px, auto);
+  align-items: center;
+  gap: var(--mx2-gap-sm);
+  min-width: 0;
+}
+.mx2-bullet-l {
+  font-size: 11px; font-weight: 800; color: var(--mx2-text2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mx2-bullet-track {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--mx2-bullet-track);
+  overflow: hidden;
+}
+/* Band segments are absolutely positioned by the renderer via inline width/left
+   ONLY — never inline colour. Colour comes from these classes. */
+.mx2-band { position: absolute; top: 0; bottom: 0; }
+.mx2-band-g   { background: var(--mx2-band-good); }
+.mx2-band-w   { background: var(--mx2-band-warn); }
+.mx2-band-b   { background: var(--mx2-band-bad); }
+.mx2-band-rel { background: var(--mx2-band-rel); }
+
+.mx2-bullet-bar {
+  position: absolute; left: 0; top: 4px; height: 8px;
+  border-radius: 2px;
+  background: var(--mx2-bullet-value);
+}
+.mx2-bullet-bar.mx2-is-neg { background: var(--mx2-neg); }
+/* Comparator tick — the prior-period marker. */
+.mx2-bullet-tick {
+  position: absolute; top: 1px; bottom: 1px; width: 2px;
+  background: var(--mx2-bullet-marker);
+}
+/* Overflow caret for a value clamped at the p95 domain end. */
+.mx2-bullet-over {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  font-size: 9px; font-weight: 900; color: var(--mx2-text);
+}
+.mx2-bullet-v {
+  font: 800 11px/1 var(--mx2-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--mx2-text);
+}
+/* The domain label column. "relative" must never look like a verified verdict. */
+.mx2-bullet-status {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase;
+  text-align: right;
+}
+.mx2-bullet-status.is-good     { color: var(--mx2-pos); }
+.mx2-bullet-status.is-warn     { color: var(--mx2-resid); }
+.mx2-bullet-status.is-bad      { color: var(--mx2-neg); }
+.mx2-bullet-status.is-relative { color: var(--mx2-mix); }
+
+
+/* ==========================================================================
+   9. STATUS CHROME — ALL SIX RENDER STATES
+   Driven entirely by [data-mx2-status] on the panel root. Values are exactly
+   MEXP2.C.STATE.*; treatments are exactly C.STATE_RULES.
+   Two rules this section obeys without exception:
+     - pointer-events is NEVER disabled. A dimmed panel stays scrollable and
+       selectable. (This is the v1 `.mexp-dim` defect.)
+     - opacity is NEVER written from JavaScript. JS sets one attribute; the
+       cascade does the rest.
+   ========================================================================== */
+
+/* Default: hide every state-specific block. Each state re-shows its own. */
+.mx2-panel [data-mx2-for] { display: none; }
+
+/* The pill. One element, per panel, text supplied by C.STATE_RULES[state].pill. */
+.mx2-pill {
+  display: none;
+  align-items: center; gap: 6px;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px;
+  white-space: nowrap;
+}
+.mx2-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Skeleton primitive. Only ever visible in loading-first. */
+.mx2-skel {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--mx2-skel-a), var(--mx2-skel-b), var(--mx2-skel-a));
+  background-size: 200% 100%;
+  animation: mx2-shimmer 1.2s linear infinite;
+}
+.mx2-skel-lg { height: 26px; }
+.mx2-skel-block { height: 200px; }
+.mx2-skel-rows { display: flex; flex-direction: column; gap: 9px; }
+@keyframes mx2-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Shared message block used by empty / unavailable / errored. */
+.mx2-msg {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 22px 16px;
+  border: 1px dashed var(--mx2-border);
+  border-radius: var(--mx2-r);
+  text-align: center;
+}
+.mx2-msg-t { font-size: 12px; font-weight: 800; color: var(--mx2-text); }
+.mx2-msg-h { font-size: 10.5px; font-weight: 600; color: var(--mx2-text3); }
+
+/* --- (1) fresh ---------------------------------------------------------
+   Full contrast. No pill, no dim, no skeleton, real zeros render as zeros. */
+.mx2-panel[data-mx2-status="fresh"] [data-mx2-for="fresh"] { display: block; }
+
+/* --- (2) loading-first -------------------------------------------------
+   Nothing has ever painted. Skeletons allowed HERE AND NOWHERE ELSE. */
+.mx2-panel[data-mx2-status="loading-first"] [data-mx2-for="loading-first"] { display: block; }
+.mx2-panel[data-mx2-status="loading-first"] .mx2-dimmable { display: none; }
+.mx2-panel[data-mx2-status="loading-first"] .mx2-msg { border-style: solid; border-color: var(--mx2-border); }
+/* Belt and braces: a skeleton left in the markup by mistake cannot show in
+   any other state, so a stale skeleton can never sit over real numbers. */
+.mx2-panel:not([data-mx2-status="loading-first"]) .mx2-skel { display: none; }
+
+/* --- (3) loading-refresh -----------------------------------------------
+   Good data is already on screen. NEVER blank it: dim it, pill it, keep it
+   fully interactive. */
+.mx2-panel[data-mx2-status="loading-refresh"] .mx2-dimmable { opacity: var(--mx2-dim); }
+.mx2-panel[data-mx2-status="loading-refresh"] .mx2-pill {
+  display: inline-flex;
+  color: var(--mx2-accent);
+  background: var(--mx2-accent-soft);
+  border: 1px solid var(--mx2-accent-border);
+}
+.mx2-panel[data-mx2-status="loading-refresh"] .mx2-pill-dot { animation: mx2-pulse 1s ease-in-out infinite; }
+@keyframes mx2-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+
+/* --- (4) empty-scope ---------------------------------------------------
+   A legal scope with zero rows and zero tonnage. Explicit message. Any
+   zero-valued tile renders as the em dash, muted — because a real PHP 0 and
+   an empty scope look identical at full contrast, and that has already cost
+   a wrong call once. */
+.mx2-panel[data-mx2-status="empty-scope"] [data-mx2-for="empty-scope"] { display: flex; }
+.mx2-panel[data-mx2-status="empty-scope"] .mx2-dimmable { display: none; }
+.mx2-panel[data-mx2-status="empty-scope"] .mx2-kpi-v,
+.mx2-panel[data-mx2-status="empty-scope"] .mx2-bullet-v {
+  color: var(--mx2-text4);
+  font-weight: 700;
+}
+.mx2-panel[data-mx2-status="empty-scope"] .mx2-kpi-d { color: var(--mx2-text4); }
+.mx2-panel[data-mx2-status="empty-scope"] .mx2-msg { border-color: var(--mx2-border); }
+
+/* --- (5) unavailable-for-scope -----------------------------------------
+   The server answered and said "not computable for this cut". That is an
+   ANSWER, so the reason text is FULL CONTRAST, not muted, not an error tone. */
+.mx2-panel[data-mx2-status="unavailable-for-scope"] [data-mx2-for="unavailable-for-scope"] { display: flex; }
+.mx2-panel[data-mx2-status="unavailable-for-scope"] .mx2-msg {
+  border-style: solid;
+  border-color: var(--mx2-border);
+  background: var(--mx2-sunken);
+}
+.mx2-panel[data-mx2-status="unavailable-for-scope"] .mx2-msg-t { color: var(--mx2-text); font-weight: 800; }
+.mx2-panel[data-mx2-status="unavailable-for-scope"] .mx2-msg-h { color: var(--mx2-text2); }
+
+/* --- (6) errored -------------------------------------------------------
+   The only state that may show an error affordance. If prior good data
+   exists the controller keeps it on screen and this degrades to the header
+   pill plus a thin warning rail — hence the message block is a sibling the
+   renderer shows only when there is nothing to preserve. */
+.mx2-panel[data-mx2-status="errored"] [data-mx2-for="errored"] { display: flex; }
+.mx2-panel[data-mx2-status="errored"] {
+  border-color: var(--mx2-error-border);
+  box-shadow: inset 3px 0 0 0 var(--mx2-error);
+}
+.mx2-panel[data-mx2-status="errored"] .mx2-pill {
+  display: inline-flex;
+  color: var(--mx2-error);
+  background: var(--mx2-error-soft);
+  border: 1px solid var(--mx2-error-border);
+}
+.mx2-panel[data-mx2-status="errored"] .mx2-msg {
+  border-style: solid;
+  border-color: var(--mx2-error-border);
+  background: var(--mx2-error-soft);
+}
+.mx2-panel[data-mx2-status="errored"] .mx2-msg-t { color: var(--mx2-error); }
+.mx2-btn-retry {
+  align-self: center;
+  border-color: var(--mx2-error-border);
+  color: var(--mx2-error);
+  background: transparent;
+}
+.mx2-btn-retry:hover { background: var(--mx2-error-soft); color: var(--mx2-error); border-color: var(--mx2-error); }
+
+/* --- stale / carryover -------------------------------------------------
+   renderStale(prev, vm) output. The gold rail plus the prev-scope banner is
+   what stops Visayas numbers being read under a Mindanao heading. The banner
+   is REQUIRED markup — a stale render without .mx2-stale-label is a defect. */
+.mx2-panel.mx2-is-stale {
+  border-color: var(--mx2-stale-border);
+  box-shadow: inset 3px 0 0 0 var(--mx2-stale);
+}
+.mx2-stale-banner {
+  display: flex; align-items: center; gap: var(--mx2-gap-xs); flex-wrap: wrap;
+  padding: 6px 10px;
+  border: 1px solid var(--mx2-stale-border);
+  border-radius: var(--mx2-r-sm);
+  background: var(--mx2-stale-soft);
+  font-size: 10px; font-weight: 800; line-height: 1.4;
+  color: var(--mx2-stale);
+}
+.mx2-stale-label { color: var(--mx2-text); font-weight: 900; }
+
+
+/* ==========================================================================
+   10. DRAWER
+   The controller owns Escape (C.ESCAPE): drawer first, then one breadcrumb,
+   then nothing at all. No drawer-local document listener.
+   ========================================================================== */
+
+.mx2-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  z-index: var(--mx2-z-drawer);
+  width: min(520px, 92vw);
+  display: flex; flex-direction: column; gap: var(--mx2-gap-sm);
+  padding: 18px;
+  overflow-y: auto;
+  background: var(--mx2-surface-solid);
+  border-left: 1px solid var(--mx2-border);
+  box-shadow: -18px 0 44px rgba(0,0,0,0.34);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform var(--mx2-ease), visibility var(--mx2-ease);
+}
+.mx2-drawer.is-open { transform: translateX(0); visibility: visible; }
+.mx2-drawer-h {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--mx2-gap-sm);
+}
+.mx2-drawer-t { font-size: 13px; font-weight: 900; color: var(--mx2-text); }
+.mx2-scrim {
+  position: fixed; inset: 0;
+  z-index: calc(var(--mx2-z-drawer) - 1);
+  background: rgba(0,10,16,0.45);
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--mx2-ease), visibility var(--mx2-ease);
+}
+.mx2-scrim.is-open { opacity: 1; visibility: visible; }
+:root[data-theme="light"] .mx2-scrim { background: rgba(10,24,34,0.32); }
+
+
+/* ==========================================================================
+   11. ACCESSIBILITY — focus, screen-reader text, reduced motion
+   ========================================================================== */
+
+/* Visible focus on EVERY interactive element, both grounds. :focus-visible
+   first, then a :focus fallback for engines without it. */
+#pg-margin-explorer-2 :focus { outline: 2px solid var(--mx2-focus); outline-offset: 2px; }
+#pg-margin-explorer-2 :focus:not(:focus-visible) { outline: none; box-shadow: none; }
+#pg-margin-explorer-2 :focus-visible {
+  outline: 2px solid var(--mx2-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--mx2-focus-shadow);
+}
+/* Table rows are focusable targets for keyboard drill-down. */
+.mx2-tbl tbody tr.is-clickable:focus-visible {
+  outline: 2px solid var(--mx2-focus);
+  outline-offset: -2px;
+}
+
+.mx2-sr {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pg-margin-explorer-2 *,
+  .mx2-drawer,
+  .mx2-scrim {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  /* The pulsing dot becomes a steady dot; the pill still says "Updating". */
+  .mx2-pill-dot { animation: none; opacity: 1; }
+  /* The shimmer becomes a flat block — still legible as "not loaded yet". */
+  .mx2-skel { background: var(--mx2-skel-b); animation: none; }
+}
+
+/* Print: charts and drawers are noise on paper. */
+@media print {
+  .mx2-drawer, .mx2-scrim, .mx2-pill, .mx2-canvas-wrap { display: none !important; }
+  .mx2-panel { border-color: #999; box-shadow: none; }
+}
+
+
+/* ==========================================================================
+   12. RESPONSIVE — desktop-first, with a REDUCED PANEL SET below 720px
+   ========================================================================== */
+
+/* Laptop: the two-up drill grid stacks before anything else does. */
+@media (max-width: 1180px) {
+  .mx2-duo { grid-template-columns: 1fr; }
+}
+
+/* Small desktop / tablet: hero halves, body single column. */
+@media (max-width: 980px) {
+  .mx2-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mx2-body { grid-template-columns: 1fr; }
+}
+
+/* Phone: the REDUCED PANEL SET.
+   Anything marked .mx2-opt-secondary is dropped outright rather than squeezed —
+   a 4-bar waterfall and a 9-column margin matrix are unreadable at 375px and
+   pretending otherwise is worse than omitting them. The hero KPIs, the matrix
+   and the state messaging survive. */
+@media (max-width: 720px) {
+  .mx2-wrap { padding: 14px 12px 32px; gap: var(--mx2-gap-sm); }
+  .mx2-hero { grid-template-columns: 1fr; gap: var(--mx2-gap-sm); }
+  .mx2-kpi-v { font-size: 22px; }
+  .mx2-filters { gap: var(--mx2-gap-sm); padding: 10px; }
+  .mx2-fdivider { display: none; }
+  .mx2-input, .mx2-select { min-width: 0; width: 100%; }
+  .mx2-fgroup { width: 100%; }
+  .mx2-opt-secondary { display: none !important; }
+  .mx2-tablewrap { max-height: 380px; }
+  .mx2-bullet { grid-template-columns: minmax(70px, 1fr) 2fr auto; }
+  .mx2-bullet-status { display: none; }
+  .mx2-drawer { width: 100vw; }
+}
+
+
+/* ==========================================================================
+   13. KPI HERO PANEL — mexp2-panel-kpi.js (the thesis panel)
+   One .mx2-panel in the hero slot, spanning the whole grid. Two card rows:
+   the honest GM/kg comparison (reported | NET of off-invoice discount |
+   discount), then the four gross-basis totals; the discount-overlay chart
+   under both. The NET card carries the primary visual weight.
+   Tokens only; no new colour is introduced here.
+   ========================================================================== */
+
+.mx2-hero > .mx2-panel { grid-column: 1 / -1; }
+
+.mx2-kpi-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); }
+.mx2-kpi-row { display: grid; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-kpi-row-hero { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mx2-kpi-row-base { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* Inner cards sit on the panel surface, so they take the second surface. */
+.mx2-kpi-row .mx2-kpi { background: var(--mx2-surface2); }
+
+/* THE honest figure: accent rail + soft accent ground, one size up. */
+.mx2-kpi-row .mx2-kpi-primary {
+  background: var(--mx2-accent-soft);
+  border-color: var(--mx2-accent-border);
+  box-shadow: inset 0 3px 0 0 var(--mx2-accent);
+}
+.mx2-kpi-primary .mx2-kpi-l { color: var(--mx2-text2); }
+.mx2-kpi-primary .mx2-kpi-v { font-size: 30px; }
+
+/* Unit suffix inside a value ("/kg"): small, muted, never tabular-bold. */
+.mx2-kpi-unit {
+  font: 800 12px/1 var(--mx2-font);
+  letter-spacing: 0;
+  margin-left: 3px;
+  color: var(--mx2-text3);
+}
+/* Full-precision peso totals are long; one size down keeps them on one line. */
+.mx2-kpi-v-money { font-size: 20px; }
+
+.mx2-kpi-chart { min-height: 200px; height: 230px; }
+.mx2-kpi-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+
+/* loading-first skeleton for this panel: three + four tiles and a chart block. */
+.mx2-kpi-skel { flex-direction: column; gap: var(--mx2-gap-sm); }
+.mx2-kpi-skel .mx2-kpi-row { margin-bottom: var(--mx2-gap-sm); }
+
+/* empty-scope: this panel KEEPS its cards on screen as em dashes (the whole
+   point of the state — a dash where a PHP 0 would have been read as real),
+   and drops only the chart. The one sentence comes from the state block. */
+.mx2-panel.mx2-panel-kpi[data-mx2-status="empty-scope"] .mx2-dimmable { display: flex; }
+.mx2-panel.mx2-panel-kpi[data-mx2-status="empty-scope"] .mx2-kpi-chart,
+.mx2-panel.mx2-panel-kpi[data-mx2-status="empty-scope"] .mx2-kpi-chart-head { display: none; }
+
+@media (max-width: 980px) {
+  .mx2-kpi-row-hero, .mx2-kpi-row-base { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .mx2-kpi-row-hero, .mx2-kpi-row-base { grid-template-columns: 1fr; }
+  .mx2-kpi-primary .mx2-kpi-v { font-size: 24px; }
+  .mx2-kpi-chart { height: 190px; }
+}
+
+
+/* ==========================================================================
+   14. DRILL MATRIX — mexp2-panel-matrix.js
+   One .mx2-panel in the body slot: sticky-headed table, sticky footer on the
+   visible-row base, per-row benchmark bullet (MEXP2.svg.bullet) or a plain
+   proportional bar on the GP unit. Tokens only; no new colour.
+   ========================================================================== */
+
+/* A body slot with a single panel (no bridge yet) spans both columns. */
+.mx2-body > .mx2-panel:only-child { grid-column: 1 / -1; }
+
+.mx2-mx-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-mx-notes { display: flex; flex-direction: column; gap: 4px; }
+.mx2-mx-note { display: flex; align-items: baseline; }
+.mx2-mx-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+
+/* The wrap reads C.TABLE_MAX_H through the token the panel sets on it. */
+.mx2-mx-wrap { border: 1px solid var(--mx2-divider); }
+.mx2-mx-tbl { table-layout: auto; }
+.mx2-mx-tbl th { vertical-align: bottom; }
+
+/* Sort buttons inherit the header type exactly; the arrow is the affordance. */
+.mx2-mx-sort {
+  all: unset;
+  display: inline; cursor: pointer;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit;
+}
+.mx2-mx-sort:focus-visible { outline: 2px solid var(--mx2-focus); outline-offset: 2px; border-radius: 3px; }
+.mx2-mx-tbl th.is-sortable:hover .mx2-mx-sort { color: var(--mx2-text); }
+
+/* Primary column: the unit-toggled figure, one weight up. */
+.mx2-mx-tbl td.mx2-mx-primary { color: var(--mx2-text); font-weight: 800; }
+/* Negative figures take the value-sign colour; positives stay text colour. */
+.mx2-mx-tbl td.mx2-neg { color: var(--mx2-neg); }
+/* Per-unit cells on a zero-tonnage row: the dash, muted, never a zero. */
+.mx2-mx-tbl td.mx2-null { color: var(--mx2-text4); font-weight: 700; }
+.mx2-mx-tbl tr.mx2-mx-novol td.mx2-dim-col { color: var(--mx2-text2); }
+.mx2-mx-chev { color: var(--mx2-text4); margin-left: 6px; font-size: 11px; }
+.mx2-mx-tbl tbody tr.is-selected td.mx2-dim-col { color: var(--mx2-accent); }
+
+/* Benchmark cell: MEXP2.svg.bullet draws at >= 280px with a 14px per-svg
+   column label ("relative" / "vs target") above the track. The table header
+   already names the column, so the host clips that strip away (CSS only —
+   the primitive is untouched) and shows the track, value and tick. */
+.mx2-mx-tbl td.mx2-mx-bench { padding-top: 5px; padding-bottom: 5px; }
+.mx2-mx-bench-host { width: 280px; height: 21px; overflow: hidden; }
+.mx2-mx-bench-host > svg { margin-top: -13px; }
+
+/* GP unit: a plain proportional bar. Width is inline geometry; colour is here. */
+.mx2-mx-bar { position: relative; width: 160px; height: 8px; border-radius: 2px; background: var(--mx2-bullet-track); overflow: hidden; }
+.mx2-mx-bar-fill { height: 100%; border-radius: 2px; background: var(--mx2-bullet-value); }
+.mx2-mx-bar-fill.mx2-is-neg { background: var(--mx2-neg); }
+
+/* Footer: ONE base (visible rows), pinned to the bottom of the scroll box. */
+.mx2-mx-tbl tfoot td {
+  position: sticky; bottom: 0; z-index: 1;
+  background: var(--mx2-surface-solid);
+  white-space: nowrap;
+}
+.mx2-mx-footnote { color: var(--mx2-text3); font-weight: 700; font-size: 10px; }
+.mx2-mx-tbl tfoot td.mx2-mx-footnote { color: var(--mx2-text4); font-weight: 700; font-size: 9.5px; text-align: left; }
+
+/* loading-first skeleton: seven row bars. */
+.mx2-mx-skel { gap: 9px; }
+.mx2-mx-skel .mx2-skel { height: 14px; }
+
+/* The controller's unscoped badge: a panel whose data does not follow a
+   client-side drill (brand, sku, ...) says so at the top of its card. */
+.mx2-unscoped {
+  display: flex; align-items: center; gap: var(--mx2-gap-xs); flex-wrap: wrap;
+  padding: 5px 10px;
+  border: 1px solid var(--mx2-mix-border);
+  border-radius: var(--mx2-r-sm);
+  background: var(--mx2-mix-soft);
+  font-size: 10px; font-weight: 800; line-height: 1.4;
+  color: var(--mx2-mix);
+}
+.mx2-unscoped-label { color: var(--mx2-text2); font-weight: 900; }
+
+@media (max-width: 720px) {
+  .mx2-mx-bar { width: 100px; }
+}
+
+/* unavailable-for-scope: the server's reason IS the answer; an empty table
+   under it would read as a second, contradictory answer. */
+.mx2-panel.mx2-panel-matrix[data-mx2-status="unavailable-for-scope"] .mx2-mx-wrap { display: none; }
+
+
+/* ==========================================================================
+   15. GM/TON BRIDGE — mexp2-panel-bridge.js (phase B, canonical_bridge)
+   One .mx2-panel in the body slot beside the matrix. The waterfall is
+   MEXP2.svg.waterfall (delta-framed, anchor strip, badges top-right); under
+   it the trust notes, then the hatched cost-split sub-strip, the method line
+   and the backend note. Tokens only; no new colour.
+   ========================================================================== */
+
+.mx2-br-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-br-anchors { color: var(--mx2-text2); }
+.mx2-br-chart { min-width: 0; }
+.mx2-br-chart > svg, .mx2-br-cost-chart > svg { display: block; max-width: 100%; }
+
+/* Trust notes: one line per signal, the glyph in the residual gold. */
+.mx2-br-notes { display: flex; flex-direction: column; gap: 4px; }
+.mx2-br-note { display: flex; align-items: baseline; }
+.mx2-br-note[data-mx2-note="sig"] { color: var(--mx2-text3); }
+
+/* C12: the estimated cost split sits on the second surface, dashed like the
+   hatched bars it holds, so it can never be mistaken for the measured bridge. */
+.mx2-br-cost {
+  padding: 8px 10px 4px;
+  border: 1px dashed var(--mx2-mix-border);
+  border-radius: var(--mx2-r-sm);
+  background: var(--mx2-surface2);
+  min-width: 0;
+}
+.mx2-br-method { color: var(--mx2-text4); }
+.mx2-br-wirenote { border-top: 1px solid var(--mx2-divider); padding-top: 6px; }
+.mx2-br-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+
+/* loading-first skeleton: a header bar and a chart block. */
+.mx2-br-skel { gap: 9px; }
+
+/* unavailable-for-scope: the reason IS the answer (server two-key form, or a
+   canonical_bridge that is itself unavailable); no chart under it. */
+.mx2-panel.mx2-panel-bridge[data-mx2-status="unavailable-for-scope"] .mx2-br-body { display: none; }
+
+/* T1-T3 trust badges: DOM pills in a band above the svg (the primitive
+   clears its host on every paint), right-aligned, tooltips native. The band
+   exists only when a badge does. Tones mirror the svg badge paint. */
+.mx2-br-chartwrap { position: relative; min-width: 0; }
+.mx2-br-chartwrap.mx2-has-badges { padding-top: 22px; }
+.mx2-br-badges {
+  position: absolute; top: 0; right: 12px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+}
+.mx2-br-badge {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--mx2-mix-border);
+  background: var(--mx2-mix-soft);
+  font-size: 9px; font-weight: 700; line-height: 12px; white-space: nowrap;
+  color: var(--mx2-text2);
+  cursor: help;
+}
+.mx2-br-badge[data-mx2-tone="warn"] {
+  border-color: var(--mx2-resid-border);
+  background: var(--mx2-resid-soft);
+  color: var(--mx2-resid);
+}
+
+
+/* ==========================================================================
+   16. FROM REPORTED TO REALISED MARGIN — mexp2-panel-g2n.js (phase B)
+   One .mx2-panel at the TOP of the body slot, spanning both columns (the
+   matrix and the bridge follow beneath it). Left 2/3: MEXP2.svg.waterfall
+   (reported -> realised GM/t with dashed placeholders for the drivers the
+   wire lacks) and the placeholder list; right 1/3: the Reported | Net | Gap
+   table, the one-sentence verdict and the discount trend line. Tokens only.
+   ========================================================================== */
+
+.mx2-body > .mx2-panel.mx2-panel-g2n { grid-column: 1 / -1; }
+
+.mx2-g2n-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-g2n-anchors { color: var(--mx2-text2); }
+.mx2-g2n-basis { color: var(--mx2-text3); max-width: 900px; }
+
+.mx2-g2n-grid {
+  display: grid;
+  grid-template-columns: 2fr minmax(280px, 1fr);
+  gap: var(--mx2-gap);
+  align-items: start;
+  min-width: 0;
+}
+.mx2-g2n-left, .mx2-g2n-right { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-g2n-chart { min-width: 0; }
+.mx2-g2n-chart > svg { display: block; max-width: 100%; }
+
+/* The placeholder list: a dashed outline glyph mirrors the svg mark, so the
+   reader ties the prose to the chart at a glance. Never a number here. */
+.mx2-g2n-missing { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid var(--mx2-divider); }
+.mx2-g2n-missing-h { font-size: 9.5px; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase; color: var(--mx2-text4); }
+.mx2-g2n-missing-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 10px; line-height: 1.5; }
+.mx2-g2n-ph-glyph {
+  display: inline-block; width: 14px; height: 6px; flex: 0 0 auto;
+  border: 1px dashed var(--mx2-text4); border-radius: 2px;
+  position: relative; top: -1px;
+}
+.mx2-g2n-ph-label { font-weight: 800; color: var(--mx2-text2); }
+.mx2-g2n-ph-tag { font-weight: 600; color: var(--mx2-text3); }
+
+/* RIGHT: the small table on the second surface, the net column one weight up. */
+.mx2-g2n-rt { font-size: 11px; font-weight: 900; letter-spacing: 0.2px; color: var(--mx2-text); }
+.mx2-g2n-tblwrap { border: 1px solid var(--mx2-divider); border-radius: var(--mx2-r-sm); overflow-x: auto; }
+.mx2-g2n-tbl td, .mx2-g2n-tbl th { padding: 6px 10px; }
+.mx2-g2n-tbl td.mx2-g2n-net { color: var(--mx2-text); font-weight: 800; }
+.mx2-g2n-tbl td.mx2-null { color: var(--mx2-text4); font-weight: 700; }
+.mx2-g2n-tbl td.mx2-num.mx2-pos { color: var(--mx2-pos); }
+.mx2-g2n-tbl td.mx2-num.mx2-neg { color: var(--mx2-neg); }
+.mx2-g2n-wedge { color: var(--mx2-text2); }
+
+/* The one deterministic sentence: the panel's verdict, accent-railed. */
+.mx2-g2n-verdict {
+  padding: 8px 10px;
+  border: 1px solid var(--mx2-accent-border);
+  border-radius: var(--mx2-r-sm);
+  background: var(--mx2-accent-soft);
+  box-shadow: inset 3px 0 0 0 var(--mx2-accent);
+  font-size: 11px; font-weight: 700; line-height: 1.5;
+  color: var(--mx2-text);
+}
+.mx2-g2n-verdict:empty { display: none; }
+.mx2-g2n-trend { color: var(--mx2-text2); }
+.mx2-g2n-trend-off { color: var(--mx2-text3); }
+
+.mx2-g2n-notes { display: flex; flex-direction: column; gap: 4px; }
+.mx2-g2n-note { display: flex; align-items: baseline; }
+.mx2-g2n-wirenote { border-top: 1px solid var(--mx2-divider); padding-top: 6px; }
+.mx2-g2n-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+
+/* loading-first skeleton: a header bar and a chart block. */
+.mx2-g2n-skel { gap: 9px; }
+
+/* unavailable-for-scope: the reason IS the answer; no chart under it. */
+.mx2-panel.mx2-panel-g2n[data-mx2-status="unavailable-for-scope"] .mx2-g2n-body { display: none; }
+
+@media (max-width: 980px) {
+  .mx2-g2n-grid { grid-template-columns: 1fr; }
+}
+
+
+/* ==========================================================================
+   17. DRILL RAIL + BREADCRUMB — mexp2-controller.js (buildDrill / placeDrill)
+   One .mx2-drill block in the body slot, spanning both columns, placed
+   DIRECTLY ABOVE the matrix panel: the "DRILL BY" rail (nine group_by chips,
+   the active one pressed, a row count once a cut has been seen, Reset drill)
+   with the breadcrumb path under it. The chip strip lives in its own
+   overflow container, so on a narrow ground the RAIL scrolls sideways and the
+   page never does. Tokens only; the DSM chip's "client-side" tag is the
+   NON-SEMANTIC mix slate (a tier, not a verdict).
+   ========================================================================== */
+
+.mx2-body > .mx2-drill { grid-column: 1 / -1; min-width: 0; }
+/* A rail followed by a lone matrix (no bridge panel) still spans the body. */
+.mx2-body > .mx2-drill + .mx2-panel:last-child { grid-column: 1 / -1; }
+
+.mx2-drill {
+  display: flex; flex-direction: column; gap: var(--mx2-gap-xs);
+  min-width: 0;
+}
+.mx2-rail {
+  display: flex; align-items: center; gap: var(--mx2-gap-sm);
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--mx2-border);
+  border-radius: var(--mx2-r-lg);
+  background: var(--mx2-surface);
+}
+.mx2-rail-label { flex: 0 0 auto; }
+.mx2-rail-reset { flex: 0 0 auto; }
+
+/* The strip's container. Wide grounds: the chips WRAP (no scrolling to find
+   Customer or SKU). Below 720px it becomes THE overflow container (section
+   12): the strip scrolls inside it, and the grid item above has min-width:0
+   so nothing can push the page wider than the viewport. */
+.mx2-rail-scroll { flex: 1 1 auto; min-width: 0; }
+.mx2-rail-chips {
+  display: flex; align-items: center; gap: var(--mx2-gap-xs);
+  flex-wrap: wrap; white-space: nowrap;
+}
+
+/* A rail chip = a filter chip plus a tier marker and a count. */
+.mx2-rail-chip { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* Row count for a cut already seen this session; empty (and collapsed) until then. */
+.mx2-rail-n {
+  font: 800 9.5px/1 var(--mx2-mono);
+  letter-spacing: 0;
+  padding: 2px 5px; border-radius: 999px;
+  background: var(--mx2-sunken);
+  color: var(--mx2-text3);
+}
+.mx2-rail-n:empty { display: none; }
+.mx2-rail-chip[aria-pressed="true"] .mx2-rail-n { background: var(--mx2-accent-fg); color: var(--mx2-accent); }
+
+/* Tier marker on the DSM chip: "client-side", mix slate, never a value sign. */
+.mx2-rail-tag {
+  font: 900 8px/1 var(--mx2-font);
+  letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 2px 5px; border-radius: 999px;
+  border: 1px solid var(--mx2-mix-border);
+  background: var(--mx2-mix-soft);
+  color: var(--mx2-mix);
+}
+.mx2-rail-chip[aria-pressed="true"] .mx2-rail-tag {
+  border-color: var(--mx2-accent-fg);
+  background: transparent;
+  color: var(--mx2-accent-fg);
+}
+/* Client-side cuts read one step quieter than the three server filters. */
+.mx2-rail-chip[data-mx2-tier="client"]:not([aria-pressed="true"]) { border-style: dashed; }
+
+.mx2-rail-reset:disabled { color: var(--mx2-text4); background: transparent; border-color: transparent; }
+
+@media (max-width: 720px) {
+  .mx2-rail { flex-wrap: wrap; gap: var(--mx2-gap-xs); padding: 8px; }
+  /* label and reset share the first line; the strip takes the full width below and scrolls */
+  .mx2-rail-label { order: 1; }
+  .mx2-rail-reset { order: 2; margin-left: auto; }
+  .mx2-rail-scroll {
+    order: 3; flex: 1 1 100%; width: 100%;
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    /* room for the focus ring, which would otherwise be clipped by overflow */
+    padding: 3px 2px;
+    margin: -3px -2px;
+  }
+  .mx2-rail-chips { display: inline-flex; flex-wrap: nowrap; }
+}
+
+
+/* ==========================================================================
+   18. WHAT MOVED MARGIN, AND WHERE TO LOOK — mexp2-panel-insight.js (phase B)
+   One .mx2-panel closing the body slot, spanning both columns BELOW the
+   bridge. Four findings in a two-up grid: a heading, one or two sentences
+   each ending in a muted mono source tag, and an optional mini-table (max 5
+   rows). No chart, no chrome of its own beyond the tokens; the tag is text.
+   ========================================================================== */
+
+.mx2-body > .mx2-panel.mx2-panel-insight { grid-column: 1 / -1; }
+
+.mx2-in-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+.mx2-in-anchors { color: var(--mx2-text2); }
+.mx2-in-method { color: var(--mx2-text3); max-width: 900px; }
+
+.mx2-in-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--mx2-gap);
+  align-items: start;
+  min-width: 0;
+}
+.mx2-in-grid:empty { display: none; }
+
+/* One finding: the second surface, accent-railed heading, prose under it. */
+.mx2-in-find {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--mx2-divider);
+  border-radius: var(--mx2-r-sm);
+  background: var(--mx2-surface2);
+}
+.mx2-in-find[data-mx2-find="realised"] {
+  border-color: var(--mx2-accent-border);
+  box-shadow: inset 3px 0 0 0 var(--mx2-accent);
+}
+.mx2-in-h {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase;
+  color: var(--mx2-text2);
+}
+.mx2-in-find[data-mx2-find="realised"] .mx2-in-h { color: var(--mx2-text); }
+
+/* A sentence, then its source tag: muted, mono, never the same weight as the prose. */
+.mx2-in-s { font-size: 11px; font-weight: 700; line-height: 1.55; color: var(--mx2-text); min-width: 0; }
+.mx2-in-find[data-mx2-find="realised"] .mx2-in-s:first-of-type .mx2-in-text { font-size: 12px; }
+.mx2-in-src {
+  display: inline-block; margin-left: 6px;
+  font: 600 9px/1.4 var(--mx2-mono);
+  letter-spacing: 0;
+  color: var(--mx2-text4);
+  word-break: break-all;
+}
+.mx2-in-src::before { content: "← "; }
+
+/* The mini-table on the sunken strip; signed effects keep the value tokens. */
+.mx2-in-tblwrap { border: 1px solid var(--mx2-divider); border-radius: var(--mx2-r-sm); overflow-x: auto; }
+.mx2-in-tbl td, .mx2-in-tbl th { padding: 5px 9px; white-space: nowrap; }
+.mx2-in-tbl td.mx2-num.mx2-pos { color: var(--mx2-pos); }
+.mx2-in-tbl td.mx2-num.mx2-neg { color: var(--mx2-neg); }
+.mx2-in-tbl td.mx2-null, .mx2-in-tbl .mx2-in-gm.mx2-null { color: var(--mx2-text4); font-weight: 700; }
+.mx2-in-tbl td.mx2-in-strong { color: var(--mx2-text); font-weight: 800; }
+.mx2-in-arrow { color: var(--mx2-text4); }
+.mx2-in-note { color: var(--mx2-text3); }
+
+.mx2-in-nothing { color: var(--mx2-text2); }
+.mx2-in-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+
+/* Empty-scope / unavailable / errored: ONE sentence and nothing else. */
+.mx2-in-one { padding: 12px 14px; }
+.mx2-panel.mx2-panel-insight[data-mx2-status="unavailable-for-scope"] .mx2-in-body,
+.mx2-panel.mx2-panel-insight[data-mx2-status="unavailable-for-scope"] .mx2-in-universe,
+.mx2-panel.mx2-panel-insight[data-mx2-status="empty-scope"] .mx2-in-universe { display: none; }
+
+/* loading-first skeleton: a header bar and a block. */
+.mx2-in-skel { gap: 9px; }
+
+@media (max-width: 980px) {
+  .mx2-in-grid { grid-template-columns: 1fr; }
+}

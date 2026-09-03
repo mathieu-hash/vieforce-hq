@@ -64,8 +64,14 @@
   // fetch, used to suppress duplicate invocations for identical params.
   // bridgeGood = a real canonical bridge has painted FOR THE CURRENT SCOPE (reset on
   // scope change); bridgeScope = the human label of the scope that bridge shows.
+  // core/diss = the RAW phase-A payload and RAW phase-B dissection block, each with
+  // the scope signature it was fetched for (coreDataSig / dissSig) and the message
+  // of its last failure (coreErr / dissErr). Read by window.MEXP_state() for the
+  // v2 adapter (js/mexp2-adapter.js); nothing in v1 renders from them.
   var LAST = { matrix: null, fetchSeq: 0, hasCore: false, coreSig: null, coreInFlight: false,
-               bridgeGood: false, bridgeScope: '' };
+               bridgeGood: false, bridgeScope: '',
+               core: null, coreDataSig: null, coreErr: null,
+               diss: null, dissSig: null, dissErr: null, dissInFlight: false };
   var built = false;
 
   // --- Config tables for chips ----------------------------------------------
@@ -551,6 +557,7 @@
       if (!data) { setUpdating(false); showError('Empty response.'); return; }
 
       LAST.matrix = data.matrix || null;
+      LAST.core = data; LAST.coreDataSig = LAST.coreSig; LAST.coreErr = null;
 
       try { renderWindow(data.meta); } catch (e) { console.error('[MEXP] window:', e); }
       try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
@@ -567,6 +574,7 @@
     }, function (err) {
       if (seq !== LAST.fetchSeq) return;            // a newer action superseded us
       LAST.coreInFlight = false;
+      LAST.coreErr = (err && err.message) ? err.message : 'Request failed.';
       console.error('[MEXP] core fetch error:', err);
       setUpdating(false);
       showError((err && err.message) ? err.message : 'Request failed.');
@@ -581,16 +589,21 @@
       try { window.MEXP_setDissectionUpdating(true); } catch (e) {}
     }
     var p;
+    LAST.dissInFlight = true;
     try { p = Promise.resolve(window.apiFetch('margin-explorer', dissectionParams())); }
     catch (e) { p = Promise.reject(e); }
     p.then(function (data) {
       if (seq !== LAST.fetchSeq) return;              // a newer phase A started — abandon
+      LAST.dissInFlight = false;
+      LAST.diss = (data && data.dissection) || null; LAST.dissSig = LAST.coreSig; LAST.dissErr = null;
       if (typeof window.MEXP_setDissectionUpdating === 'function') {
         try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
       }
       renderPhaseB(data && data.dissection, null);
     }, function (err) {
       if (seq !== LAST.fetchSeq) return;            // superseded
+      LAST.dissInFlight = false;
+      LAST.dissErr = (err && err.message) ? err.message : 'Request failed.';
       console.error('[MEXP] dissection fetch error:', err);
       if (typeof window.MEXP_setDissectionUpdating === 'function') {
         try { window.MEXP_setDissectionUpdating(false); } catch (e) {}
@@ -927,6 +940,21 @@
   // =========================================================================
   // PUBLIC ENTRY
   // =========================================================================
+  // Read-only snapshot for the v2 adapter (js/mexp2-adapter.js): the raw phase-A
+  // payload and phase-B dissection block LAST holds, each tagged with the scope
+  // signature it belongs to, plus the current scope, its signature and its label.
+  // A payload whose sig differs from `sig` belongs to a previous scope.
+  window.MEXP_state = function MEXP_state() {
+    return {
+      sig: scopeSig(),
+      label: scopeLabel(),
+      scope: { period: STATE.period, ref_month: STATE.ref_month || null, region: STATE.region,
+               bu: STATE.bu, customer: STATE.customer || null, group_by: STATE.group_by,
+               compare: STATE.compare, unit: STATE.unit },
+      core: LAST.core, coreSig: LAST.coreDataSig, coreErr: LAST.coreErr, coreInFlight: LAST.coreInFlight,
+      diss: LAST.diss, dissSig: LAST.dissSig, dissErr: LAST.dissErr, dissInFlight: LAST.dissInFlight
+    };
+  };
   window.loadMarginExplorer = function loadMarginExplorer() {
     if (!built) {
       // Seed the INITIAL default from the global topbar only on first build.
