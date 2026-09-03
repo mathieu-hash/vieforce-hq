@@ -205,8 +205,11 @@
         },
         scales: {
           y: {
-            suggestedMin: sugMin,
-            suggestedMax: sugMax,
+            // hard min/max: the anchor bars are [0, value], so a *suggested* min
+            // would be overridden by the data's 0 and the axis would start at zero
+            // again. The anchors are clipped at the axis floor by design.
+            min: sugMin,
+            max: sugMax,
             grid: { color: p.grid },
             ticks: { color: p.text3, font: { size: 9 }, callback: function (v) { return fmtV(v); } }
           },
