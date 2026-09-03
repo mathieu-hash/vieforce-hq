@@ -2,7 +2,9 @@
  * Exposes: window.MEXP_renderMatrix(containerEl, matrix, opts)
  *   matrix = { group_by, total_gp, rows:[ {dim,sales,kg,tons,gp,gp_pct,gm_per_kg,pct_of_gp,expandable}, ... ] }
  *   opts   = { unit:'kg'|'ton'|'gp_pct'|'gp', selectedDim:string|null,
- *              onRowClick(dimValue,row), onGroupByChange(groupByKey) }
+ *              onRowClick(row), onGroupByChange(groupByKey) }
+ *   onRowClick receives the whole row object (read row.dim); the footer sums
+ *   ONLY the rows on screen and says so ("Visible rows (N)").
  */
 (function () {
   'use strict';
@@ -197,7 +199,7 @@
     table.appendChild(tbody);
 
     // Footer total
-    table.appendChild(buildFooter(rows, cfg, totalGp, unit));
+    table.appendChild(buildFooter(rows, cfg, unit));
 
     wrap.appendChild(table);
     containerEl.appendChild(wrap);
@@ -235,37 +237,43 @@
       '<td>' + _esc(fmtTons(r.tons)) + '</td>';
 
     tr.addEventListener('click', function () {
-      if (typeof onRowClick === 'function') onRowClick(r.dim, r);
+      if (typeof onRowClick === 'function') onRowClick(r);
     });
     return tr;
   }
 
-  function buildFooter(rows, cfg, totalGp, unit) {
+  function buildFooter(rows, cfg, unit) {
     var tfoot = document.createElement('tfoot');
     var tr = document.createElement('tr');
     tr.className = 'mexp-foot';
 
-    var sumGp = rows.reduce(function (s, r) { return s + (+r.gp || 0); }, 0);
-    var sumTons = rows.reduce(function (s, r) { return s + (+r.tons || 0); }, 0);
-    var sumKg = rows.reduce(function (s, r) { return s + (+r.kg || 0); }, 0);
-    var gpTotal = (totalGp != null) ? +totalGp : sumGp;
+    // ONE base: every footer figure is summed from the rows on screen. The
+    // server's total_gp is never mixed in, so the primary, GP ₱, the 100% share
+    // and the tonnage all describe the same rows. Tonnage is summed from kg
+    // (exact); row.tons is pre-rounded per row and drops <500 kg rows to 0.
+    var sumGp = 0, sumKg = 0, sumSales = 0;
+    rows.forEach(function (r) {
+      sumGp += (+r.gp || 0);
+      sumKg += (+r.kg || 0);
+      sumSales += (+r.sales || 0);
+    });
+    var sumTons = sumKg / 1000;
 
-    // Weighted primary for the total row.
+    // Weighted primary for the footer row, from the same rows.
     var primaryStr = '—';
     if (unit === 'gp') {
-      primaryStr = _fc(gpTotal);
+      primaryStr = _fc(sumGp);
     } else if (unit === 'gp_pct') {
-      var sumSales = rows.reduce(function (s, r) { return s + (+r.sales || 0); }, 0);
       if (sumSales) primaryStr = cfg.fmt(sumGp / sumSales * 100);
     } else {
-      // kg / ton: weighted GM per kg = total GP / total kg, scaled
-      if (sumKg) primaryStr = cfg.fmt(gpTotal / sumKg * cfg.scale);
+      // kg / ton: weighted GM per kg = visible GP / visible kg, scaled
+      if (sumKg) primaryStr = cfg.fmt(sumGp / sumKg * cfg.scale);
     }
 
     tr.innerHTML =
-      '<td class="mexp-c-dim">Total</td>' +
+      '<td class="mexp-c-dim" title="Sum of the ' + rows.length + ' rows shown">Visible rows (' + rows.length + ')</td>' +
       '<td class="mexp-primary">' + _esc(primaryStr) + '</td>' +
-      '<td>' + _esc(_fc(gpTotal)) + '</td>' +
+      '<td>' + _esc(_fc(sumGp)) + '</td>' +
       '<td>100.0%</td>' +
       '<td>' + _esc(fmtTons(sumTons)) + '</td>';
     tfoot.appendChild(tr);
