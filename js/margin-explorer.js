@@ -163,7 +163,6 @@
     // stale state (same scope failed to refresh): dimmed but still readable/clickable;
     // the panel's own label names the scope it is showing.
     '#pg-margin-explorer .mexp-stale{opacity:.55;transition:opacity .15s}',
-    '#pg-margin-explorer .mexp-stale-note{font-size:10px;font-weight:700;color:var(--gold);line-height:1.5}',
     '.mexp-clear{border:1px solid var(--glass-border);background:rgba(255,255,255,.035);color:var(--text2);font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:6px 11px;border-radius:8px;cursor:pointer}',
     '.mexp-clear:hover{border-color:var(--glass-border-hover);color:var(--text)}',
     // filter bar
@@ -176,8 +175,9 @@
     '.mexp-search{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;min-width:170px}',
     '.mexp-search::placeholder{color:var(--text3)}',
     '.mexp-divider{width:1px;align-self:stretch;background:var(--glass-border);margin:0 2px}',
-    // hero
-    '.mexp-hero{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}',
+    // hero — five cards: 5-up from 1100px, 3+2 below, 2-up under 980px
+    '.mexp-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}',
+    '@media(min-width:1100px){.mexp-hero{grid-template-columns:repeat(5,1fr)}}',
     '.mexp-kpi{border:1px solid var(--glass-border);border-radius:var(--r-lg);background:var(--surface);padding:14px 16px}',
     '.mexp-kpi-l{font-size:10px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:var(--text3)}',
     '.mexp-kpi-v{font-size:26px;font-weight:900;letter-spacing:-.5px;margin-top:7px;font-family:var(--mono,inherit);color:var(--text)}',
@@ -185,6 +185,7 @@
     '.mexp-kpi-d.up{color:var(--green)}',
     '.mexp-kpi-d.down{color:var(--red)}',
     '.mexp-kpi-d.flat{color:var(--text3)}',
+    '.mexp-kpi-b{font-size:11px;font-weight:600;color:var(--text3);margin-top:4px;line-height:1.4}',
     // 2-col body — Drill Matrix | Bridge, stretched to equal height so neither column
     // leaves a dead blank region; ingredient table sits full-width below. Each column
     // is a host: the mexp2 panel section (.mx2-panel, css/mexp2.css) is the box.
@@ -208,7 +209,7 @@
     '.mexp-snapshot{display:none;flex-direction:column;gap:10px;min-width:0;flex:1 1 auto}',
     '.mx2-panel.mexp-tab-snapshot>*:not(.mexp-tabs):not(.mexp-snapshot){display:none!important}',
     '.mx2-panel.mexp-tab-snapshot>.mexp-snapshot{display:flex}',
-    '.mexp-snapshot-note{font-size:10px;font-weight:700;color:var(--text3);border:1px solid var(--glass-border);border-radius:8px;padding:5px 10px}',
+    '.mexp-snapshot-note{font-size:11px;font-weight:700;color:var(--text3);border:1px solid var(--glass-border);border-radius:8px;padding:5px 10px}',
     // --- reconciling drill tables under the bridge (Cost components + Product Mix by SSG) ---
     // Two compact tables, side-by-side, each tied to its parent bar. tabular-nums,
     // thin separators, negatives red. Footer line proves Σ === the bridge bar.
@@ -301,14 +302,16 @@
             chipRow('unit', UNITS, STATE.unit) + '</div>' +
         '</div>' +
 
-        // ---- hero KPIs (four cards; the fifth slot, "GM / kg net of discount",
-        //      is filled in a later phase and stays hidden until then) ----
+        // ---- hero KPIs: the four v1 cards plus "GM / kg net of discount", read
+        //      from discount_overlay (present on both phases, nullable). The
+        //      four sales-derived cards are gross of the off-invoice discount;
+        //      the fifth is the only one net of it, and its basis line says so. ----
         '<div class="mexp-hero">' +
           heroCard('net',   'Net Sales') +
           heroCard('gp',    'Gross Profit') +
           heroCard('gppct', 'GP %') +
           heroCard('gmkg',  'GM / kg') +
-          '<div class="mexp-kpi" id="mexp-hero-gmkgnet-card" style="display:none"></div>' +
+          heroCard('gmkgnet', 'GM / kg net of discount', 'net of off-invoice discount') +
         '</div>' +
         '<div class="mexp-note" id="mexp-hero-note" style="display:none"></div>' +
 
@@ -333,11 +336,14 @@
     return true;
   }
 
-  function heroCard(key, label) {
+  // `basis` (optional) adds the one-line basis under the delta — only the
+  // net-of-discount card carries one; the other four are v1 verbatim.
+  function heroCard(key, label, basis) {
     return '<div class="mexp-kpi">' +
       '<div class="mexp-kpi-l">' + _esc(label) + '</div>' +
       '<div class="mexp-kpi-v" id="mexp-hero-' + key + '">—</div>' +
       '<div class="mexp-kpi-d flat" id="mexp-hero-' + key + '-d">—</div>' +
+      (basis ? '<div class="mexp-kpi-b">' + _esc(basis) + '</div>' : '') +
     '</div>';
   }
 
@@ -760,7 +766,7 @@
       LAST.core = data; LAST.coreDataSig = LAST.coreSig; LAST.coreErr = null;
 
       try { renderWindow(data.meta); } catch (e) { console.error('[MEXP] window:', e); }
-      try { renderHero(data.hero); }   catch (e) { console.error('[MEXP] hero:', e); }
+      try { renderHero(data.hero, data.discount_overlay); } catch (e) { console.error('[MEXP] hero:', e); }
       try { renderMatrixOnly(); }      catch (e) { console.error('[MEXP] matrix:', e); }
       // The ONE bridge is canonical_bridge (phase B). Phase A no longer paints a
       // competing bridge — the bridge box keeps its loading state until phase B lands.
@@ -858,12 +864,13 @@
     el.textContent = bits.join('  ·  ');
   }
 
-  function renderHero(hero) {
+  function renderHero(hero, overlay) {
     if (!hero) return;
     setHero('net',   hero.net_sales,    'php',  hero.net_sales && hero.net_sales.delta_pct, 'pct');
     setHero('gp',    hero.gross_profit, 'php',  hero.gross_profit && hero.gross_profit.delta_pct, 'pct');
     setHero('gppct', hero.gp_pct,       'pct0', hero.gp_pct && hero.gp_pct.delta_pp, 'pp');
     setHero('gmkg',  hero.gm_per_kg,    'kg',   hero.gm_per_kg && hero.gm_per_kg.delta, 'abs');
+    setHeroNet(overlay);
     var noteEl = $('mexp-hero-note');
     if (noteEl) {
       if (hero.compare_note) { noteEl.textContent = (hero.ly_comparable === false ? '⚠ ' : 'ⓘ ') + hero.compare_note; noteEl.style.display = 'block'; }
@@ -905,6 +912,30 @@
         dEl.className = 'mexp-kpi-d ' + cls;
       }
     }
+  }
+
+  // The fifth card: discount_overlay.gm_per_kg_net_of_discount (3 dp on the
+  // wire; shown at 2 dp like GM / kg). The block is null when its query threw
+  // or the window has no kg; its deltas are null on compare=ly (the overlay
+  // only computes a prior-window comparison) or when the prior window is empty.
+  function setHeroNet(ov) {
+    var vEl = $('mexp-hero-gmkgnet'), dEl = $('mexp-hero-gmkgnet-d');
+    if (!vEl || !dEl) return;
+    var ok = ov && typeof ov === 'object' && ov.gm_per_kg_net_of_discount != null && !isNaN(+ov.gm_per_kg_net_of_discount);
+    if (!ok) {
+      vEl.textContent = '—';
+      dEl.textContent = 'not computed';
+      dEl.className = 'mexp-kpi-d flat';
+      return;
+    }
+    var d = ov.delta_net_of_discount;
+    if ((d == null || isNaN(+d)) && STATE.compare === 'ly') {
+      vEl.textContent = '₱' + (+ov.gm_per_kg_net_of_discount).toFixed(2);
+      dEl.textContent = 'n/a vs LY';
+      dEl.className = 'mexp-kpi-d flat';
+      return;
+    }
+    setHero('gmkgnet', { value: ov.gm_per_kg_net_of_discount }, 'kg', d == null ? null : +d, 'abs');
   }
 
   // The Snapshot tab: the single-period drill matrix, with the category table's
@@ -1065,22 +1096,27 @@
           '<td class="num" style="color:' + dCol + ';font-weight:600;cursor:help" title="' + tip + '">' + fdt(i.perton_delta) + '</td>' +
           '</tr>';
       }).join('');
-      var sub = (ingMeta && ingMeta.note) ? es(ingMeta.note) : '';
+      // ONE caption line: the server's basis note, then the legend. Clipped to a
+      // single line; the full text (with the short-window caveat) is the tooltip.
+      var capParts = [];
+      if (ingMeta && ingMeta.note) capParts.push(String(ingMeta.note));
+      capParts.push('▲ red = cost rose · ▼ green = cost fell · hover Δ for the price vs recipe split');
+      var capFull = capParts.join(' · ') + '. Short windows (early MTD) have few purchase invoices — use QTD/YTD for a stable price read.';
       el.innerHTML = '<div class="mexp-panel-h"><span class="mexp-panel-t">Ingredient Cost / Ton of Feed</span>' +
         '<span class="mexp-natl-tag" title="Production lens — recipe-weighted national ingredient cost. Does not respond to the Region/BU filter.">National — not filtered by Region/BU</span></div>' +
         '<style>' +
-        '.mexp-ing-tbl{width:100%;border-collapse:collapse;font-size:11px}' +
+        '.mexp-ing-cap{font-size:11px;color:var(--text3);font-weight:600;margin:-2px 0 6px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help}' +
+        '.mexp-ing-tbl{width:100%;border-collapse:collapse;font-size:13px}' +
         '.mexp-ing-tbl th,.mexp-ing-tbl td{padding:3px 6px;border-bottom:1px solid var(--surface2,#1b2940)}' +
-        '.mexp-ing-tbl th{color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:right;font-weight:600;white-space:nowrap}' +
+        '.mexp-ing-tbl th{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:right;font-weight:600;white-space:nowrap}' +
         '.mexp-ing-tbl th:first-child{text-align:left}' +
         '.mexp-ing-tbl td.num{text-align:right;font-family:var(--mono,monospace);white-space:nowrap}' +
-        '.mexp-ing-tbl td.ing-nm{color:var(--text2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.mexp-ing-tbl td.ing-nm{color:var(--text2);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '</style>' +
-        '<div style="font-size:9px;color:var(--text3);margin:-2px 0 6px;line-height:1.4">' + sub + '</div>' +
+        '<div class="mexp-ing-cap" title="' + es(capFull) + '">' + es(capParts.join(' · ')) + '</div>' +
         '<table class="mexp-ing-tbl"><thead><tr>' +
         '<th>Ingredient</th><th>₱/kg was→now</th><th>incl %</th><th>₱/t feed</th><th>Δ ₱/t</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody></table>' +
-        '<div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.4">▲ red = cost rose · ▼ green = cost fell · hover Δ for price vs recipe split. Short windows (early MTD) have few purchase invoices — use QTD/YTD for a stable price read.</div>';
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
       el.style.display = 'block';
       return;
     }

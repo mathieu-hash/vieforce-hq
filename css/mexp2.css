@@ -383,7 +383,7 @@
    LOADING_REFRESH stay readable while announcing itself. */
 .mx2-dimmable { transition: opacity var(--mx2-ease); }
 
-.mx2-note { font-size: 10px; font-weight: 600; line-height: 1.5; color: var(--mx2-text3); }
+.mx2-note { font-size: 11px; font-weight: 600; line-height: 1.5; color: var(--mx2-text3); } /* 11px floor: no sentence on the page is smaller */
 .mx2-note-strong { color: var(--mx2-text2); }
 
 /* The DOM fallback mexp2-charts.js appends beside a <canvas> that has no 2d
@@ -1165,13 +1165,6 @@
 .mx2-nb-stat-v.mx2-neg { color: var(--mx2-neg); }
 .mx2-nb-stat-b { margin-top: 4px; font-size: 9.5px; font-weight: 600; color: var(--mx2-text4); }
 @media (max-width: 560px) { .mx2-nb-strip { grid-template-columns: 1fr; } }
-
-/* The one line under the strip when the reported and realised signs disagree. */
-.mx2-nb-offset {
-  padding: 7px 10px;
-  border: 1px solid var(--mx2-resid-border); border-radius: var(--mx2-r-sm);
-  background: var(--mx2-resid-soft);
-}
 
 /* ONE drivers table: selector Category | BU | Region | Customer, 13px floor. */
 .mx2-nb-drivers { display: flex; flex-direction: column; gap: 8px; min-width: 0; }

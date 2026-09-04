@@ -136,8 +136,6 @@
     stripReported: "Δ reported", stripDiscount: "Δ discount", stripNet: "Δ realised",
     stripReportedB: "GM/t, gross of discount", stripDiscountB: "off-invoice (OINV.DiscSum) per ton", stripNetB: "GM/t, net of discount",
     stripDiscountTip: "A positive discount change lowers realised margin by the same amount.",
-    offsetA: "A list-price change (reported price ", offsetB: ") was offset by a discount change of ",
-    offsetC: " — realised price ", offsetD: ".",
     // net drivers
     driversT: "Drivers", driversTop: "top " + DRIVER_ROWS, driversTopB: " by |effect|",
     driversTip: "Each lens is a standalone one-dimensional share-shift over that dimension alone, valued against the average margin. Lenses do not sum to each other nor to the Mix bars; the listed rows are the server's top N, so they do not sum to the lens total.",
@@ -193,7 +191,6 @@
   }
   function signedTon(v) { var f = F(); return v === null ? DASH : f.signed(v, 0) + PER_TON; }
   function tonOrDash(v) { var f = F(); return v === null ? DASH : f.perTon(v); }
-  function sign(v) { return v === null ? 0 : (v > 0 ? 1 : (v < 0 ? -1 : 0)); }
   function stateBlock(state, title, hint) {
     var b = el("div", "mx2-msg"); b.setAttribute("data-mx2-for", state);
     b.appendChild(el("div", "mx2-msg-t", title));
@@ -261,7 +258,7 @@
   // NET_BRIDGE.SAME_AS_CANONICAL); significance and cost_components are
   // canonical-only, discount / vs_reported are net-only.
   function modelFor(cb, source) {
-    var f = F(), M = { ok: false, spec: null, badges: [], details: [], anchors: anchorsOf(cb), unavailableReason: null, strip: null, offset: "", lenses: null, unstable: false, churn: false };
+    var f = F(), M = { ok: false, spec: null, badges: [], details: [], anchors: anchorsOf(cb), unavailableReason: null, strip: null, lenses: null, unstable: false, churn: false };
     if (!isObj(cb)) return M;
     if (cb.available !== true) { M.unavailableReason = (cb.reason == null) ? "" : String(cb.reason); return M; }
     M.ok = true;
@@ -383,13 +380,7 @@
       var dDisc = num(disc.delta_per_ton);
       if (dDisc === null && gap !== null) dDisc = -gap;              // gap = net - reported = -(discount change)
       if (dn === null && dr !== null && dDisc !== null) dn = dr - dDisc;
-      var pr = num(vs.price_reported), pn = num(vs.price_net);
       M.strip = { reported: dr, discount: dDisc, net: dn };
-      var flipDelta = (sign(dr) !== 0 && sign(dn) !== 0 && sign(dr) !== sign(dn));
-      var flipPrice = (sign(pr) !== 0 && sign(pn) !== 0 && sign(pr) !== sign(pn));
-      if ((flipDelta || flipPrice) && dDisc !== null) {
-        M.offset = COPY.offsetA + signedTon(pr) + COPY.offsetB + signedTon(dDisc) + COPY.offsetC + signedTon(pn) + COPY.offsetD;
-      }
       M.lenses = lensesOf(cb.lenses);
     }
     return M;
@@ -504,7 +495,6 @@
           net: stripCell(COPY.stripNet, COPY.stripNetB, "")
         };
         R.strip.appendChild(R.stripCells.reported.box); R.strip.appendChild(R.stripCells.discount.box); R.strip.appendChild(R.stripCells.net.box);
-        R.offset = el("div", "mx2-note mx2-note-strong mx2-nb-offset", "");
         R.drivers = el("div", "mx2-nb-drivers");
         R.drvHead = el("div", "mx2-nb-drv-h");
         R.drvTitle = el("span", "mx2-nb-drv-t", COPY.driversT);
@@ -582,7 +572,9 @@
         if (!M.details[i]) continue;
         R.details.appendChild(el("div", "mx2-note mx2-br-detail", M.details[i]));
       }
-      show(R.main, R.badgeRow, M.ok);
+      // The badges (and the details behind them) are shown ONCE, on the reported
+      // box; the net box repeats neither — its strip and drivers are its content.
+      show(R.main, R.badgeRow, M.ok && !NET);
       paintDetails();
     }
 
@@ -592,8 +584,6 @@
       setText(c.reported.v, signedTon(s.reported)); cls(c.reported.v, "mx2-pos", s.reported !== null && s.reported > 0); cls(c.reported.v, "mx2-neg", s.reported !== null && s.reported < 0);
       setText(c.discount.v, signedTon(s.discount));
       setText(c.net.v, signedTon(s.net)); cls(c.net.v, "mx2-pos", s.net !== null && s.net > 0); cls(c.net.v, "mx2-neg", s.net !== null && s.net < 0);
-      setText(R.offset, M.offset);
-      show(R.side, R.offset, !!M.offset, R.drivers);
     }
 
     // ---- net only: the drivers table --------------------------------------
