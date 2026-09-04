@@ -1084,58 +1084,40 @@
 
 
 /* ==========================================================================
-   15. GM/TON BRIDGE — mexp2-panel-bridge.js (phase B, canonical_bridge)
-   One .mx2-panel in the body slot beside the matrix. The waterfall is
-   MEXP2.svg.waterfall (delta-framed, anchor strip, badges top-right); under
-   it the trust notes, then the hatched cost-split sub-strip, the method line
-   and the backend note. Tokens only; no new colour.
+   15. GM/TON BRIDGES — mexp2-panel-bridge.js (phase B)
+   "bridge" (canonical_bridge) is the right box of the page body; the host
+   page grafts v1's two drill tables under it. "netbridge" (net_bridge) is the
+   bottom section: the net waterfall beside a three-number strip and ONE
+   drivers table. Both draw MEXP2.svg.waterfall on ONE shared scale. Under
+   each chart: three badges (partial · mix unstable · reconciled) and a
+   "details" toggle — nothing else in small print. Tokens only; no new colour.
    ========================================================================== */
 
 .mx2-br-body { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
-.mx2-br-anchors { color: var(--mx2-text2); }
+.mx2-br-basis { color: var(--mx2-text3); }
+.mx2-br-chartwrap { position: relative; min-width: 0; }
 .mx2-br-chart { min-width: 0; }
-.mx2-br-chart > svg, .mx2-br-cost-chart > svg { display: block; max-width: 100%; }
+.mx2-br-chart > svg { display: block; max-width: 100%; }
 
-/* Trust notes: one line per signal, the glyph in the residual gold. */
-.mx2-br-notes { display: flex; flex-direction: column; gap: 4px; }
-.mx2-br-note { display: flex; align-items: baseline; }
-.mx2-br-note[data-mx2-note="sig"] { color: var(--mx2-text3); }
-
-/* C12: the estimated cost split sits on the second surface, dashed like the
-   hatched bars it holds, so it can never be mistaken for the measured bridge. */
-.mx2-br-cost {
-  padding: 8px 10px 4px;
-  border: 1px dashed var(--mx2-mix-border);
-  border-radius: var(--mx2-r-sm);
-  background: var(--mx2-surface2);
-  min-width: 0;
-}
-.mx2-br-method { color: var(--mx2-text4); }
-.mx2-br-wirenote { border-top: 1px solid var(--mx2-divider); padding-top: 6px; }
-.mx2-br-universe { border-top: 1px solid var(--mx2-divider); padding-top: 8px; }
+/* The inline "no bridge for <scope> — <reason>" line: the box always carries a state. */
+.mx2-br-nobridge { padding: 10px 2px; }
 
 /* loading-first skeleton: a header bar and a chart block. */
 .mx2-br-skel { gap: 9px; }
 
 /* unavailable-for-scope: the reason IS the answer (server two-key form, or a
-   canonical_bridge that is itself unavailable); no chart under it. */
+   bridge block that is itself unavailable); no chart under it. */
 .mx2-panel.mx2-panel-bridge[data-mx2-status="unavailable-for-scope"] .mx2-br-body { display: none; }
 
-/* T1-T3 trust badges: DOM pills in a band above the svg (the primitive
-   clears its host on every paint), right-aligned, tooltips native. The band
-   exists only when a badge does. Tones mirror the svg badge paint. */
-.mx2-br-chartwrap { position: relative; min-width: 0; }
-.mx2-br-chartwrap.mx2-has-badges { padding-top: 22px; }
-.mx2-br-badges {
-  position: absolute; top: 0; right: 12px;
-  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
-}
+/* The badge row under the chart: the three pills left, the details toggle right. */
+.mx2-br-badgerow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.mx2-br-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .mx2-br-badge {
   display: inline-block;
   padding: 2px 8px; border-radius: 999px;
   border: 1px solid var(--mx2-mix-border);
   background: var(--mx2-mix-soft);
-  font-size: 9px; font-weight: 700; line-height: 12px; white-space: nowrap;
+  font-size: 9.5px; font-weight: 800; line-height: 13px; white-space: nowrap;
   color: var(--mx2-text2);
   cursor: help;
 }
@@ -1144,7 +1126,64 @@
   background: var(--mx2-resid-soft);
   color: var(--mx2-resid);
 }
+.mx2-br-badge[data-mx2-tone="ok"] {
+  border-color: var(--mx2-pos-border);
+  background: var(--mx2-pos-soft);
+  color: var(--mx2-pos);
+}
+.mx2-br-details-btn { margin-left: auto; font-size: 9.5px; padding: 2px 9px; border-radius: 999px; }
+.mx2-br-details-btn[aria-expanded="true"] { color: var(--mx2-text); border-color: var(--mx2-border); }
+.mx2-br-details {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-top: 6px; border-top: 1px solid var(--mx2-divider);
+}
+.mx2-br-detail { color: var(--mx2-text2); }
 
+/* --- the net box: waterfall column | strip + drivers column ----------------
+   Side by side from 1100px, stacked below. */
+.mx2-nb-grid { display: grid; grid-template-columns: 1fr; gap: var(--mx2-gap); min-width: 0; }
+@media (min-width: 1100px) {
+  .mx2-nb-grid { grid-template-columns: 1fr 1.15fr; align-items: start; }
+}
+.mx2-nb-col { display: flex; flex-direction: column; gap: var(--mx2-gap-sm); min-width: 0; }
+
+/* Three-number strip: Δ reported · Δ off-invoice discount · Δ realised. */
+.mx2-nb-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mx2-gap-sm); }
+.mx2-nb-stat {
+  padding: 10px 12px; min-width: 0;
+  border: 1px solid var(--mx2-border); border-radius: var(--mx2-r-sm);
+  background: var(--mx2-surface2);
+}
+.mx2-nb-stat-l { font-size: 9.5px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: var(--mx2-text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mx2-nb-stat-v {
+  margin-top: 5px;
+  font-family: var(--mx2-mono); font-size: 22px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--mx2-text);
+}
+.mx2-nb-stat-v.mx2-pos { color: var(--mx2-pos); }
+.mx2-nb-stat-v.mx2-neg { color: var(--mx2-neg); }
+.mx2-nb-stat-b { margin-top: 4px; font-size: 9.5px; font-weight: 600; color: var(--mx2-text4); }
+@media (max-width: 560px) { .mx2-nb-strip { grid-template-columns: 1fr; } }
+
+/* The one line under the strip when the reported and realised signs disagree. */
+.mx2-nb-offset {
+  padding: 7px 10px;
+  border: 1px solid var(--mx2-resid-border); border-radius: var(--mx2-r-sm);
+  background: var(--mx2-resid-soft);
+}
+
+/* ONE drivers table: selector Category | BU | Region | Customer, 13px floor. */
+.mx2-nb-drivers { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mx2-nb-drv-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mx2-nb-drv-t { font-size: 10px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; color: var(--mx2-text3); cursor: help; }
+.mx2-nb-sel { min-width: 120px; }
+.mx2-nb-drv-meta { margin-left: auto; }
+.mx2-nb-drv-body { overflow-x: auto; }
+.mx2-nb-drv-tbl { font-size: 13px; }
+.mx2-nb-drv-tbl th { position: static; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 800; padding: 6px 6px; }
+.mx2-nb-drv-tbl td { font-size: 13px; padding: 6px 6px; }
+.mx2-nb-drv-tbl td.mx2-dim-col { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 
 /* ==========================================================================
    16. FROM REPORTED TO REALISED MARGIN — mexp2-panel-g2n.js (phase B)
