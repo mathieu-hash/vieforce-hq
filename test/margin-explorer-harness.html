@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Margin Explorer — offline harness</title>
+<!--
+  test/margin-explorer-harness.html — the evolved Margin Explorer page, offline.
+
+  WHY THIS EXISTS. app.html is login-gated and /api/margin-explorer answers 401
+  without a session, so the only way to exercise the grafted page without the
+  backend is to stand the page up on a stub shell. This file is that shell:
+  it defines the globals js/margin-explorer.js and the mexp2 modules read from
+  app.html / js/api.js / js/auth.js, replaces apiFetch with the deterministic
+  raw-wire mock (test/mexp2-mock.js), and calls loadMarginExplorer() into the
+  same #pg-margin-explorer div the shell owns.
+
+  WHAT IS REAL HERE. The page modules are the repo files, loaded in the exact
+  order app.html uses (app.html:3712-3730). The theme mechanism is the shell's:
+  <html data-theme=""> is dark, "light" is light, toggleTheme() is the shell's
+  function copied verbatim. The design tokens are the shell's :root and
+  [data-theme="light"] blocks copied from app.html:26-103.
+
+  WHAT IS STUBBED. apiFetch / apiPost (mock envelopes), getSession / logout
+  (a fake session in localStorage under the shell's key), exportTableToXlsx
+  (logs instead of downloading), navTo / loadPage (log only). Nothing here is
+  loaded by app.html and nothing here is linked from the nav.
+
+  NOT FOR PRODUCTION. Serve from the repo root (paths are absolute) — see
+  test/README.md.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/hq.css">
+<link rel="stylesheet" href="/css/mexp2.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<style>
+/* ---- Shell design tokens, copied VERBATIM from app.html:26-103. ----
+ * hq.css above defines an older light-only :root (--bg #f5f5f5, --border #eee,
+ * --text-primary ...) that app.html never loads; these blocks come later in the
+ * cascade so the page paints on the shell's tokens, exactly as in app.html. */
+:root {
+  /* Vienovo Brand — Dark Mode */
+  --bg: #00293A;
+  --bg2: #003347;
+  --bg3: #004058;
+  --bg4: #004A64;
+  --surface: rgba(0,50,72,0.55);
+  --surface-solid: #003248;
+  --surface-hover: rgba(0,60,85,0.7);
+  --glass: rgba(0,42,62,0.4);
+  --glass-border: rgba(255,255,255,0.07);
+  --glass-border-hover: rgba(255,255,255,0.12);
+  --border: rgba(255,255,255,0.10);      /* solid control border — referenced app-wide, sits between --glass-border and --divider */
+  --surface2: rgba(0,60,85,0.55);        /* second-level surface (tracks, table separators) — a step lighter than --surface */
+  --navy: #004A64;
+  --blue: #00AEEF;
+  --blue2: #00A8CF;
+  --cyan: #00C4E8;
+  --green: #97D700;
+  --green2: #7AB800;
+  --red: #EF4444;
+  --red2: #FF6B6B;
+  --gold: #FFC72C;
+  --amber: #F58320;
+  --text: #F0F4FA;
+  --text2: rgba(240,244,250,0.72);
+  --text3: rgba(240,244,250,0.55);  /* WCAG AA — was 0.35; bumped for period buttons / topbar-sub contrast */
+  --text4: rgba(240,244,250,0.42);  /* WCAG AA — was 0.18; bumped for sidebar section titles */
+  --divider: rgba(255,255,255,0.10);
+  --glow-blue: rgba(0,174,239,0.12);
+  --glow-green: rgba(151,215,0,0.1);
+  --glow-red: rgba(239,68,68,0.1);
+  --glow-gold: rgba(255,199,44,0.1);
+  --r: 12px;
+  --r-sm: 8px;
+  --r-lg: 16px;
+  --font: 'Montserrat', system-ui, sans-serif;
+  --mono: 'Source Code Pro', monospace;
+  --sidebar-w: 240px;
+  --sidebar-collapsed: 64px;
+  --header-h: 56px;
+  --transition: 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ===== LIGHT THEME — Vienovo Brand ===== */
+[data-theme="light"] {
+  --bg: #F5F5F5;
+  --bg2: #EEEFF2;
+  --bg3: #E4E6EB;
+  --bg4: #D8DCE4;
+  --surface: rgba(255,255,255,0.9);
+  --surface-solid: #FFFFFF;
+  --surface-hover: rgba(255,255,255,0.98);
+  --glass: rgba(255,255,255,0.7);
+  --glass-border: rgba(0,74,100,0.1);
+  --glass-border-hover: rgba(0,74,100,0.16);
+  --border: rgba(0,74,100,0.14);
+  --surface2: rgba(0,74,100,0.06);
+  --navy: #004A64;
+  --blue: #00AEEF;
+  --blue2: #00A8CF;
+  --cyan: #0098C8;
+  --green: #7AB800;
+  --green2: #5E9600;
+  --red: #DC2626;
+  --red2: #EF4444;
+  --gold: #D7AB26;
+  --amber: #F58320;
+  --text: #1A1A1A;
+  --text2: #444444;
+  --text3: rgba(68,68,68,0.78);  /* WCAG AA — was 0.6 */
+  --text4: rgba(68,68,68,0.58);  /* WCAG AA — was 0.3 */
+  --divider: rgba(0,74,100,0.12);
+  --glow-blue: rgba(0,174,239,0.08);
+  --glow-green: rgba(151,215,0,0.08);
+  --glow-red: rgba(220,38,38,0.07);
+  --glow-gold: rgba(215,171,38,0.08);
+}
+
+/* ---- The shell's page frame (app.html:544-556, reduced to what the page needs) ---- */
+html, body { height: 100%; }
+body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+.content { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 28px 32px; position: relative; }
+.page { display: none; position: relative; z-index: 1; }
+.page.active { display: block; }
+
+/* ---- Harness bar (not part of the page under test) ---- */
+.hx-bar { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; font: 600 12px/1.4 system-ui, sans-serif; color: var(--text); background: var(--bg3); border-bottom: 1px solid var(--divider); z-index: 50; }
+.hx-bar .hx-title { font-weight: 800; letter-spacing: .02em; margin-right: 6px; }
+.hx-bar label { display: inline-flex; align-items: center; gap: 5px; color: var(--text2); }
+.hx-bar select, .hx-bar button { font: 600 12px system-ui, sans-serif; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-solid); color: var(--text); cursor: pointer; }
+.hx-bar button:hover { border-color: var(--blue); }
+.hx-bar .hx-stat { color: var(--text3); font-weight: 500; }
+.hx-bar .hx-stat b { color: var(--text); }
+.hx-bar .hx-stat.is-bad b { color: var(--red2); }
+.hx-log { flex: 1 1 100%; max-height: 54px; overflow: auto; margin: 0; white-space: pre-wrap; font: 10px/1.35 var(--mono); color: var(--text3); }
+</style>
+</head>
+<body>
+<!-- Harness bar: scenario, fault injection, theme (the shell's own button class so toggleTheme() updates its glyph), re-entry, error tally. -->
+<div class="hx-bar" id="hx-bar">
+  <span class="hx-title">Margin Explorer harness</span>
+  <label>Scenario
+    <select id="hx-scn"></select>
+  </label>
+  <button type="button" data-do="fail:core" title="The next phase-A fetch (include=bridge,movers,gap) rejects once with a 504">fail phase A once</button>
+  <button type="button" data-do="fail:diss" title="The next phase-B fetch (include=dissection) rejects once with a 504">fail phase B once</button>
+  <button type="button" data-do="reenter" title="Calls loadMarginExplorer() again, as the shell does on navTo">re-enter page</button>
+  <button type="button" class="theme-btn" data-do="theme" title="The shell's toggleTheme(): data-theme '' = dark, 'light' = light">🌙</button>
+  <span class="hx-stat" id="hx-calls">apiFetch calls: <b>0</b></span>
+  <span class="hx-stat" id="hx-errors">console errors: <b>0</b></span>
+  <span class="hx-stat" id="hx-theme">data-theme: <b>""</b></span>
+  <pre class="hx-log" id="hx-log"></pre>
+</div>
+
+<!-- The shell's page frame: .content is the scroll container the page's sticky scope bar sticks inside. -->
+<div class="content">
+  <div class="page active" id="pg-margin-explorer"></div>
+</div>
+
+<script>
+/* ==========================================================================
+ * SHELL STUBS — every global the page reads, with the shell's own semantics.
+ * Source of each: app.html (line refs are the evolution branch), js/api.js,
+ * js/auth.js. ES5 only (the shell and v1 are ES5).
+ *
+ *   READ BY js/margin-explorer.js          window.apiFetch, window.apiPost,
+ *                                          window.esc, window.PD,
+ *                                          window.VF_REF_MONTH, window.RG
+ *   READ BY js/mexp2-controller.js         window.PD, VF_REF_MONTH, RG (seedPatch)
+ *   READ BY js/mexp2-panel-trendmatrix.js  window.exportTableToXlsx
+ *   READ BY js/margin-explorer-matrix.js   fc, fcn, esc (bare globals, guarded)
+ *   READ BY js/margin-explorer-dissection.js  window.Chart (chart.js above)
+ *   READ BY js/mexp2-charts.js             window.Chart
+ *   READ BY the theme retheme path         charts (the shell's chart map,
+ *                                          walked by toggleTheme)
+ *   NOT a shell global: "BU". The BU filter lives only in the page's STATE;
+ *   app.html defines no BU variable (the topbar has region + segment).
+ * ======================================================================= */
+
+/* ---- topbar state (app.html:3738-3743) ---- */
+var PD  = localStorage.getItem('vf_period') || 'MTD';
+var CMP = localStorage.getItem('vf_compare') || 'vs_pp';
+var UT  = localStorage.getItem('vf_unit') || 'MT';
+var VF_REF_MONTH = localStorage.getItem('vf_ref_month') || '';
+var RG  = localStorage.getItem('vf_region') || 'ALL';
+var SEG = localStorage.getItem('vf_segment') || 'ALL';
+var PG  = 'pg-margin-explorer';
+var DC  = {};
+
+/* ---- chart registry (app.html:7546 `let charts = {}`; var here so the
+ *      harness can inspect it as window.charts) ---- */
+var charts = {};
+
+/* ---- formatters, verbatim (app.html:3967-3980) ---- */
+function fc(n){if(n==null||isNaN(n))return'₱0';n=+n;if(Math.abs(n)>=1e6)return'₱'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return'₱'+(n/1e3).toFixed(0)+'K';return'₱'+n.toFixed(0)}
+function fn(n){if(n==null||isNaN(n))return'0';n=+n;if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString('en-US',{maximumFractionDigits:0})}
+function fp(n){return n==null?'--':(+n).toFixed(1)+'%'}
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fv(mt,bags){return UT==='MT'?fn(mt)+' MT':fn(bags)+' bags'}
+function fvu(mt,bags){return UT==='MT'?fn(mt):fn(bags)}
+function fvl(){return UT==='MT'?'MT':'bags'}
+function fcn(n){if(n==null||isNaN(n))return'0';n=+n;return n.toLocaleString('en-US',{maximumFractionDigits:0})}
+
+/* ---- session (js/auth.js:4,147-163) — a fake 24h session under the shell's key ---- */
+var SESSION_KEY = 'vf_session';
+(function seedSession() {
+  var raw = null, s = null;
+  try { raw = localStorage.getItem(SESSION_KEY); if (raw) s = JSON.parse(raw); } catch (e) { s = null; }
+  if (s && s.id && Date.now() < s.expiresAt) return;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      id: 'harness-' + Date.now().toString(36), name: 'Harness User', role: 'exec', region: 'ALL',
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000
+    }));
+  } catch (e) {}
+})();
+function getSession() {
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    var session = JSON.parse(raw);
+    if (!session || !session.id) return null;
+    if (Date.now() > session.expiresAt) { localStorage.removeItem(SESSION_KEY); return null; }
+    return session;
+  } catch (e) { return null; }
+}
+function logout() { hxSay('logout() called — the shell would redirect to the login page here'); }
+
+/* ---- navigation / export stubs (app.html:4110 navTo, :4243 loadPage, :4052 exportTableToXlsx) ---- */
+function navTo(id) { hxSay('navTo(' + id + ') — shell would switch page'); }
+function loadPage(id) { hxSay('loadPage(' + id + ')'); if (id === 'pg-margin-explorer') loadMarginExplorer(); }
+function exportTableToXlsx(table, filename) {
+  var rows = table ? table.querySelectorAll('tr').length : 0;
+  hxSay('exportTableToXlsx(' + filename + ') — ' + rows + ' rows (no download in the harness)');
+}
+function stampRefresh() {}
+
+/* ---- theme (app.html:7842-7866, copied except the home-combo chart rebuild, which has no chart here): "" is dark, "light" is light ---- */
+var currentTheme = 'dark';
+function toggleTheme(){
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', currentTheme === 'dark' ? '' : 'light');
+  document.querySelectorAll('.theme-btn').forEach(function(b){b.textContent = currentTheme === 'dark' ? '🌙' : '☀️'});
+  localStorage.setItem('vf_theme', currentTheme);
+  // Re-theme charts
+  var isLight = currentTheme === 'light';
+  var gridC = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+  var tickC = isLight ? 'rgba(15,29,47,0.4)' : 'rgba(240,244,250,0.25)';
+  var legendC = isLight ? 'rgba(15,29,47,0.5)' : 'rgba(240,244,250,0.35)';
+  Object.values(charts).forEach(function(chart){
+    if(!chart||!chart.options) return;
+    var s = chart.options.scales||{};
+    ['y','y1','x'].forEach(function(axis){
+      if(s[axis]){
+        if(s[axis].grid) s[axis].grid.color = axis==='x' ? 'transparent' : gridC;
+        if(s[axis].ticks) s[axis].ticks.color = tickC;
+        if(s[axis].title) s[axis].title.color = isLight ? 'rgba(15,29,47,0.3)' : 'rgba(240,244,250,0.2)';
+      }
+    });
+    if(chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) chart.options.plugins.legend.labels.color = legendC;
+    chart.update('none');
+  });
+  hxTheme();
+}
+/* the shell's boot restores a saved light theme (app.html:3876) */
+(function restoreTheme() {
+  var saved = null;
+  try { saved = localStorage.getItem('vf_theme'); } catch (e) {}
+  if (saved === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme', 'light'); document.querySelectorAll('.theme-btn').forEach(function (b) { b.textContent = '☀️'; }); }
+})();
+
+/* ==========================================================================
+ * HARNESS STATE + LOG
+ * ======================================================================= */
+var HARNESS = { scenario: 'happy', failOnce: { core: false, diss: false }, calls: 0, errors: 0, lastParams: null };
+window.HARNESS = HARNESS;
+var HX_LOG = document.getElementById('hx-log');
+function hxSay(s) {
+  var d = new Date(), t = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+  if (HX_LOG) HX_LOG.textContent = (t + '  ' + s + '\n' + HX_LOG.textContent).slice(0, 4000);
+}
+function hxStat(id, v, bad) {
+  var el = document.getElementById(id), b = el && el.querySelector('b');
+  if (b) b.textContent = v;
+  if (el) { if (bad) el.className = 'hx-stat is-bad'; else el.className = 'hx-stat'; }
+}
+function hxTheme() { hxStat('hx-theme', '"' + document.documentElement.getAttribute('data-theme') + '"'); }
+window.addEventListener('error', function (e) {
+  HARNESS.errors++;
+  hxStat('hx-errors', HARNESS.errors, true);
+  hxSay('ERROR ' + e.message + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno);
+});
+(function tallyConsoleErrors() {
+  var orig = console.error;
+  console.error = function () {
+    HARNESS.errors++;
+    hxStat('hx-errors', HARNESS.errors, true);
+    try { hxSay('console.error ' + Array.prototype.slice.call(arguments).map(function (a) { return (a && a.message) ? a.message : String(a); }).join(' ').slice(0, 200)); } catch (e) {}
+    return orig.apply(console, arguments);
+  };
+})();
+
+/* ==========================================================================
+ * apiFetch / apiPost — the mock stands in for the network.
+ * Same resolve semantics as js/api.js: a Promise of the parsed body; a
+ * non-2xx rejects with Error('API error: <status> <body>'). The mock's
+ * fetch(endpoint, params, override) forces the selected scenario, skips the
+ * fixture loader and keeps the mock's phase latency (140ms A / 520ms B).
+ * ======================================================================= */
+function apiFetch(endpoint, params) {
+  params = params || {};
+  var n = ++HARNESS.calls, M = window.MEXP2 && window.MEXP2.mock;
+  var phase = (String(params.include || '').indexOf('dissection') >= 0) ? 'diss' : 'core';
+  HARNESS.lastParams = params;
+  hxStat('hx-calls', n);
+  hxSay('apiFetch #' + n + ' ' + endpoint + ' [' + phase + '] ' + JSON.stringify(params));
+  if (endpoint !== 'margin-explorer') return Promise.reject(new Error('API error: 404 the harness has no stub for /' + endpoint));
+  if (!M || typeof M.fetch !== 'function') return Promise.reject(new Error('API error: 500 test/mexp2-mock.js not loaded'));
+  if (HARNESS.failOnce[phase]) {
+    HARNESS.failOnce[phase] = false;
+    hxSay('   #' + n + ' -> rejecting once (fault injection)');
+    return new Promise(function (resolve, reject) { setTimeout(function () { reject(new Error('API error: 504 upstream timeout (harness fault injection)')); }, 200); });
+  }
+  return M.fetch(endpoint, params, HARNESS.scenario).then(function (body) {
+    hxSay('   #' + n + ' <- ' + (M.lastSource ? M.lastSource() : '') + ' ' + (body && body.meta && body.meta.window ? JSON.stringify(body.meta.window) : ''));
+    return body;
+  });
+}
+function apiPost(endpoint, body) {
+  hxSay('apiPost ' + endpoint + ' ' + (body && body.digest ? 'digest keys=' + Object.keys(body.digest).join(',') : ''));
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      var d = body && body.digest;
+      resolve({ text: 'HARNESS AI READ (no model behind this): scope ' + (d && d.scope) + '. Headline discount_overlay ' + JSON.stringify(d && d.headline && d.headline.discount_overlay) + '.' });
+    }, 300);
+  });
+}
+</script>
+
+<!-- Page modules in app.html's mandatory order (app.html:3712-3730). test/mexp2-mock.js
+     is not in app.html; it sits after mexp2-charts.js and before mexp2-url.js, where the
+     ES5 gate loads it. -->
+<script src="/js/mexp2-contract.js"></script>
+<script src="/js/mexp2-wire.js"></script>
+<script src="/js/mexp2-fmt.js"></script>
+<script src="/js/mexp2-store.js"></script>
+<script src="/js/mexp2-api.js"></script>
+<script src="/js/mexp2-svg.js"></script>
+<script src="/js/mexp2-charts.js"></script>
+<script src="/test/mexp2-mock.js"></script>
+<script src="/js/mexp2-url.js"></script>
+<script src="/js/mexp2-panel-kpi.js"></script>
+<script src="/js/mexp2-panel-g2n.js"></script>
+<script src="/js/mexp2-panel-bridge.js"></script>
+<script src="/js/mexp2-panel-insight.js"></script>
+<script src="/js/mexp2-panel-trendmatrix.js"></script>
+<script src="/js/mexp2-controller.js"></script>
+<script src="/js/mexp2-adapter.js"></script>
+<script src="/js/margin-explorer-matrix.js"></script>
+<script src="/js/margin-explorer-dissection.js"></script>
+<script src="/js/margin-explorer-netbridge.js"></script>
+<script src="/js/margin-explorer.js"></script>
+
+<script>
+/* ==========================================================================
+ * HARNESS BAR WIRING + ENTRY
+ * ======================================================================= */
+(function () {
+  var sel = document.getElementById('hx-scn'), M = window.MEXP2 && window.MEXP2.mock, list, i, o, q;
+  list = (M && M.SCENARIOS) || [{ id: 'happy', label: 'Happy path' }];
+  for (i = 0; i < list.length; i++) {
+    o = document.createElement('option');
+    o.value = list[i].id;
+    o.textContent = list[i].id + ' — ' + list[i].label;
+    o.title = list[i].desc || '';
+    sel.appendChild(o);
+  }
+  // ?scenario=<id> preselects; otherwise the last choice on this browser.
+  q = (window.location.search.match(/[?&]scenario=([^&]+)/) || [])[1];
+  if (!q) { try { q = localStorage.getItem('hx_scenario'); } catch (e) { q = null; } }
+  if (q && M && M.get && M.get(q)) HARNESS.scenario = q;
+  sel.value = HARNESS.scenario;
+  sel.addEventListener('change', function () {
+    HARNESS.scenario = sel.value;
+    try { localStorage.setItem('hx_scenario', sel.value); } catch (e) {}
+    hxSay('scenario -> ' + sel.value + ' (re-entering the page)');
+    loadMarginExplorer();
+  });
+  document.getElementById('hx-bar').addEventListener('click', function (e) {
+    var b = e.target, d;
+    while (b && b !== this && !(b.getAttribute && b.getAttribute('data-do'))) b = b.parentNode;
+    if (!b || b === this) return;
+    d = b.getAttribute('data-do');
+    if (d === 'theme') { toggleTheme(); return; }
+    if (d === 'reenter') { hxSay('loadMarginExplorer() (re-entry)'); loadMarginExplorer(); return; }
+    if (d.indexOf('fail:') === 0) { HARNESS.failOnce[d.slice(5)] = true; hxSay('next ' + (d.slice(5) === 'diss' ? 'phase-B' : 'phase-A') + ' fetch will reject once; click the page Refresh or re-enter'); return; }
+  });
+  hxTheme();
+  hxSay('harness up · scenario ' + HARNESS.scenario + ' · session ' + (getSession() ? getSession().id : 'none'));
+  if (typeof window.loadMarginExplorer !== 'function') { hxSay('ERROR loadMarginExplorer is not defined; js/margin-explorer.js did not load'); return; }
+  loadMarginExplorer();
+})();
+</script>
+</body>
+</html>
