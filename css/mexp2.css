@@ -1740,6 +1740,16 @@
 }
 [data-theme="light"] #pg-margin-explorer .mexp-filters + .mexp-filters { background: rgba(245,245,245,0.88); }
 
+/* Wide screens: the three net numbers stack beside the waterfall as sub-KPIs
+   (the column used to hold the drivers table, which became the lenses below). */
+@media (min-width: 1100px) {
+  .mx2-nb-strip { grid-template-columns: 1fr; gap: 10px; }
+  .mx2-nb-stat { padding: 14px 16px; }
+  .mx2-nb-stat-v { font-size: 28px; }
+  .mx2-nb-stat-l { font-size: 10px; letter-spacing: 0.8px; }
+  .mx2-nb-stat-b { font-size: 10.5px; }
+}
+
 /* Panels that answer a click lift a little on hover. */
 #pg-margin-explorer .mx2-panel:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.30); }
 [data-theme="light"] #pg-margin-explorer .mx2-panel:hover { box-shadow: 0 8px 24px rgba(0,41,58,0.10); }
