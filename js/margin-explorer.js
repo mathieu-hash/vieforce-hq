@@ -5,10 +5,11 @@
 // Contract (per build brief):
 //   - Data via apiFetch('margin-explorer', state)  (global, async, parsed JSON)
 //   - Matrix (Snapshot tab) rendered by window.MEXP_renderMatrix(el, matrix, opts)
-//   - Category-by-month matrix and the reported GM/ton bridge are the mexp2
-//     panels "trendmatrix" and "bridge" (js/mexp2-panel-*.js), fed a view model
-//     built by MEXP2.adapter.vmFromV1 from the raw phase-A / phase-B payloads.
-//   - Net bridge / dissection rendered by MEXP_renderNetBridge / MEXP_renderDissection
+//   - Category-by-month matrix, the reported GM/ton bridge and the NET bridge
+//     section are the mexp2 panels "trendmatrix", "bridge" and "netbridge"
+//     (js/mexp2-panel-*.js), fed a view model built by MEXP2.adapter.vmFromV1
+//     from the raw phase-A / phase-B payloads.
+//   - Dissection rendered by MEXP_renderDissection
 //   - Helpers fc/fcn/esc are global (guarded if absent).
 //
 // This file builds ONLY the page shell + filter state + orchestration.
@@ -16,12 +17,13 @@
 //
 // PAGE ORDER (v1, unchanged): head · period bar · filter bar · hero KPIs ·
 // 2-col body (Drill Matrix box | GM/ton Bridge box) · ingredient table ·
-// NET bridge panel · finished-feed dissection block (self-mounted by
+// NET bridge section · finished-feed dissection block (self-mounted by
 // margin-explorer-dissection.js, which also carries the AI read button).
-// Only the two boxes of the body are mexp2 panels: the Drill Matrix box is the
-// category-by-month table with the old single-period matrix as its "Snapshot"
-// tab; the Bridge box is the SVG waterfall with v1's two reconciling drill
-// tables (Cost, Product Mix by SSG) under it.
+// Three boxes are mexp2 panels: the Drill Matrix box is the category-by-month
+// table with the old single-period matrix as its "Snapshot" tab; the Bridge
+// box is the SVG waterfall with v1's two reconciling drill tables (Cost,
+// Product Mix by SSG) under it; the NET bridge section is the same SVG on the
+// same scale beside its three-number strip and drivers table.
 //
 // THE ONE SCOPE MECHANISM: applyScope(patch) — installed on MEXP2.adapter as
 // applyScope so the category table's row / cell clicks, the Snapshot row click
@@ -32,7 +34,7 @@
 // region / bu / customer crumb re-scopes the server, any other dim (ssg, dsm)
 // is a client-side row filter on the Snapshot only.
 //
-// Staleness policy (shared by bridge drills, net bridge, dissection): a panel
+// Staleness policy (shared by bridge drills and dissection): a panel
 // keeps its last good render ONLY for the scope it was painted for. When the
 // scope changes every "had good" flag is reset, so an empty or unavailable
 // scope is shown as exactly that — never as "source busy". When the SAME scope
@@ -189,6 +191,7 @@
     '.mexp-body{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:stretch;margin-bottom:16px}',
     '.mexp-host{min-width:0;display:flex;flex-direction:column}',
     '.mexp-host>.mx2-panel{flex:1 1 auto}',
+    '.mexp-net-host{margin-top:16px}',
     '.mexp-panel{border:1px solid var(--glass-border);border-radius:var(--r-lg);background:var(--surface);padding:14px 16px}',
     '.mexp-ing-panel{margin-top:0}',
     '.mexp-panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}',
@@ -319,14 +322,9 @@
         '<div class="mexp-panel mexp-ing-panel">' +
           '<div class="mexp-coming" id="mexp-movers">Movers &amp; gap analysis — coming in Phase 2</div>' +
         '</div>' +
-        // ---- NET bridge — same decomposition on margin net of off-invoice discount ----
-        '<div class="mexp-panel mexp-net-panel" id="mexp-net-panel" style="display:none">' +
-          '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
-            '<span class="mexp-panel-t">GM/ton Bridge — NET of off-invoice discount</span>' +
-            '<span class="mexp-panel-st" id="mexp-net-sub">Realised margin: line GP less the document trade discount (OINV.DiscSum), which is excluded from GrssProfit</span>' +
-          '</div></div>' +
-          '<div id="mexp-net-body"></div>' +
-        '</div>' +
+        // ---- NET bridge section — the mexp2 "netbridge" panel (same SVG, same
+        //      scale as the reported bridge, strip + drivers), mounted by mountPanels ----
+        '<div class="mexp-host mexp-net-host" id="mexp-net-host"></div>' +
       '</div>';
 
     root.innerHTML = html;
@@ -346,10 +344,11 @@
   // =========================================================================
   // THE TWO mexp2 BOXES
   // =========================================================================
-  // Mount the category-by-month table into the left column and the reported
-  // bridge into the right one, then graft the v1 pieces onto their frames: the
-  // Snapshot tab (single-period matrix) on the left, the two reconciling drill
-  // tables under the bridge on the right.
+  // Mount the category-by-month table into the left column, the reported
+  // bridge into the right one and the net bridge into the bottom section, then
+  // graft the v1 pieces onto their frames: the Snapshot tab (single-period
+  // matrix) on the left, the two reconciling drill tables under the bridge on
+  // the right.
   function mountPanels() {
     var ns = M2();
     if (!ns || !ns.adapter || typeof ns.adapter.mountPanels !== 'function') {
@@ -358,7 +357,7 @@
     }
     // THE scope mechanism, installed on the adapter seam the panels dispatch through.
     ns.adapter.applyScope = applyScope;
-    PANELS = ns.adapter.mountPanels({ trendmatrix: $('mexp-matrix-host'), bridge: $('mexp-bridge-host') }, ['trendmatrix', 'bridge']);
+    PANELS = ns.adapter.mountPanels({ trendmatrix: $('mexp-matrix-host'), bridge: $('mexp-bridge-host'), netbridge: $('mexp-net-host') }, ['trendmatrix', 'bridge', 'netbridge']);
     graftSnapshotTab();
     graftBridgeDrills();
   }
@@ -646,7 +645,6 @@
     var box = $('mexp-bridge-drills');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
     if (typeof window.MEXP_resetDissection === 'function') { try { window.MEXP_resetDissection(); } catch (e) {} }
-    if (typeof window.MEXP_resetNetBridge === 'function') { try { window.MEXP_resetNetBridge(); } catch (e) {} }
   }
 
   // -- View model for the two mexp2 boxes -------------------------------------
@@ -838,15 +836,9 @@
     // The reconciling drills under the bridge — fed by phase B's canonical_bridge.
     try { renderCanonicalDrills(unavailable || diss.canonical_bridge || { available: false, reason: 'No exact bridge returned for this scope.' }); }
     catch (e) { console.error('[MEXP] bridge drills:', e); }
-    // NET bridge (bottom panel) — same decomposition net of off-invoice discount.
-    try {
-      if (typeof window.MEXP_renderNetBridge === 'function') {
-        window.MEXP_renderNetBridge(unavailable || diss.net_bridge || { available: false, reason: 'No net bridge returned for this scope.' }, label);
-      }
-    } catch (e) { console.error('[MEXP] net bridge:', e); }
     try { if (typeof window.MEXP_renderDissection === 'function') window.MEXP_renderDissection(unavailable || diss, label); } catch (e) { console.error('[MEXP] dissection:', e); }
 
-    // the two mexp2 boxes
+    // the three mexp2 boxes (bridge, net bridge section, category table)
     var ns = M2();
     if (!ns || !ns.adapter) return;
     if (errMsg) { buildVm({ dissError: errMsg }); markErrored('diss'); return; }
