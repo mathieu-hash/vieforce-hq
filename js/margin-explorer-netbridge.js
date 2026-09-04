@@ -52,6 +52,8 @@
   function gates() { var ns = window.MEXP2; return (ns && ns.C && ns.C.TRUST_GATES) || {}; }
 
   // Trust signals: is this window comparable, and is the mix split a measurement?
+  // A percentage the wire left absent prints as a dash, never "undefined%".
+  function pctOr(v) { return (typeof v === 'number' && isFinite(v)) ? v : '—'; }
   function trust(nb) {
     var w = nb.window || {}, md = nb.mix_detail || {}, mo = nb.mix_ordering || {};
     var items = [];
@@ -62,15 +64,15 @@
         : { ok: false, t: 'Windows are NOT like-for-like — ' + w.base_shipping_days + ' vs ' + w.compare_shipping_days + ' shipping days' });
     }
     if (w.compare_partial) {
-      items.push({ ok: null, t: 'Compare month is ' + w.month_progress_pct + '% elapsed (last posted ' + w.last_posted_date + ') — this is an early read' });
+      items.push({ ok: null, t: 'Compare month is ' + pctOr(w.month_progress_pct) + '% elapsed (last posted ' + (w.last_posted_date || '—') + ') — this is an early read' });
     }
     items.push(mo.sign_stable
       ? { ok: true, t: 'Customer/Product split is stable across decomposition order' }
       : { ok: false, t: 'Customer/Product split is NOT order-stable (customer bar ranges ' +
           pt(mo.customer_range ? mo.customer_range[0] : 0) + ' … ' + pt(mo.customer_range ? mo.customer_range[1] : 0) + ') — quote the combined mix, not the split' });
     items.push(md.churn_dominated
-      ? { ok: false, t: 'Mix is churn-dominated — ' + md.one_sided_share_pct + '% comes from customer×SKU pairs present in only one window; matched pairs cover ' + md.matched_kg_share_pct + '% of current tonnage. That is timing, not a commercial shift.' }
-      : { ok: true, t: 'Mix is driven by continuing customers (matched pairs cover ' + md.matched_kg_share_pct + '% of current tonnage)' });
+      ? { ok: false, t: 'Mix is churn-dominated — ' + pctOr(md.one_sided_share_pct) + '% comes from customer×SKU pairs present in only one window; matched pairs cover ' + pctOr(md.matched_kg_share_pct) + '% of current tonnage. That is timing, not a commercial shift.' }
+      : { ok: true, t: 'Mix is driven by continuing customers (matched pairs cover ' + pctOr(md.matched_kg_share_pct) + '% of current tonnage)' });
     return '<div class="mnb-trust">' + items.map(function (i) {
       var ic = i.ok === true ? '✓' : (i.ok === false ? '⚠' : 'ⓘ');
       var c = i.ok === true ? 'ok' : (i.ok === false ? 'warn' : 'info');
@@ -133,6 +135,11 @@
     if (!panel || !body) return;
     styles();
     label = label || 'this scope';
+    // Shape gate: a malformed net_bridge (wrong types on a 200) is routed to
+    // unavailable with a reason, never printed as "undefined → undefined".
+    if (nb && nb.available !== false && !(typeof nb.base_month === 'string' && typeof nb.compare_month === 'string')) {
+      nb = { available: false, reason: 'the net bridge block failed the shape check (base_month / compare_month) — treated as unavailable.' };
+    }
     if (!nb || nb.available === false) {
       var reason = (nb && nb.reason) || 'not available for this anchor.';
       if (NET_GOOD) {
@@ -143,6 +150,8 @@
         // nothing to keep: an unsupported / empty scope is an answer — print it
         panel.classList.remove('mexp-stale');
         staleNote(panel, body, '');
+        // the subtitle must not keep a previous payload's anchors
+        if (sub) sub.textContent = 'Net of off-invoice discount · ' + label + ' · each lens is a standalone one-dimensional share-shift; lenses do not sum to each other or to the mix bars';
         body.innerHTML = '<div class="mnb-unavail">' +
           ((nb && nb.error) ? '⚠ Drivers could not be loaded for ' : 'ⓘ No net-bridge lenses for ') +
           esc(label) + ' — ' + esc(reason) + '</div>';

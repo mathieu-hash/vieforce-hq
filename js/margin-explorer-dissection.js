@@ -115,11 +115,25 @@
     if (on) sec.classList.add('mexp-dim'); else sec.classList.remove('mexp-dim');
   };
 
+  // Shape gate: a 200 whose dissection block has the wrong types (malformed
+  // payload) is routed to unavailable with a reason, never rendered as
+  // "undefined -> undefined" or caught as a TypeError in a chart loop.
+  function dissShapeOk(d) {
+    if (!d || typeof d !== 'object') return false;
+    if (typeof d.base_month !== 'string' || typeof d.compare_month !== 'string') return false;
+    if (d.trajectory != null && !(typeof d.trajectory === 'object' && typeof d.trajectory.length === 'number')) return false;
+    if (d.ingredients != null && d.ingredients.items != null && !(typeof d.ingredients.items === 'object' && typeof d.ingredients.items.length === 'number')) return false;
+    return true;
+  }
+
   window.MEXP_renderDissection = function (d, label) {
     var sec = ensure(); if (!sec) return;
     SCOPE_LABEL = label || SCOPE_LABEL;
     var subEl = document.getElementById('diss-sub');
 
+    if (d && d.available !== false && !dissShapeOk(d)) {
+      d = { available: false, reason: 'the dissection block failed the shape check (base_month / compare_month / trajectory) — treated as unavailable.' };
+    }
     if (!d || d.available === false) {
       var reason = (d && d.reason) || 'No finished-feed data for this selection.';
       if (HAD_GOOD) {

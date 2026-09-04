@@ -1526,7 +1526,9 @@
   color: var(--mx2-text3); cursor: help;
 }
 .mx2-br-drill-h b { color: var(--mx2-text2); font-weight: 900; }
-.mx2-br-drill-tbl { font-size: 10.5px; }
+.mx2-br-drill-tbl { font-size: 10.5px; table-layout: fixed; } /* fixed: the nowrap label column truncates instead of pushing the table past its grid column */
+.mx2-br-drill-tbl td.mx2-num { width: 58px; }
+.mx2-br-drill-off { color: var(--mx2-resid); font-weight: 700; font-size: 9.5px; }
 .mx2-br-drill-tbl td, .mx2-br-drill-tbl th { padding: 3px 6px; }
 .mx2-br-drill-tbl td.mx2-dim-col { font-weight: 600; color: var(--mx2-text2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx2-br-drill-tbl td.mx2-num.mx2-pos { color: var(--mx2-pos); }

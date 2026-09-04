@@ -490,9 +490,12 @@
       foot = el("tfoot"); tr = el("tr", "mx2-br-drill-foot");
       td = el("td", "mx2-dim-col", COPY.drillFootA + D.barLabel + COPY.drillFootB); tr.appendChild(td);
       td = el("td", "mx2-num", signedTon(D.bar)); cls(td, "mx2-neg", D.bar !== null && D.bar < 0); cls(td, "mx2-pos", D.bar !== null && D.bar > 0); tr.appendChild(td);
-      td = el("td", "mx2-num mx2-br-drill-share", (tie === false) ? (COPY.drillOff.replace(/^ · /, "") + signedTon(off)) : ""); tr.appendChild(td);
+      td = el("td", "mx2-num mx2-br-drill-share", ""); tr.appendChild(td);
       foot.appendChild(tr); t.appendChild(foot);
       box.appendChild(t);
+      // The miss is a sentence under the table, not a nowrap cell in a 46px
+      // column (which overflowed the grid column into the neighbouring panel).
+      if (tie === false) box.appendChild(el("div", "mx2-note mx2-br-drill-off", COPY.drillOff.replace(/^ · /, "") + signedTon(off)));
       return box;
     }
     function paintDrills(M) {

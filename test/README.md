@@ -63,7 +63,7 @@ choice made on that browser (`localStorage.hx_scenario`).
 ## What is real and what is stubbed
 
 Real: every page module from `js/` in the exact order `app.html` loads them
-(app.html:3712-3730), `css/hq.css`, `css/mexp2.css`, the shell's `:root` /
+(app.html:3712-3730), `css/mexp2.css` (not `css/hq.css`, which app.html never loads), the shell's `:root` /
 `[data-theme="light"]` token blocks (copied verbatim from app.html:26-103), the
 formatters `fc fn fp esc fv fvu fvl fcn` (app.html:3967-3980), the topbar
 globals `PD CMP UT VF_REF_MONTH RG SEG` seeded from `localStorage` the way the
