@@ -65,8 +65,12 @@ Avant, les mêmes chiffres apparaissaient trois fois (barres CSS, tableau Report
 - **Un** bridge net (variante de `mexp2-panel-bridge.js`) dessiné avec le même SVG, sur la **même
   échelle** que le bridge reporté (domaine union) — les deux se comparent à l'œil
 - Une bande de **trois chiffres** : Δ reporté · Δ remise · Δ réalisé
-- **Un seul** tableau de drivers avec sélecteur Catégorie | BU | Région | Client, 13 px minimum,
-  7 lignes max triées par |effet|, BU masqué quand une seule BU est filtrée
+- Les **quatre lenses de composition** (Catégorie · BU · Région · Client) sous le bridge net, en grille
+  2×2 de cartes du shell (revenues le 2026-09-04 à la demande de Mathieu, à la place du tableau de
+  drivers à sélecteur) : barre d'effet signée depuis un zéro centré, **une seule échelle** pour les
+  quatre lenses, « dumbbell » de part avant → après, paire GM/t, avatar initiales, tags NEW / GONE
+  quand une entité n'existe que d'un côté, total de la lens en sous-KPI. 7 lignes max par |effet|,
+  BU masquée quand une seule BU est filtrée. Un `<table>` en layout fixe par carte.
 
 ### Option approuvée
 
@@ -268,7 +272,11 @@ Contrat API      js/mexp2-wire.js
 Seam wire        js/mexp2-api.js — normalise() / mapCore / mapDissection
 ```
 
-**Reprise 2026-09-04** — la branche a été vérifiée en local par une autre session : les six
+**Reprise 2026-09-04** — commits `dabc3e8` → `8bd4ca7` : les boîtes `mexp2` portent désormais le thème du
+shell (tokens `--mx2-*` résolus sur ceux du shell, cartes verre, chips de la page), les quatre lenses sont
+revenues (voir ④), et la page a gagné une entrée en cascade, des pastilles de delta sur les KPI, un halo
+derrière les cartes, une barre de filtres collante. CSS + panneau JS seulement, contrôleur v1 intact.
+La branche a été vérifiée en local : les six
 scénarios du harnais tournent sans erreur console (Chromium headless), matrice, bridge reporté,
 bridge net, bande de trois chiffres, drivers et cinquième carte KPI rendent tous. Le correctif
 `animation:false` resté non commité sur `master` local (canvas Chart.js vide, 08-27) est rendu
