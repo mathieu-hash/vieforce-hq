@@ -1,6 +1,6 @@
 # Margin Explorer — passation / handoff
 
-**Branche :** `margin-explorer-evolution` · **HEAD :** `c52141d` · 20 commits au-dessus de `master`
+**Branche :** `margin-explorer-evolution` · HEAD : voir `git log -1` · 22 commits au-dessus de `master`
 **Preview Vercel :** https://vieforce-hq-git-margin-explorer-e-8d6384-mathieu-7782s-projects.vercel.app/app.html
 **Production :** intacte. `master` est toujours sur `548dd3d`. Rien n'a été fusionné.
 
@@ -137,12 +137,14 @@ js/margin-explorer.js  (contrôleur v1, conservé)
    │
    ├── #mexp-matrix-host  → MEXP2.panel("trendmatrix")   ① la matrice + onglet Snapshot
    └── #mexp-bridge-host  → MEXP2.panel("bridge")        ② le bridge reporté
-       #mexp-net-panel    → MEXP2.panel("bridge") variante net   ④ le bas de page
+       #mexp-net-host     → MEXP2.panel("netbridge")             ④ le bas de page
 ```
 
-**Ordre de chargement obligatoire** (dans `app.html`) :
-`mexp2-contract → wire → fmt → store → api → svg → charts → adapter → panel-trendmatrix →
-panel-bridge`, puis les fichiers `margin-explorer*.js`.
+**Ordre de chargement** (tel qu'il est dans `app.html`) :
+`mexp2-contract → wire → fmt → store → api → svg → charts → panel-bridge → panel-trendmatrix →
+adapter`, puis les fichiers `margin-explorer*.js`. Contraintes réelles : `store` (qui définit
+`MEXP2.panel`) avant les deux panneaux ; tous les `mexp2-*` avant `margin-explorer*.js`. L'adaptateur
+et les panneaux ne se référencent qu'à l'exécution, leur ordre relatif est libre.
 
 | Fichier | Rôle |
 |---|---|
@@ -257,7 +259,7 @@ palette sombre complète sur `:root`, surcharges claires sous `[data-theme="ligh
 ## 8. Repères rapides
 
 ```
-Branche          margin-explorer-evolution   (20 commits au-dessus de master)
+Branche          margin-explorer-evolution   (22 commits au-dessus de master)
 Production       master @ 548dd3d — jamais touché
 Preview          https://vieforce-hq-git-margin-explorer-e-8d6384-mathieu-7782s-projects.vercel.app/app.html
                  (double connexion : Vercel, puis le login VieForce)
@@ -265,6 +267,12 @@ Harnais          test/margin-explorer-harness.html  (servir en localhost)
 Contrat API      js/mexp2-wire.js
 Seam wire        js/mexp2-api.js — normalise() / mapCore / mapDissection
 ```
+
+**Reprise 2026-09-04** — la branche a été vérifiée en local par une autre session : les six
+scénarios du harnais tournent sans erreur console (Chromium headless), matrice, bridge reporté,
+bridge net, bande de trois chiffres, drivers et cinquième carte KPI rendent tous. Le correctif
+`animation:false` resté non commité sur `master` local (canvas Chart.js vide, 08-27) est rendu
+caduc par cette branche : le bridge n'utilise plus de canvas.
 
 Les commits `febc1ab` → `a0b16d7` sont les corrections de bugs ; `cbddbab` → `db2cff5` la greffe
 et la refonte (partiellement annulée ensuite) ; `00ab43d` → `c52141d` la retaille aux quatre
