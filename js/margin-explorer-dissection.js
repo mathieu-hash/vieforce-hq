@@ -136,13 +136,16 @@
     }
     if (!d || d.available === false) {
       var reason = (d && d.reason) || 'No finished-feed data for this selection.';
-      if (HAD_GOOD) {
+      // Only a TRANSPORT failure (error:true) keeps the last good charts: a
+      // determinate available:false is the answer for this scope and replaces them.
+      if (HAD_GOOD && d && d.error) {
         // same scope, refresh failed: keep charts, dim, name the scope shown
         sec.classList.add('mexp-stale');
         if (subEl) subEl.textContent = '⚠ source busy — could not refresh; showing ' + (GOOD_SCOPE || SCOPE_LABEL) + ' (' + reason + ')';
         return;
       }
       // nothing to keep for this scope: an empty scope is an answer, not an outage
+      HAD_GOOD = false; GOOD_SCOPE = '';
       sec.classList.remove('mexp-stale');
       LAST = null;
       if (subEl) subEl.textContent = ((d && d.error) ? '⚠ Trajectory could not be loaded for ' : 'ⓘ No finished-feed trajectory for ') + SCOPE_LABEL + ' — ' + reason;

@@ -142,12 +142,15 @@
     }
     if (!nb || nb.available === false) {
       var reason = (nb && nb.reason) || 'not available for this anchor.';
-      if (NET_GOOD) {
+      // Only a TRANSPORT failure (error:true) keeps the last good render: a
+      // determinate available:false is the answer for this scope and replaces it.
+      if (NET_GOOD && nb && nb.error) {
         // same scope, refresh failed: keep the render, dim it, name the scope shown
         panel.classList.add('mexp-stale');
         staleNote(panel, body, '⚠ source busy — could not refresh; showing ' + (NET_SCOPE || label) + ' (' + reason + ')');
       } else {
         // nothing to keep: an unsupported / empty scope is an answer — print it
+        NET_GOOD = false; NET_SCOPE = '';
         panel.classList.remove('mexp-stale');
         staleNote(panel, body, '');
         // the subtitle must not keep a previous payload's anchors
