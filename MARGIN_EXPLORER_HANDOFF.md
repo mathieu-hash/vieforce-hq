@@ -71,12 +71,10 @@ Avant, les mêmes chiffres apparaissaient trois fois (barres CSS, tableau Report
   quatre lenses, « dumbbell » de part avant → après, paire GM/t, avatar initiales, tags NEW / GONE
   quand une entité n'existe que d'un côté, total de la lens en sous-KPI. 7 lignes max par |effet|,
   BU masquée quand une seule BU est filtrée. Un `<table>` en layout fixe par carte.
-- Au-dessus des lignes de chaque lens, un **quadrant** : abscisse = décalage de part (pp), ordonnée =
-  GM/t après moins le GM/t courant du scope, bulle = tonnage, couleur = signe de l'effet. Haut-droite =
-  gain de part là où ça paie ; bas-droite = dilution. Survol d'une ligne ↔ bulle. Clic sur une ligne
-  Région / BU / Client applique le filtre de la page via `applyScope` (Catégorie n'est pas un filtre
-  serveur, pas de clic). L'en-tête de la lens dit « 7 of 12 rows · 63 % of tonnage » = couverture des
-  lignes affichées (somme de leurs parts après).
+- Clic sur une ligne Région / BU / Client applique le filtre de la page via `applyScope` (Catégorie
+  n'est pas un filtre serveur, pas de clic). L'en-tête de la lens dit « 7 of 12 rows · 63 % of tonnage »
+  = couverture des lignes affichées (somme de leurs parts après). Une seule représentation par mesure :
+  un quadrant et un « dumbbell » de part ont été essayés puis retirés comme redondants (Mathieu, 09-04).
 
 ### Option approuvée
 

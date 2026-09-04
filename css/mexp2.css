@@ -1645,10 +1645,10 @@
 .mx2-lens-row { height: 36px; border-top: 1px solid rgba(255,255,255,0.05); transition: background 0.12s; }
 [data-theme="light"] .mx2-lens-row { border-top-color: rgba(0,41,58,0.06); }
 .mx2-lens-row:hover { background: var(--mx2-accent-soft); }
-.mx2-lens-td-id { width: 24%; overflow: hidden; }   /* fixed layout: widths from the header row; the name ellipsises */
-.mx2-lens-td-eff { width: 22%; }
-.mx2-lens-td-sh { width: 37%; white-space: nowrap; overflow: hidden; }
-.mx2-lens-td-gm { width: 17%; white-space: nowrap; text-align: right; }
+.mx2-lens-td-id { width: 30%; overflow: hidden; }   /* fixed layout: widths from the header row; the name ellipsises */
+.mx2-lens-td-eff { width: 26%; }
+.mx2-lens-td-sh { width: 26%; white-space: nowrap; overflow: hidden; }
+.mx2-lens-td-gm { width: 18%; white-space: nowrap; text-align: right; }
 
 /* identity: an initials avatar, the name, an optional new/gone tag */
 .mx2-lens-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -1672,44 +1672,14 @@
 .mx2-lens-val.mx2-pos { color: var(--mx2-pos); }
 .mx2-lens-val.mx2-neg { color: var(--mx2-neg); }
 
-/* share: a before → after dumbbell (blue, neutral), the pair, the shift */
-.mx2-lens-sh { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.mx2-lens-db { flex: 0 0 auto; display: block; overflow: visible; }
-.mx2-lens-db-track { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
-.mx2-lens-db-track.is-one { stroke-dasharray: 2 2; }
-[data-theme="light"] .mx2-lens-db-track { stroke: rgba(0,41,58,0.14); }
-.mx2-lens-db-link { stroke: var(--mx2-accent); stroke-opacity: 0.5; stroke-width: 2; }
-.mx2-lens-db-before { fill: none; stroke: var(--mx2-text3); stroke-width: 1.2; }
-.mx2-lens-db-after { fill: var(--mx2-accent); }
-.mx2-lens-sh-t { font: 500 10.5px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; color: var(--mx2-text2); }
-.mx2-lens-shift { font: 700 10px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; color: var(--mx2-text3); }
-
-/* The quadrant above the rows: share shift × margin vs the scope average.
-   Bubbles carry the row's one colour; the right half is tinted by outcome. */
-.mx2-lens-quadwrap { margin: 2px 0 6px; }
-.mx2-lens-quad { display: block; width: 100%; height: auto; overflow: visible; }
-.mx2-lens-q-good { fill: var(--mx2-pos); fill-opacity: 0.045; }
-.mx2-lens-q-bad { fill: var(--mx2-neg); fill-opacity: 0.045; }
-.mx2-lens-q-axis { stroke: rgba(255,255,255,0.14); stroke-width: 1; }
-[data-theme="light"] .mx2-lens-q-axis { stroke: rgba(0,41,58,0.16); }
-.mx2-lens-q-lab { font: 700 8.5px var(--mx2-font); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--mx2-text4); }
-.mx2-lens-q-ax { font: 600 8px var(--mx2-font); fill: var(--mx2-text4); }
-.mx2-lens-q-pt circle { fill-opacity: 0.55; stroke-width: 1.2; transition: fill-opacity 0.12s, stroke-width 0.12s; }
-.mx2-lens-q-pt.is-pos circle { fill: var(--mx2-pos); stroke: var(--mx2-pos); }
-.mx2-lens-q-pt.is-neg circle { fill: var(--mx2-neg); stroke: var(--mx2-neg); }
-.mx2-lens-q-pt.is-hi circle { fill-opacity: 0.9; stroke-width: 2.5; }
-.mx2-lens-q-name { font: 800 8px var(--mx2-mono); fill: var(--mx2-text3); pointer-events: none; }
-.mx2-lens-row.is-hi { background: var(--mx2-accent-soft); }
-.mx2-lens-row.is-link { cursor: pointer; }
-.mx2-lens-row.is-link:focus { outline: none; box-shadow: inset 0 0 0 1px var(--mx2-accent-border); }
-.mx2-lens-row.is-link .mx2-lens-name { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 2px; transition: text-decoration-color 0.12s; }
-.mx2-lens-row.is-link:hover .mx2-lens-name, .mx2-lens-row.is-link.is-hi .mx2-lens-name { text-decoration-color: var(--mx2-accent); }
-
-/* Light theme: the brand navy carries the headers, the blue stays for the accent. */
-[data-theme="light"] .mx2-lens-eyebrow { color: var(--navy, #004A64); }
-[data-theme="light"] .mx2-lens-title, [data-theme="light"] .mx2-lens-name-h { color: var(--navy, #004A64); }
-[data-theme="light"] .mx2-lens-av { background: rgba(0,74,100,0.10); color: var(--navy, #004A64); }
-[data-theme="light"] .mx2-panel-t { color: var(--navy, #004A64); }
+/* share: before → after in the same voice as GM/t, the shift as a quiet pill */
+.mx2-lens-sh { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mx2-lens-sh-t { font: 500 11px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; }
+.mx2-lens-sh-b { color: var(--mx2-text3); }
+.mx2-lens-sh-a { color: var(--mx2-text4); }
+.mx2-lens-sh-c { color: var(--mx2-text); font-weight: 700; }
+.mx2-lens-shift { font: 700 10px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; color: var(--mx2-text3); padding: 3px 6px; border-radius: 999px; background: rgba(255,255,255,0.07); }
+[data-theme="light"] .mx2-lens-shift { background: rgba(0,41,58,0.06); }
 
 /* GM/t: before quiet, after present; no colour */
 .mx2-lens-gm { text-align: right; font: 500 11px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
