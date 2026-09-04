@@ -60,7 +60,7 @@
   }
   function fmtTons(v) {
     if (v == null || isNaN(v)) return '—';
-    return (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' MT';
+    return (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' t';
   }
   // Green-ish positive / red negative color for a primary value.
   function valueColor(v) {
@@ -188,7 +188,7 @@
       '<th>' + _esc(cfg.header) + '</th>' +
       '<th>GP ₱</th>' +
       '<th>% of GP</th>' +
-      '<th>MT</th>' +
+      '<th>Vol (t)</th>' +
       '</tr>';
     table.appendChild(thead);
 
