@@ -34,10 +34,9 @@
   if (!C) throw new Error("mexp2-adapter: mexp2-contract.js must load before this file.");
 
   var S = C.STATE;
-  // Display order on the v1 page: the category-by-month hero, the headline KPI,
-  // the three bridges on one scale (reported | reported->realised | realised),
-  // then the insight prose.
-  var DEFAULT_ORDER = ["trendmatrix", "kpi", "bridge", "g2n", "netbridge", "insight"];
+  // Display order on the v1 page: the category-by-month table (Drill Matrix
+  // box), the reported bridge (Bridge box), the realised bridge (net section).
+  var DEFAULT_ORDER = ["trendmatrix", "bridge", "netbridge"];
 
   function dbg(level, msg, data) {
     try { var d = NS.debug; if (d && typeof d[level] === "function") d[level]("adapter: " + msg, data); } catch (e) { /* silent */ }

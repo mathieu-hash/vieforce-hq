@@ -521,6 +521,9 @@
         if (O.ok) dom = unionDomain(M.spec, O.spec);
         if (dom) M.spec.domain = dom;
       }
+      // opts.drills === false: the host page draws its own reconciling drill
+      // tables under this panel (v1's Cost / Product Mix by SSG), so none here.
+      if (opts.drills === false) M.drills = null;
 
       // header
       setText(R.sub, stale ? COPY.stalePrefix + label : label);
@@ -618,7 +621,7 @@
   }
 
   NS.panel("bridge", makeBridge({
-    id: "bridge", source: "canonical",
+    id: "bridge", source: "canonical", drills: false,
     title: "GM/ton bridge — reported",
     basis: C.BASIS_SUFFIX.reported + " · exact Bennet at customer×SKU · Price and Cost are levers, Mix is composition"
   }));
