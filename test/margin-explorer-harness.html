@@ -16,7 +16,7 @@
   same #pg-margin-explorer div the shell owns.
 
   WHAT IS REAL HERE. The page modules are the repo files, loaded in the exact
-  order app.html uses (app.html:3712-3730). The theme mechanism is the shell's:
+  order app.html uses (app.html:3711-3721). The theme mechanism is the shell's:
   <html data-theme=""> is dark, "light" is light, toggleTheme() is the shell's
   function copied verbatim. The design tokens are the shell's :root and
   [data-theme="light"] blocks copied from app.html:26-103.
@@ -155,7 +155,7 @@ body { margin: 0; display: flex; flex-direction: column; background: var(--bg); 
   <pre class="hx-log" id="hx-log"></pre>
 </div>
 
-<!-- The shell's page frame: .content is the scroll container the page's sticky scope bar sticks inside. -->
+<!-- The shell's page frame: .content is the scroll container the page lives in. -->
 <div class="content">
   <div class="page active" id="pg-margin-explorer"></div>
 </div>
@@ -169,7 +169,6 @@ body { margin: 0; display: flex; flex-direction: column; background: var(--bg); 
  *   READ BY js/margin-explorer.js          window.apiFetch, window.apiPost,
  *                                          window.esc, window.PD,
  *                                          window.VF_REF_MONTH, window.RG
- *   READ BY js/mexp2-controller.js         window.PD, VF_REF_MONTH, RG (seedPatch)
  *   READ BY js/mexp2-panel-trendmatrix.js  window.exportTableToXlsx
  *   READ BY js/margin-explorer-matrix.js   fc, fcn, esc (bare globals, guarded)
  *   READ BY js/margin-explorer-dissection.js  window.Chart (chart.js above)
@@ -340,8 +339,8 @@ function apiPost(endpoint, body) {
 }
 </script>
 
-<!-- Page modules in app.html's mandatory order (app.html:3712-3730). test/mexp2-mock.js
-     is not in app.html; it sits after mexp2-charts.js and before mexp2-url.js, where the
+<!-- Page modules in app.html's mandatory order (app.html:3711-3721). test/mexp2-mock.js
+     is not in app.html; it sits after mexp2-charts.js and before the panels, where the
      ES5 gate loads it. -->
 <script src="/js/mexp2-contract.js"></script>
 <script src="/js/mexp2-wire.js"></script>
@@ -351,13 +350,8 @@ function apiPost(endpoint, body) {
 <script src="/js/mexp2-svg.js"></script>
 <script src="/js/mexp2-charts.js"></script>
 <script src="/test/mexp2-mock.js"></script>
-<script src="/js/mexp2-url.js"></script>
-<script src="/js/mexp2-panel-kpi.js"></script>
-<script src="/js/mexp2-panel-g2n.js"></script>
 <script src="/js/mexp2-panel-bridge.js"></script>
-<script src="/js/mexp2-panel-insight.js"></script>
 <script src="/js/mexp2-panel-trendmatrix.js"></script>
-<script src="/js/mexp2-controller.js"></script>
 <script src="/js/mexp2-adapter.js"></script>
 <script src="/js/margin-explorer-matrix.js"></script>
 <script src="/js/margin-explorer-dissection.js"></script>

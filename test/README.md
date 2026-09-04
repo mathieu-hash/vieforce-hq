@@ -10,7 +10,6 @@ without a backend any other way.
 | `margin-explorer-harness.html` | **The whole Margin Explorer page** on a stub shell, fed by the mock. Start here. |
 | `mexp2-mock.js` | Deterministic raw-wire mock of `/api/margin-explorer` (`window.MEXP2.mock`), six scenarios. |
 | `trendmatrix-test.html` | The category-by-month hero panel alone (`mexp2-panel-trendmatrix.js`). |
-| `mexp-page-test.html` | Earlier, narrower page harness; superseded by `margin-explorer-harness.html`. |
 
 ## Serve it
 
@@ -63,7 +62,7 @@ choice made on that browser (`localStorage.hx_scenario`).
 ## What is real and what is stubbed
 
 Real: every page module from `js/` in the exact order `app.html` loads them
-(app.html:3712-3730), `css/mexp2.css` (not `css/hq.css`, which app.html never loads), the shell's `:root` /
+(app.html:3711-3721), `css/mexp2.css` (not `css/hq.css`, which app.html never loads), the shell's `:root` /
 `[data-theme="light"]` token blocks (copied verbatim from app.html:26-103), the
 formatters `fc fn fp esc fv fvu fvl fcn` (app.html:3967-3980), the topbar
 globals `PD CMP UT VF_REF_MONTH RG SEG` seeded from `localStorage` the way the
