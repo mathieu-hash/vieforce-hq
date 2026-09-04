@@ -15,3 +15,8 @@ _verify_*.png
 _mexp_*.png
 .playwright-mcp/
 _margin_audit/
+
+# local verification artefacts (never deploy)
+test/screenshots/
+_serve.ps1
+_serve.log
