@@ -88,6 +88,7 @@
   var LENS_DIMS = ["ssg", "bu", "region", "customer"];
   var LENS_LABEL = { ssg: "Category", bu: "BU", region: "Region", customer: "Customer" };
   var LENS_TITLE = { ssg: "Category · SSG", bu: "Business unit", region: "Region", customer: "Customer" };
+  var LENS_FILTER = { bu: "bu", region: "region", customer: "customer" };   // the three server filters; ssg is not one
 
   var COPY = {
     universe: "Finished feed (103) only; nets credit notes. Does not tie to the hero.",
@@ -141,6 +142,10 @@
     lensEyebrow: "Composition lenses", lensTitle: "Where the mix moved",
     lensSub: "Standalone one-dimensional share-shifts, net of discount · sorted by |effect| · lenses do not sum to each other nor to the Mix bars",
     lensRows: " rows", lensTotalB: "net effect", lensNone: "No rows in this lens for the window.",
+    lensOf: " of ", lensCov: " of tonnage",
+    lensFilterTip: "Click to filter the page on ", lensQuadTip: "Share shift vs margin against the scope average · bubble = tonnage",
+    quadX: "share shift (pp)", quadY: "GM/t vs scope avg",
+    quadTL: "losing share where it pays", quadTR: "gaining share where it pays", quadBL: "shedding thin margin", quadBR: "gaining share on thin margin",
     lensFoot: "top " + DRIVER_ROWS + " by |effect| · ₱/t vs prior window",
     lensNew: "new", lensGone: "gone", lensNewTip: "Present in the compare window only", lensGoneTip: "Present in the base window only",
     thEffect: "effect ₱/t", thShare: "share before → after", thGm: "GM/t",
@@ -260,7 +265,7 @@
   // NET_BRIDGE.SAME_AS_CANONICAL); significance and cost_components are
   // canonical-only, discount / vs_reported are net-only.
   function modelFor(cb, source) {
-    var f = F(), M = { ok: false, spec: null, badges: [], details: [], anchors: anchorsOf(cb), unavailableReason: null, strip: null, lenses: null, unstable: false, churn: false };
+    var f = F(), M = { ok: false, spec: null, badges: [], details: [], anchors: anchorsOf(cb), unavailableReason: null, strip: null, lenses: null, unstable: false, churn: false, current: null };
     if (!isObj(cb)) return M;
     if (cb.available !== true) { M.unavailableReason = (cb.reason == null) ? "" : String(cb.reason); return M; }
     M.ok = true;
@@ -268,6 +273,7 @@
     var note = cb.note == null ? "" : String(cb.note);
 
     var prior = num(cb.prior_gm_ton), current = num(cb.current_gm_ton);
+    M.current = current;
     var price = num(cb.price), cost = num(cb.cost), cm = num(cb.customer_mix), pm = num(cb.product_mix), mixTotal = num(cb.mix_total);
     var mo = cb.mix_ordering, md = cb.mix_detail, cc = cb.cost_components, win = cb.window;
     var sig = (source === "net") ? null : significanceOf(cb.significance);
@@ -402,10 +408,12 @@
         r = rows[j]; if (!isObj(r)) continue;
         v = num(r.value); if (v === null) continue;
         list.push({ key: r.key == null ? "" : String(r.key), value: v, share0: num(r.share0_pct), share1: num(r.share1_pct),
-          shift: num(r.share_shift_pp), gm0: num(r.gm_ton0), gm1: num(r.gm_ton1) });
+          shift: num(r.share_shift_pp), gm0: num(r.gm_ton0), gm1: num(r.gm_ton1), tons0: num(r.tons0), tons1: num(r.tons1) });
       }
       list.sort(function (a, b) { return Math.abs(b.value) - Math.abs(a.value); });
-      out[dim] = { total: num(lens.total), n: list.length, rows: list.slice(0, DRIVER_ROWS) };
+      var kept = list.slice(0, DRIVER_ROWS), cov = 0, k;
+      for (k = 0; k < kept.length; k++) if (kept[k].share1 !== null) cov += kept[k].share1;
+      out[dim] = { total: num(lens.total), n: list.length, rows: kept, coverage: kept.length ? cov : null };
     }
     return out;
   }
@@ -624,8 +632,21 @@
       if (r.share1 !== null) mkSvg("circle", { cx: x(r.share1), cy: H / 2, r: 3.5, "class": "mx2-lens-db-after" }, svg);
       return svg;
     }
-    function lensRow(r, i, maxAbs, axis) {
-      var f = F(), row = el("tr", "mx2-lens-row"), ident, av, name, tag, eff, track, bar, val, sh, txt, gm, pct, sf, td;
+    function scopeFn() {
+      if (NS.adapter && typeof NS.adapter.applyScope === "function") return NS.adapter.applyScope;
+      if (typeof window.MEXP_applyScope === "function") return window.MEXP_applyScope;
+      return null;
+    }
+    function lensRow(r, i, maxAbs, axis, dim) {
+      var f = F(), row = el("tr", "mx2-lens-row"), ident, av, name, tag, eff, track, bar, val, sh, txt, gm, pct, sf, td, fkey = LENS_FILTER[dim];
+      row.setAttribute("data-mx2-i", String(i));
+      if (fkey && scopeFn()) {
+        row.className += " is-link";
+        row.setAttribute("title", COPY.lensFilterTip + r.key);
+        row.setAttribute("tabindex", "0");
+        row.addEventListener("click", function () { var patch = {}; patch[fkey] = r.key; scopeFn()(patch); });
+        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.keyCode === 13) { var patch = {}; patch[fkey] = r.key; scopeFn()(patch); } });
+      }
       // identity
       ident = el("div", "mx2-lens-id");
       av = el("span", "mx2-lens-av", initials(r.key)); av.setAttribute("aria-hidden", "true");
@@ -660,11 +681,64 @@
       td = el("td", "mx2-lens-td-gm"); td.appendChild(gm); row.appendChild(td);
       return row;
     }
-    function lensCard(dim, L, maxAbs) {
-      var card = el("article", "mx2-lens"), head = el("div", "mx2-lens-h"), left = el("div", "mx2-lens-hl"), right = el("div", "mx2-lens-hr"), tbl, thead, cap, body, i, axis;
+    // The quadrant: x = share shift (pp), y = GM/t after minus the scope's current
+    // GM/t, bubble = tonnage after, colour = the effect sign (the row's one colour).
+    // Top-right is growth where it pays; bottom-right is dilution.
+    function quadrant(L, current) {
+      var f = F(), W = 560, H = 168, PL = 8, PR = 8, PT = 20, PB = 34, cx = PL + (W - PL - PR) / 2, cy = PT + (H - PT - PB) / 2;
+      var pts = [], i, r, mx = 1, my = 50, mt = 0, x, y, rad, g, c, n = 0;
+      if (current === null) return null;
+      for (i = 0; i < L.rows.length; i++) {
+        r = L.rows[i];
+        if (r.shift === null || r.gm1 === null) continue;
+        pts.push({ i: i, r: r, dx: r.shift, dy: r.gm1 - current, t: r.tons1 === null ? 0 : r.tons1 });
+        if (Math.abs(r.shift) > mx) mx = Math.abs(r.shift);
+        if (Math.abs(r.gm1 - current) > my) my = Math.abs(r.gm1 - current);
+        if (r.tons1 !== null && r.tons1 > mt) mt = r.tons1;
+      }
+      if (pts.length < 3) return null;
+      var svg = mkSvg("svg", { "class": "mx2-lens-quad", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": COPY.lensQuadTip });
+      mkSvg("title", {}, svg).textContent = COPY.lensQuadTip;
+      // quadrant tints: right half (gaining share) reads slightly warmer than the left
+      mkSvg("rect", { x: cx, y: PT, width: W - PR - cx, height: cy - PT, "class": "mx2-lens-q-good" }, svg);
+      mkSvg("rect", { x: cx, y: cy, width: W - PR - cx, height: H - PB - cy, "class": "mx2-lens-q-bad" }, svg);
+      mkSvg("line", { x1: PL, x2: W - PR, y1: cy, y2: cy, "class": "mx2-lens-q-axis" }, svg);
+      mkSvg("line", { x1: cx, x2: cx, y1: PT, y2: H - PB, "class": "mx2-lens-q-axis" }, svg);
+      var lab = function (t, xx, yy, anchor, cls) { var e = mkSvg("text", { x: xx, y: yy, "text-anchor": anchor, "class": cls }, svg); e.textContent = t; return e; };
+      // corner labels live in the bands above and below the plot, never under a bubble
+      lab(COPY.quadTL, PL + 4, PT - 8, "start", "mx2-lens-q-lab");
+      lab(COPY.quadTR, W - PR - 4, PT - 8, "end", "mx2-lens-q-lab");
+      lab(COPY.quadBL, PL + 4, H - PB + 12, "start", "mx2-lens-q-lab");
+      lab(COPY.quadBR, W - PR - 4, H - PB + 12, "end", "mx2-lens-q-lab");
+      lab(COPY.quadX + " →", W - PR - 4, H - 4, "end", "mx2-lens-q-ax");
+      lab("↑ " + COPY.quadY, PL + 4, H - 4, "start", "mx2-lens-q-ax");
+      for (i = 0; i < pts.length; i++) {
+        c = pts[i];
+        x = cx + (c.dx / mx) * (W - PL - PR) / 2 * 0.88;
+        y = cy - (c.dy / my) * (H - PT - PB) / 2 * 0.8;
+        rad = 4 + (mt > 0 ? Math.sqrt(c.t / mt) * 9 : 0);
+        g = mkSvg("g", { "class": "mx2-lens-q-pt " + (c.r.value < 0 ? "is-neg" : "is-pos"), "data-mx2-i": String(c.i) }, svg);
+        mkSvg("title", {}, g).textContent = c.r.key + " · " + f.pp(c.r.shift) + " · " + tonOrDash(c.r.gm1) + " (" + signedTon(c.dy) + " vs avg) · " + (c.r.tons1 === null ? DASH : f.mt(c.r.tons1));
+        mkSvg("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: rad.toFixed(1) }, g);
+        n++;
+        if (n <= 3) { var t = mkSvg("text", { x: (x + rad + 3).toFixed(1), y: (y + 3).toFixed(1), "class": "mx2-lens-q-name" }, g); t.textContent = initials(c.r.key); }
+      }
+      return svg;
+    }
+    function bindHighlight(card) {
+      // row ↔ bubble: hover either, both light up (index-matched)
+      function set(i, on) {
+        var nodes = card.querySelectorAll('[data-mx2-i="' + i + '"]'), k;
+        for (k = 0; k < nodes.length; k++) cls(nodes[k], "is-hi", on);
+      }
+      card.addEventListener("mouseover", function (e) { var t = e.target; while (t && t !== card && !(t.getAttribute && t.getAttribute("data-mx2-i"))) t = t.parentNode; if (t && t !== card) set(t.getAttribute("data-mx2-i"), true); });
+      card.addEventListener("mouseout", function (e) { var t = e.target; while (t && t !== card && !(t.getAttribute && t.getAttribute("data-mx2-i"))) t = t.parentNode; if (t && t !== card) set(t.getAttribute("data-mx2-i"), false); });
+    }
+    function lensCard(dim, L, maxAbs, current) {
+      var card = el("article", "mx2-lens"), head = el("div", "mx2-lens-h"), left = el("div", "mx2-lens-hl"), right = el("div", "mx2-lens-hr"), tbl, thead, cap, body, i, axis, q, f = F();
       card.setAttribute("data-mx2-lens", dim);
       left.appendChild(el("span", "mx2-lens-name-h", LENS_TITLE[dim] || LENS_LABEL[dim]));
-      left.appendChild(el("span", "mx2-lens-n", whole(L.n) + COPY.lensRows));
+      left.appendChild(el("span", "mx2-lens-n", (L.n > L.rows.length ? whole(L.rows.length) + COPY.lensOf + whole(L.n) : whole(L.n)) + COPY.lensRows + (L.coverage !== null ? " · " + f.pct(L.coverage) + COPY.lensCov : "")));
       right.appendChild(el("div", "mx2-lens-total " + (L.total !== null && L.total < 0 ? "mx2-neg" : (L.total !== null && L.total > 0 ? "mx2-pos" : "")), signedTon(L.total)));
       right.appendChild(el("div", "mx2-lens-total-b", COPY.lensTotalB));
       head.appendChild(left); head.appendChild(right);
@@ -680,9 +754,12 @@
       thead.appendChild(cap); tbl.appendChild(thead);
       body = el("tbody", "mx2-lens-rows");
       axis = shareAxis(L.rows);
-      for (i = 0; i < L.rows.length; i++) body.appendChild(lensRow(L.rows[i], i, maxAbs, axis));
+      for (i = 0; i < L.rows.length; i++) body.appendChild(lensRow(L.rows[i], i, maxAbs, axis, dim));
       tbl.appendChild(body);
+      q = quadrant(L, current);
+      if (q) { var qw = el("div", "mx2-lens-quadwrap"); qw.appendChild(q); card.appendChild(qw); }
       card.appendChild(tbl);
+      bindHighlight(card);
       card.appendChild(el("div", "mx2-lens-foot", COPY.lensFoot));
       return card;
     }
@@ -703,7 +780,7 @@
       }
       for (i = 0; i < LENS_DIMS.length; i++) {
         dim = LENS_DIMS[i]; if (!lensAvailable(M, dim, scope)) continue;
-        R.lensGrid.appendChild(lensCard(dim, M.lenses[dim], maxAbs)); any = true;
+        R.lensGrid.appendChild(lensCard(dim, M.lenses[dim], maxAbs, M.current)); any = true;
       }
       if (!any) R.lensGrid.appendChild(el("div", "mx2-note mx2-lens-span", COPY.lensNone));
     }

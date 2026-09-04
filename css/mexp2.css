@@ -71,43 +71,43 @@
 :root {
 
   /* -- ground + surfaces ------------------------------------------------- */
-  --mx2-bg:            var(--bg, #F5F5F5);   /* page ground, matches shell --bg        */
-  --mx2-surface:       var(--surface, rgba(255,255,255,0.9));    /* panel fill                 */
-  --mx2-surface2:      var(--surface2, rgba(0,74,100,0.06));    /* LOCAL BACKFILL for --surface2 */
-  --mx2-surface3:      var(--surface-hover, rgba(255,255,255,0.98));    /* hover / raised             */
-  --mx2-surface-solid: var(--surface-solid, #FFFFFF);               /* opaque, for drawers        */
+  --mx2-bg:            var(--bg, #00293A);   /* page ground, matches shell --bg        */
+  --mx2-surface:       var(--surface, rgba(0,50,72,0.55));    /* panel fill                 */
+  --mx2-surface2:      var(--surface2, rgba(0,60,85,0.55));    /* LOCAL BACKFILL for --surface2 */
+  --mx2-surface3:      var(--surface-hover, rgba(0,60,85,0.7));    /* hover / raised             */
+  --mx2-surface-solid: var(--surface-solid, #003248);               /* opaque, for drawers        */
   --mx2-sunken:        rgba(0,20,30,0.30);    /* table head, inset strips   */
 
   /* -- lines ------------------------------------------------------------- */
-  --mx2-border:        var(--glass-border, rgba(0,74,100,0.10)); /* LOCAL BACKFILL for --border */
-  --mx2-border-strong: var(--glass-border-hover, rgba(0,74,100,0.16));
-  --mx2-divider:       var(--divider, rgba(0,74,100,0.12)); /* in-table hairlines        */
+  --mx2-border:        var(--glass-border, rgba(255,255,255,0.07)); /* LOCAL BACKFILL for --border */
+  --mx2-border-strong: var(--glass-border-hover, rgba(255,255,255,0.12));
+  --mx2-divider:       var(--divider, rgba(255,255,255,0.10)); /* in-table hairlines        */
 
   /* -- type -------------------------------------------------------------- */
-  --mx2-text:  var(--text, #1A1A1A);
-  --mx2-text2: var(--text2, #444444);
-  --mx2-text3: var(--text3, rgba(68,68,68,0.78));
-  --mx2-text4: var(--text4, rgba(68,68,68,0.58));
+  --mx2-text:  var(--text, #F0F4FA);
+  --mx2-text2: var(--text2, rgba(240,244,250,0.72));
+  --mx2-text3: var(--text3, rgba(240,244,250,0.55));
+  --mx2-text4: var(--text4, rgba(240,244,250,0.42));
 
   /* -- interactive accent ------------------------------------------------ */
-  --mx2-accent:        var(--blue2, #00A8CF);
+  --mx2-accent:        var(--blue, #00AEEF);
   --mx2-accent-fg:     #FFFFFF;                /* text ON the accent fill — white, as .mexp-chip.active */
-  --mx2-accent-soft:   var(--glow-blue, rgba(0,174,239,0.08));
-  --mx2-accent-border: rgba(0,168,207,0.35);
+  --mx2-accent-soft:   var(--glow-blue, rgba(0,174,239,0.12));
+  --mx2-accent-border: rgba(0,174,239,0.30);
 
   /* -- brand (furniture only — NEVER a value sign) ----------------------- */
-  --mx2-brand-green: var(--green, #7AB800);
+  --mx2-brand-green: var(--green, #97D700);
 
   /* -- semantic value signs ---------------------------------------------
      Emerald, not the brand lime, so a good bar cannot be misread as brand
      furniture. Coral-red, not the shell's flat #EF4444, so a negative bar in
      a chart is distinguishable from a shell error chrome sitting beside it. */
-  --mx2-pos:        var(--green, #7AB800);
-  --mx2-pos-soft:   rgba(122,184,0,0.14);
-  --mx2-pos-border: rgba(122,184,0,0.40);
-  --mx2-neg:        var(--red, #DC2626);
-  --mx2-neg-soft:   rgba(220,38,38,0.10);
-  --mx2-neg-border: rgba(220,38,38,0.38);
+  --mx2-pos:        var(--green, #97D700);
+  --mx2-pos-soft:   rgba(151,215,0,0.16);
+  --mx2-pos-border: rgba(151,215,0,0.42);
+  --mx2-neg:        var(--red, #EF4444);
+  --mx2-neg-soft:   rgba(239,68,68,0.16);
+  --mx2-neg-border: rgba(239,68,68,0.42);
 
   /* -- composition / mix — deliberately NON-semantic slate ---------------- */
   --mx2-mix:        #8CA3BC;
@@ -115,22 +115,22 @@
   --mx2-mix-border: rgba(140,163,188,0.40);
 
   /* -- residual ("Unexplained") — gold, per the waterfall spec ------------ */
-  --mx2-resid:        var(--gold, #D7AB26);
+  --mx2-resid:        var(--gold, #FFC72C);
   --mx2-resid-soft:   rgba(215,171,38,0.14);
   --mx2-resid-border: rgba(215,171,38,0.40);
 
   /* -- stale / carryover gold — prev-scope data on screen ----------------- */
-  --mx2-stale:        var(--gold, #D7AB26);
-  --mx2-stale-soft:   rgba(215,171,38,0.11);
-  --mx2-stale-border: rgba(215,171,38,0.36);
+  --mx2-stale:        var(--gold, #FFC72C);
+  --mx2-stale-soft:   rgba(255,199,44,0.13);
+  --mx2-stale-border: rgba(255,199,44,0.38);
 
   /* -- bullet chart ------------------------------------------------------ */
   --mx2-bullet-track:  rgba(255,255,255,0.06); /* the un-banded remainder   */
-  --mx2-bullet-value:  var(--blue2, #00A8CF);                /* the actual-value bar      */
-  --mx2-bullet-marker: var(--text, #1A1A1A);                /* comparator tick           */
-  --mx2-band-good:     rgba(122,184,0,0.18);
+  --mx2-bullet-value:  var(--blue, #00AEEF);                /* the actual-value bar      */
+  --mx2-bullet-marker: var(--text, #F0F4FA);                /* comparator tick           */
+  --mx2-band-good:     rgba(151,215,0,0.20);
   --mx2-band-warn:     rgba(255,199,44,0.18);
-  --mx2-band-bad:      rgba(220,38,38,0.14);
+  --mx2-band-bad:      rgba(239,68,68,0.16);
   --mx2-band-rel:      rgba(140,163,188,0.16); /* bands === null: "relative" */
 
   /* -- chart chrome — MUST be legible on BOTH grounds -------------------- */
@@ -144,13 +144,13 @@
   --mx2-tooltip-border: rgba(255,255,255,0.18);
 
   /* -- error chrome ------------------------------------------------------ */
-  --mx2-error:        var(--red, #DC2626);
-  --mx2-error-soft:   rgba(220,38,38,0.07);
-  --mx2-error-border: rgba(220,38,38,0.34);
+  --mx2-error:        var(--red, #EF4444);
+  --mx2-error-soft:   rgba(239,68,68,0.09);
+  --mx2-error-border: rgba(239,68,68,0.40);
 
   /* -- focus ring — one token, used by every interactive element --------- */
-  --mx2-focus:        var(--blue2, #00A8CF);
-  --mx2-focus-shadow: rgba(0,168,207,0.22);
+  --mx2-focus:        var(--cyan, #00C4E8);
+  --mx2-focus-shadow: rgba(0,196,232,0.28);
 
   /* -- skeleton shimmer -------------------------------------------------- */
   --mx2-skel-a: rgba(255,255,255,0.05);
@@ -182,54 +182,54 @@
    ========================================================================== */
 :root[data-theme="light"] {
 
-  --mx2-bg:            #F5F5F5;
-  --mx2-surface:       #FFFFFF;
-  --mx2-surface2:      #EDF1F5;
-  --mx2-surface3:      #E3E9F0;
-  --mx2-surface-solid: #FFFFFF;
+  --mx2-bg:            var(--bg, #F5F5F5);
+  --mx2-surface:       var(--surface, rgba(255,255,255,0.9));
+  --mx2-surface2:      var(--surface2, rgba(0,74,100,0.06));
+  --mx2-surface3:      var(--surface-hover, rgba(255,255,255,0.98));
+  --mx2-surface-solid: var(--surface-solid, #FFFFFF);
   --mx2-sunken:        rgba(0,41,58,0.04);
 
-  --mx2-border:        rgba(0,41,58,0.15);
-  --mx2-border-strong: rgba(0,41,58,0.28);
-  --mx2-divider:       rgba(0,41,58,0.09);
+  --mx2-border:        var(--glass-border, rgba(0,74,100,0.10));
+  --mx2-border-strong: var(--glass-border-hover, rgba(0,74,100,0.16));
+  --mx2-divider:       var(--divider, rgba(0,74,100,0.12));
 
-  --mx2-text:  #10222E;
-  --mx2-text2: #3B4C58;
-  --mx2-text3: rgba(16,34,46,0.68);
-  --mx2-text4: rgba(16,34,46,0.50);
+  --mx2-text:  var(--text, #1A1A1A);
+  --mx2-text2: var(--text2, #444444);
+  --mx2-text3: var(--text3, rgba(68,68,68,0.78));
+  --mx2-text4: var(--text4, rgba(68,68,68,0.58));
 
-  --mx2-accent:        #0089C4;   /* darkened: #00AEEF fails AA on white */
+  --mx2-accent:        var(--blue2, #00A8CF);   /* darkened: #00AEEF fails AA on white */
   --mx2-accent-fg:     #FFFFFF;
-  --mx2-accent-soft:   rgba(0,137,196,0.12);
-  --mx2-accent-border: rgba(0,137,196,0.40);
+  --mx2-accent-soft:   var(--glow-blue, rgba(0,174,239,0.08));
+  --mx2-accent-border: rgba(0,168,207,0.35);
 
-  --mx2-brand-green: #7AB800;     /* shell's own light-mode brand green */
+  --mx2-brand-green: var(--green, #7AB800);     /* shell's own light-mode brand green */
 
-  --mx2-pos:        #067A55;
-  --mx2-pos-soft:   rgba(6,122,85,0.12);
-  --mx2-pos-border: rgba(6,122,85,0.38);
-  --mx2-neg:        #C1362A;
-  --mx2-neg-soft:   rgba(193,54,42,0.10);
-  --mx2-neg-border: rgba(193,54,42,0.38);
+  --mx2-pos:        var(--green, #7AB800);
+  --mx2-pos-soft:   rgba(122,184,0,0.14);
+  --mx2-pos-border: rgba(122,184,0,0.40);
+  --mx2-neg:        var(--red, #DC2626);
+  --mx2-neg-soft:   rgba(220,38,38,0.10);
+  --mx2-neg-border: rgba(220,38,38,0.38);
 
   --mx2-mix:        #55697C;
   --mx2-mix-soft:   rgba(85,105,124,0.13);
   --mx2-mix-border: rgba(85,105,124,0.36);
 
-  --mx2-resid:        #8A6100;
-  --mx2-resid-soft:   rgba(138,97,0,0.11);
-  --mx2-resid-border: rgba(138,97,0,0.36);
+  --mx2-resid:        var(--gold, #D7AB26);
+  --mx2-resid-soft:   rgba(215,171,38,0.14);
+  --mx2-resid-border: rgba(215,171,38,0.40);
 
-  --mx2-stale:        #8A6100;
-  --mx2-stale-soft:   rgba(138,97,0,0.09);
-  --mx2-stale-border: rgba(138,97,0,0.34);
+  --mx2-stale:        var(--gold, #D7AB26);
+  --mx2-stale-soft:   rgba(215,171,38,0.11);
+  --mx2-stale-border: rgba(215,171,38,0.36);
 
   --mx2-bullet-track:  rgba(0,41,58,0.07);
-  --mx2-bullet-value:  #0089C4;
-  --mx2-bullet-marker: #10222E;
-  --mx2-band-good:     rgba(6,122,85,0.18);
+  --mx2-bullet-value:  var(--blue2, #00A8CF);
+  --mx2-bullet-marker: var(--text, #1A1A1A);
+  --mx2-band-good:     rgba(122,184,0,0.18);
   --mx2-band-warn:     rgba(199,141,0,0.20);
-  --mx2-band-bad:      rgba(193,54,42,0.14);
+  --mx2-band-bad:      rgba(220,38,38,0.14);
   --mx2-band-rel:      rgba(85,105,124,0.15);
 
   /* The bug fix, restated for light: these are DARK on a light ground. */
@@ -242,12 +242,12 @@
   --mx2-tooltip-fg:     #10222E;
   --mx2-tooltip-border: rgba(0,41,58,0.18);
 
-  --mx2-error:        #C1362A;
-  --mx2-error-soft:   rgba(193,54,42,0.07);
-  --mx2-error-border: rgba(193,54,42,0.34);
+  --mx2-error:        var(--red, #DC2626);
+  --mx2-error-soft:   rgba(220,38,38,0.07);
+  --mx2-error-border: rgba(220,38,38,0.34);
 
-  --mx2-focus:        #005E87;
-  --mx2-focus-shadow: rgba(0,94,135,0.22);
+  --mx2-focus:        var(--blue2, #00A8CF);
+  --mx2-focus-shadow: rgba(0,168,207,0.22);
 
   --mx2-skel-a: rgba(0,41,58,0.05);
   --mx2-skel-b: rgba(0,41,58,0.12);
@@ -1683,6 +1683,33 @@
 .mx2-lens-db-after { fill: var(--mx2-accent); }
 .mx2-lens-sh-t { font: 500 10.5px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; color: var(--mx2-text2); }
 .mx2-lens-shift { font: 700 10px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; color: var(--mx2-text3); }
+
+/* The quadrant above the rows: share shift × margin vs the scope average.
+   Bubbles carry the row's one colour; the right half is tinted by outcome. */
+.mx2-lens-quadwrap { margin: 2px 0 6px; }
+.mx2-lens-quad { display: block; width: 100%; height: auto; overflow: visible; }
+.mx2-lens-q-good { fill: var(--mx2-pos); fill-opacity: 0.045; }
+.mx2-lens-q-bad { fill: var(--mx2-neg); fill-opacity: 0.045; }
+.mx2-lens-q-axis { stroke: rgba(255,255,255,0.14); stroke-width: 1; }
+[data-theme="light"] .mx2-lens-q-axis { stroke: rgba(0,41,58,0.16); }
+.mx2-lens-q-lab { font: 700 8.5px var(--mx2-font); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--mx2-text4); }
+.mx2-lens-q-ax { font: 600 8px var(--mx2-font); fill: var(--mx2-text4); }
+.mx2-lens-q-pt circle { fill-opacity: 0.55; stroke-width: 1.2; transition: fill-opacity 0.12s, stroke-width 0.12s; }
+.mx2-lens-q-pt.is-pos circle { fill: var(--mx2-pos); stroke: var(--mx2-pos); }
+.mx2-lens-q-pt.is-neg circle { fill: var(--mx2-neg); stroke: var(--mx2-neg); }
+.mx2-lens-q-pt.is-hi circle { fill-opacity: 0.9; stroke-width: 2.5; }
+.mx2-lens-q-name { font: 800 8px var(--mx2-mono); fill: var(--mx2-text3); pointer-events: none; }
+.mx2-lens-row.is-hi { background: var(--mx2-accent-soft); }
+.mx2-lens-row.is-link { cursor: pointer; }
+.mx2-lens-row.is-link:focus { outline: none; box-shadow: inset 0 0 0 1px var(--mx2-accent-border); }
+.mx2-lens-row.is-link .mx2-lens-name { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 2px; transition: text-decoration-color 0.12s; }
+.mx2-lens-row.is-link:hover .mx2-lens-name, .mx2-lens-row.is-link.is-hi .mx2-lens-name { text-decoration-color: var(--mx2-accent); }
+
+/* Light theme: the brand navy carries the headers, the blue stays for the accent. */
+[data-theme="light"] .mx2-lens-eyebrow { color: var(--navy, #004A64); }
+[data-theme="light"] .mx2-lens-title, [data-theme="light"] .mx2-lens-name-h { color: var(--navy, #004A64); }
+[data-theme="light"] .mx2-lens-av { background: rgba(0,74,100,0.10); color: var(--navy, #004A64); }
+[data-theme="light"] .mx2-panel-t { color: var(--navy, #004A64); }
 
 /* GM/t: before quiet, after present; no colour */
 .mx2-lens-gm { text-align: right; font: 500 11px/1 var(--mx2-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
