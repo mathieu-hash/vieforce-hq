@@ -249,7 +249,11 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 350 },
+        // Animation disabled — same Chart.js v4.4.1 + datalabels regression as the Home
+        // combo charts (app.html, verified 2026-04-19): with animation init, bar heights
+        // can remain null and the canvas paints blank. Static render is the safe path.
+        animation: false,
+        animations: false,
         layout: { padding: { top: 22 } },
         plugins: {
           legend: { display: false },
@@ -381,7 +385,9 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 350 },
+        // Animation disabled — Chart.js v4.4.1 + datalabels regression (see MEXP_renderBridge).
+        animation: false,
+        animations: false,
         layout: { padding: { top: 22 } },
         plugins: {
           legend: { display: false },
@@ -474,7 +480,9 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 300 },
+        // Animation disabled — Chart.js v4.4.1 + datalabels regression (see MEXP_renderBridge).
+        animation: false,
+        animations: false,
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: function (item) { return fmt(item.parsed.y); } } }
