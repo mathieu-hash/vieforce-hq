@@ -8,7 +8,7 @@
  *                              discount). The bottom section of the page: the
  *                              net waterfall beside a three-number strip
  *                              (Δ reported · Δ off-invoice discount · Δ realised)
- *                              and ONE drivers table with a lens selector.
+ *                              and the four composition lenses (Category · BU · Region · Customer).
  * ----------------------------------------------------------------------------
  * ONE implementation, two registrations: makeBridge(opts) closes over its own
  * host / refs, so the reported and the realised bridge are the same code with
@@ -87,6 +87,7 @@
   var GATES = C.TRUST_GATES || {};
   var LENS_DIMS = ["ssg", "bu", "region", "customer"];
   var LENS_LABEL = { ssg: "Category", bu: "BU", region: "Region", customer: "Customer" };
+  var LENS_TITLE = { ssg: "Category · SSG", bu: "Business unit", region: "Region", customer: "Customer" };
 
   var COPY = {
     universe: "Finished feed (103) only; nets credit notes. Does not tie to the hero.",
@@ -136,12 +137,13 @@
     stripReported: "Δ reported", stripDiscount: "Δ discount", stripNet: "Δ realised",
     stripReportedB: "GM/t, gross of discount", stripDiscountB: "off-invoice (OINV.DiscSum) per ton", stripNetB: "GM/t, net of discount",
     stripDiscountTip: "A positive discount change lowers realised margin by the same amount.",
-    // net drivers
-    driversT: "Drivers", driversTop: "top " + DRIVER_ROWS, driversTopB: " by |effect|",
-    driversTip: "Each lens is a standalone one-dimensional share-shift over that dimension alone, valued against the average margin. Lenses do not sum to each other nor to the Mix bars; the listed rows are the server's top N, so they do not sum to the lens total.",
-    driversNone: "No rows in this lens for the window.",
-    driversTotal: "lens total ",
-    thKey: "", thEffect: "effect", thShare: "share before → after", thGm: "GM/t before → after",
+    // net composition lenses
+    lensEyebrow: "Composition lenses", lensTitle: "Where the mix moved",
+    lensSub: "Standalone one-dimensional share-shifts, net of discount · sorted by |effect| · lenses do not sum to each other nor to the Mix bars",
+    lensRows: " rows", lensTotalB: "net effect", lensNone: "No rows in this lens for the window.",
+    lensFoot: "top " + DRIVER_ROWS + " by |effect| · ₱/t vs prior window",
+    lensNew: "new", lensGone: "gone", lensNewTip: "Present in the compare window only", lensGoneTip: "Present in the base window only",
+    thEffect: "effect ₱/t", thShare: "share before → after", thGm: "GM/t",
     shiftTip: "share shift "
   };
 
@@ -436,8 +438,6 @@
     var PANEL_ID = opts.id, SOURCE = opts.source, NET = (SOURCE === "net");
     var host = null, R = null, def;
     var detailsOpen = false;          // the details toggle, kept across repaints
-    var lensDim = "ssg";              // the drivers selector, kept across repaints
-    var LAST = { M: null, scope: null };   // what the drivers table was last painted from
 
     function build(hostEl) {
       var head = el("div", "mx2-panel-h"), col = el("div", "mx2-panel-hcol");
@@ -495,19 +495,20 @@
           net: stripCell(COPY.stripNet, COPY.stripNetB, "")
         };
         R.strip.appendChild(R.stripCells.reported.box); R.strip.appendChild(R.stripCells.discount.box); R.strip.appendChild(R.stripCells.net.box);
-        R.drivers = el("div", "mx2-nb-drivers");
-        R.drvHead = el("div", "mx2-nb-drv-h");
-        R.drvTitle = el("span", "mx2-nb-drv-t", COPY.driversT);
-        R.drvTitle.setAttribute("title", COPY.driversTip);
-        R.drvSel = el("select", "mx2-select mx2-nb-sel");
-        R.drvSel.setAttribute("aria-label", "Drivers lens");
-        R.drvSel.addEventListener("change", onLens);
-        R.drvMeta = el("span", "mx2-note mx2-nb-drv-meta", "");
-        R.drvHead.appendChild(R.drvTitle); R.drvHead.appendChild(R.drvSel); R.drvHead.appendChild(R.drvMeta);
-        R.drvBody = el("div", "mx2-nb-drv-body");
-        R.drivers.appendChild(R.drvHead); R.drivers.appendChild(R.drvBody);
         R.side.appendChild(R.strip);
-        R.side.appendChild(R.drivers);
+
+        // The four composition lenses: one full-width section under the grid.
+        R.lenses = el("section", "mx2-lens-sec");
+        R.lenses.setAttribute("aria-label", COPY.lensEyebrow);
+        var lh = el("div", "mx2-lens-sech"), lhl = el("div", "mx2-lens-sechl");
+        lhl.appendChild(el("div", "mx2-lens-eyebrow", COPY.lensEyebrow));
+        lhl.appendChild(el("div", "mx2-lens-title", COPY.lensTitle));
+        lhl.appendChild(el("div", "mx2-lens-sub", COPY.lensSub));
+        R.lensWin = el("div", "mx2-lens-win", "");
+        lh.appendChild(lhl); lh.appendChild(R.lensWin);
+        R.lensGrid = el("div", "mx2-lens-grid");
+        R.lenses.appendChild(lh); R.lenses.appendChild(R.lensGrid);
+        R.body.appendChild(R.lenses);
       }
 
       R.skel = el("div", "mx2-br-skel mx2-skel-rows"); R.skel.setAttribute("data-mx2-for", C.STATE.LOADING_FIRST);
@@ -587,63 +588,124 @@
     }
 
     // ---- net only: the drivers table --------------------------------------
-    function onLens() {
-      lensDim = R.drvSel.value || "ssg";
-      if (LAST.M) paintDrivers(LAST.M, LAST.scope);
-    }
     function lensAvailable(M, dim, scope) {
       if (dim === "bu" && scope && scope.bu && String(scope.bu).toUpperCase() !== "ALL") return false;   // a single BU: the lens has one row
       return !!(M.lenses && M.lenses[dim]);
     }
-    function paintDrivers(M, scope) {
-      var f = F(), i, o, dim, L, t, thead, tr, tb, r, td, chosen = null, first = null;
-      LAST.M = M; LAST.scope = scope;
-      // selector: Category | BU | Region | Customer, BU hidden on a single-BU scope
-      R.drvSel.innerHTML = "";
-      for (i = 0; i < LENS_DIMS.length; i++) {
-        dim = LENS_DIMS[i];
-        if (!lensAvailable(M, dim, scope)) continue;
-        o = el("option", "", LENS_LABEL[dim]); o.value = dim;
-        R.drvSel.appendChild(o);
-        if (first === null) first = dim;
-        if (dim === lensDim) chosen = dim;
-      }
-      if (chosen === null) chosen = first;
-      R.drvBody.innerHTML = "";
-      setText(R.drvMeta, "");
+    // ---- composition lenses -------------------------------------------------
+    // Initials for the avatar: first letters of the first two words, else the
+    // first two letters. "KEY ACCOUNTS" -> KA, "Luzon" -> LU, "J & B AGRIVET" -> JB.
+    function initials(key) {
+      var words = String(key || "").toUpperCase().replace(/[^A-Z0-9 ]+/g, " ").split(/\s+/), out = "", i;
+      for (i = 0; i < words.length && out.length < 2; i++) if (words[i]) out += words[i].charAt(0);
+      if (out.length < 2 && words[0]) out = words[0].slice(0, 2);
+      return out || "?";
+    }
+    // The share axis of one lens: the largest share on either side, rounded up
+    // to a round number so the dumbbells of a lens share one scale.
+    function shareAxis(rows) {
+      var m = 0, i, r;
+      for (i = 0; i < rows.length; i++) { r = rows[i]; if (r.share0 !== null && r.share0 > m) m = r.share0; if (r.share1 !== null && r.share1 > m) m = r.share1; }
+      if (m <= 10) return 10; if (m <= 25) return 25; if (m <= 50) return 50; return 100;
+    }
+    function mkSvg(tag, attrs, parent) {
+      var n = document.createElementNS("http://www.w3.org/2000/svg", tag), k;
+      for (k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, String(attrs[k]));
+      if (parent) parent.appendChild(n);
+      return n;
+    }
+    function dumbbell(r, axis) {
+      var W = 64, H = 12, PAD = 5, svg = mkSvg("svg", { "class": "mx2-lens-db", width: W, height: H, viewBox: "0 0 " + W + " " + H, "aria-hidden": "true" });
+      var x = function (v) { return PAD + (Math.max(0, Math.min(axis, v)) / axis) * (W - 2 * PAD); };
+      var one = (r.share0 === null || r.share1 === null);
+      mkSvg("line", { x1: PAD, x2: W - PAD, y1: H / 2, y2: H / 2, "class": "mx2-lens-db-track" + (one ? " is-one" : "") }, svg);
+      if (!one) mkSvg("line", { x1: x(r.share0), x2: x(r.share1), y1: H / 2, y2: H / 2, "class": "mx2-lens-db-link" }, svg);
+      if (r.share0 !== null) mkSvg("circle", { cx: x(r.share0), cy: H / 2, r: 3.2, "class": "mx2-lens-db-before" }, svg);
+      if (r.share1 !== null) mkSvg("circle", { cx: x(r.share1), cy: H / 2, r: 3.5, "class": "mx2-lens-db-after" }, svg);
+      return svg;
+    }
+    function lensRow(r, i, maxAbs, axis) {
+      var f = F(), row = el("tr", "mx2-lens-row"), ident, av, name, tag, eff, track, bar, val, sh, txt, gm, pct, sf, td;
+      // identity
+      ident = el("div", "mx2-lens-id");
+      av = el("span", "mx2-lens-av", initials(r.key)); av.setAttribute("aria-hidden", "true");
+      name = el("span", "mx2-lens-name", r.key); name.setAttribute("title", r.key);
+      ident.appendChild(av); ident.appendChild(name);
+      if (r.gm0 === null && r.gm1 !== null) { tag = el("span", "mx2-lens-tag is-new", COPY.lensNew); tag.setAttribute("title", COPY.lensNewTip); ident.appendChild(tag); }
+      else if (r.gm1 === null && r.gm0 !== null) { tag = el("span", "mx2-lens-tag is-gone", COPY.lensGone); tag.setAttribute("title", COPY.lensGoneTip); ident.appendChild(tag); }
+      td = el("td", "mx2-lens-td-id"); td.appendChild(ident); row.appendChild(td);
+      // effect: a signed bar from a centred zero axis, on the scale shared by all four lenses
+      eff = el("div", "mx2-lens-eff");
+      track = el("div", "mx2-lens-track");
+      bar = el("span", "mx2-lens-bar " + (r.value < 0 ? "is-neg" : "is-pos"));
+      pct = maxAbs > 0 ? Math.max(1.5, Math.abs(r.value) / maxAbs * 50) : 0;
+      bar.style.width = pct.toFixed(2) + "%";
+      bar.style.animationDelay = (i * 40) + "ms";
+      track.appendChild(bar);
+      val = el("span", "mx2-lens-val " + (r.value < 0 ? "mx2-neg" : (r.value > 0 ? "mx2-pos" : "")), signedTon(r.value));
+      eff.appendChild(track); eff.appendChild(val);
+      td = el("td", "mx2-lens-td-eff"); td.appendChild(eff); row.appendChild(td);
+      // share: dumbbell + before -> after + shift
+      sh = el("div", "mx2-lens-sh");
+      sh.appendChild(dumbbell(r, axis));
+      txt = el("span", "mx2-lens-sh-t", (r.share0 === null ? DASH : f.pct(r.share0)) + ARROW + (r.share1 === null ? DASH : f.pct(r.share1)));
+      sh.appendChild(txt);
+      if (r.shift !== null) { sf = el("span", "mx2-lens-shift", f.pp(r.shift)); sf.setAttribute("title", COPY.shiftTip + f.pp(r.shift)); sh.appendChild(sf); }
+      td = el("td", "mx2-lens-td-sh"); td.appendChild(sh); row.appendChild(td);
+      // GM/t pair
+      gm = el("div", "mx2-lens-gm");
+      gm.appendChild(el("span", "mx2-lens-gm-b", tonOrDash(r.gm0)));
+      gm.appendChild(el("span", "mx2-lens-gm-a", ARROW));
+      gm.appendChild(el("span", "mx2-lens-gm-c", tonOrDash(r.gm1)));
+      td = el("td", "mx2-lens-td-gm"); td.appendChild(gm); row.appendChild(td);
+      return row;
+    }
+    function lensCard(dim, L, maxAbs) {
+      var card = el("article", "mx2-lens"), head = el("div", "mx2-lens-h"), left = el("div", "mx2-lens-hl"), right = el("div", "mx2-lens-hr"), tbl, thead, cap, body, i, axis;
+      card.setAttribute("data-mx2-lens", dim);
+      left.appendChild(el("span", "mx2-lens-name-h", LENS_TITLE[dim] || LENS_LABEL[dim]));
+      left.appendChild(el("span", "mx2-lens-n", whole(L.n) + COPY.lensRows));
+      right.appendChild(el("div", "mx2-lens-total " + (L.total !== null && L.total < 0 ? "mx2-neg" : (L.total !== null && L.total > 0 ? "mx2-pos" : "")), signedTon(L.total)));
+      right.appendChild(el("div", "mx2-lens-total-b", COPY.lensTotalB));
+      head.appendChild(left); head.appendChild(right);
+      card.appendChild(head);
+      if (!L.rows.length) { card.appendChild(el("div", "mx2-note", COPY.lensNone)); return card; }
+      tbl = el("table", "mx2-lens-tbl");
+      tbl.appendChild(el("caption", "mx2-sr", (LENS_TITLE[dim] || LENS_LABEL[dim]) + " " + COPY.lensEyebrow));
+      thead = el("thead"); cap = el("tr", "mx2-lens-cap");
+      cap.appendChild(el("th", "mx2-lens-td-id", LENS_LABEL[dim]));
+      cap.appendChild(el("th", "mx2-lens-td-eff", COPY.thEffect));
+      cap.appendChild(el("th", "mx2-lens-td-sh", COPY.thShare));
+      cap.appendChild(el("th", "mx2-lens-td-gm", COPY.thGm));
+      thead.appendChild(cap); tbl.appendChild(thead);
+      body = el("tbody", "mx2-lens-rows");
+      axis = shareAxis(L.rows);
+      for (i = 0; i < L.rows.length; i++) body.appendChild(lensRow(L.rows[i], i, maxAbs, axis));
+      tbl.appendChild(body);
+      card.appendChild(tbl);
+      card.appendChild(el("div", "mx2-lens-foot", COPY.lensFoot));
+      return card;
+    }
+    function paintLenses(M, scope) {
+      var i, j, dim, L, maxAbs = 0, any = false;
+      R.lensGrid.innerHTML = "";
+      setText(R.lensWin, M.anchors && M.anchors.pair ? M.anchors.pair : "");
       if (M.unstable) {
-        // T1: the split is a modelling artefact — the sentence stands, no table
-        R.drvSel.disabled = true;
-        R.drvBody.appendChild(el("div", "mx2-note mx2-note-strong", (GATES.MIX_ORDERING && GATES.MIX_ORDERING.copy) || COPY.badgeMix));
+        // T1: the split is a modelling artefact: the sentence stands, no lenses
+        R.lensGrid.appendChild(el("div", "mx2-note mx2-note-strong mx2-lens-span", (GATES.MIX_ORDERING && GATES.MIX_ORDERING.copy) || COPY.badgeMix));
         return;
       }
-      R.drvSel.disabled = (chosen === null);
-      if (chosen === null) { R.drvBody.appendChild(el("div", "mx2-note", COPY.driversNone)); return; }
-      R.drvSel.value = chosen;
-      L = M.lenses[chosen];
-      setText(R.drvMeta, COPY.driversTop + (L.n > DRIVER_ROWS ? " of " + whole(L.n) : "") + COPY.driversTopB + " · " + COPY.driversTotal + signedTon(L.total));
-      if (!L.rows.length) { R.drvBody.appendChild(el("div", "mx2-note", COPY.driversNone)); return; }
-      t = el("table", "mx2-tbl mx2-nb-drv-tbl");
-      t.appendChild(el("caption", "mx2-sr", COPY.driversT + " " + LENS_LABEL[chosen]));
-      thead = el("thead"); tr = el("tr");
-      tr.appendChild(el("th", "", LENS_LABEL[chosen]));
-      tr.appendChild(el("th", "mx2-num", COPY.thEffect));
-      tr.appendChild(el("th", "mx2-num", COPY.thShare));
-      tr.appendChild(el("th", "mx2-num", COPY.thGm));
-      thead.appendChild(tr); t.appendChild(thead);
-      tb = el("tbody");
-      for (i = 0; i < L.rows.length; i++) {
-        r = L.rows[i]; tr = el("tr");
-        td = el("td", "mx2-dim-col", r.key); td.setAttribute("title", r.key); tr.appendChild(td);
-        td = el("td", "mx2-num", signedTon(r.value)); cls(td, "mx2-neg", r.value < 0); cls(td, "mx2-pos", r.value > 0); tr.appendChild(td);
-        td = el("td", "mx2-num", (r.share0 === null ? DASH : f.pct(r.share0)) + ARROW + (r.share1 === null ? DASH : f.pct(r.share1)));
-        if (r.shift !== null) td.setAttribute("title", COPY.shiftTip + f.pp(r.shift));
-        tr.appendChild(td);
-        td = el("td", "mx2-num", tonOrDash(r.gm0) + ARROW + tonOrDash(r.gm1)); tr.appendChild(td);
-        tb.appendChild(tr);
+      // one effect scale across the four lenses: same unit, so short bars are information
+      for (i = 0; i < LENS_DIMS.length; i++) {
+        dim = LENS_DIMS[i]; if (!lensAvailable(M, dim, scope)) continue;
+        L = M.lenses[dim];
+        for (j = 0; j < L.rows.length; j++) if (Math.abs(L.rows[j].value) > maxAbs) maxAbs = Math.abs(L.rows[j].value);
       }
-      t.appendChild(tb);
-      R.drvBody.appendChild(t);
+      for (i = 0; i < LENS_DIMS.length; i++) {
+        dim = LENS_DIMS[i]; if (!lensAvailable(M, dim, scope)) continue;
+        R.lensGrid.appendChild(lensCard(dim, M.lenses[dim], maxAbs)); any = true;
+      }
+      if (!any) R.lensGrid.appendChild(el("div", "mx2-note mx2-lens-span", COPY.lensNone));
     }
 
     // Paint one dissection block. `label` is vm.label, or prev.label when stale.
@@ -681,7 +743,7 @@
       setText(R.noBridge, M.unavailableReason !== null ? COPY.noBridgeA + label + COPY.noBridgeB + M.unavailableReason : "");
       show(R.main, R.noBridge, M.unavailableReason !== null, R.badgeRow);
       paintBadges(M);
-      if (NET) { paintStrip(M); paintDrivers(M, scope); show(R.body, R.grid, true); }
+      if (NET) { paintStrip(M); paintLenses(M, scope); show(R.body, R.grid, true); }
 
       // state-block copy that depends on the payload
       setText(R.erroredTitle, (stale || isObj(diss)) ? C.STATE_COPY["errored-stale"] : C.STATE_COPY[C.STATE.ERRORED]);
@@ -740,7 +802,7 @@
           cls(host, "mx2-panel-" + PANEL_ID, false);
           host.innerHTML = "";
         }
-        host = null; R = null; LAST.M = null; LAST.scope = null;
+        host = null; R = null;
       },
 
       // test probes — not used by the controller
