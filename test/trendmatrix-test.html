@@ -11,18 +11,24 @@
   .bar button { font: 700 11px system-ui; padding: 5px 9px; }
   #log { font: 11px/1.5 ui-monospace, monospace; color: #9fb; padding: 6px 20px; white-space: pre-wrap; }
   html[data-theme="light"] #log { color: #063; }
+  #checks { font: 11px/1.6 ui-monospace, monospace; padding: 6px 20px; white-space: pre-wrap; color: #cde; }
+  html[data-theme="light"] #checks { color: #234; }
+  #checks .ok { color: #7d6; } #checks .bad { color: #f77; font-weight: 700; }
 </style>
 </head>
 <body>
 <div class="bar">
   <button data-do="loading">loading-first</button>
   <button data-do="fresh">fresh (happy)</button>
+  <button data-do="wide">fresh + synthetic 24-month spine (vs LY exercisable)</button>
   <button data-do="stale">stale (prev=happy, scope Visayas)</button>
   <button data-do="unavail">unavailable</button>
   <button data-do="empty">diss not returned (errored)</button>
   <button data-do="theme">toggle theme</button>
+  <button data-do="checks">run model checks</button>
 </div>
 <div id="log"></div>
+<div id="checks"></div>
 <div id="pg-margin-explorer-2" class="mx2-wrap"><div id="host" class="mx2-stack"></div></div>
 
 <script src="/js/mexp2-contract.js"></script>
@@ -38,7 +44,7 @@
 <script>
 (function () {
   "use strict";
-  var NS = window.MEXP2, A = NS.adapter, log = document.getElementById("log");
+  var NS = window.MEXP2, A = NS.adapter, log = document.getElementById("log"), checks = document.getElementById("checks");
   function say(s) { log.textContent = (s + "\n" + log.textContent).slice(0, 1500); }
   var SCOPE = { period: "QTD", ref_month: null, region: "ALL", bu: "ALL", customer: null, group_by: "bu", compare: "pp", unit: "kg" };
   var DRILL = [];
@@ -46,6 +52,30 @@
   var dissEnv = NS.mock.rawDiss("happy", { period: "QTD", region: "ALL", bu: "ALL", group_by: "bu", compare: "pp" });
   var diss = dissEnv.dissection;
   var mode = "fresh";
+
+  // A SYNTHETIC 24-month spine shifted one year forward (Oct'25 .. Sep'27) so
+  // that some months have a same-month-last-year on or after the Jan-2026
+  // cutoff. Test fixture only: the real cube spine is 12 months and today no
+  // month has a comparable LY — the panel's header note is the honest state.
+  function ymAdd(ym, n) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + n; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + "-" + ("0" + (m + 1)).slice(-2); }
+  function wideDiss() {
+    var ct = diss.category_trend, months = [], i, j, cats = [], avg = [], c, cells, last = ct.months[ct.months.length - 1], end = ymAdd(last, 12);
+    for (i = 23; i >= 0; i--) months.push(ymAdd(end, -i));
+    for (i = 0; i < ct.categories.length; i++) {
+      c = ct.categories[i]; cells = [];
+      for (j = 0; j < months.length; j++) {
+        var src = c.cells[j % 12], k = (j < 12) ? 0.93 : 1;   // the earlier year runs ~7% lower GM/ton
+        cells.push({ month: months[j], gm_ton: src.gm_ton === null ? null : Math.round(src.gm_ton * k), gm_pct: src.gm_pct === null ? null : +(src.gm_pct * k).toFixed(1), tons: src.tons });
+      }
+      cats.push({ ssg: c.ssg, total_tons: c.total_tons, cells: cells });
+    }
+    for (j = 0; j < months.length; j++) { var a = ct.avg[j % 12], k2 = (j < 12) ? 0.93 : 1; avg.push({ month: months[j], gm_ton: a.gm_ton === null ? null : Math.round(a.gm_ton * k2), gm_pct: a.gm_pct === null ? null : +(a.gm_pct * k2).toFixed(1), tons: a.tons }); }
+    var out = {}, key; for (key in diss) if (Object.prototype.hasOwnProperty.call(diss, key)) out[key] = diss[key];
+    out.category_trend = { available: true, months: months, partial_month: end, categories: cats, avg: avg, note: ct.note + " [SYNTHETIC 24-month spine, +12 months]" };
+    out.base_month = ymAdd(diss.base_month, 12); out.compare_month = ymAdd(diss.compare_month, 12);
+    return out;
+  }
+
   // The ONE scope mechanism, stubbed: log the patch and re-render with it applied.
   A.applyScope = function (patch) {
     say("applyScope " + JSON.stringify(patch));
@@ -63,9 +93,9 @@
   function label() { return SCOPE.period + " · " + (SCOPE.region === "ALL" ? "All regions" : SCOPE.region) + (SCOPE.bu !== "ALL" ? " · " + SCOPE.bu : "") + (SCOPE.customer ? " · customer \"" + SCOPE.customer + "\"" : ""); }
   function render(m) {
     mode = m;
-    var vm, h;
+    var vm, h, d = (m === "wide") ? wideDiss() : diss;
     if (m === "loading") { h = { coreLoading: true, dissLoading: true, scope: SCOPE }; vm = A.vmFromV1(null, null, "k", label(), h); }
-    else if (m === "fresh") { h = { scope: SCOPE }; vm = A.vmFromV1(core, diss, "k", label(), h); }
+    else if (m === "fresh" || m === "wide") { h = { scope: SCOPE }; vm = A.vmFromV1(core, d, "k", label(), h); }
     else if (m === "stale") {
       // renderStale directly: the previous scope's data under the new scope's label.
       h = { dissLoading: true, scope: SCOPE, prev: { key: "p", label: "QTD · All regions", core: NS.api.mapCore(core), diss: NS.api.mapDissection(diss) } };
@@ -79,14 +109,78 @@
     A.renderAll(vm, h);
     say("render " + m + " status(diss)=" + A.phaseStatus(vm, h, "diss") + " scope=" + JSON.stringify(vm.scope));
   }
+
+  // ---- model checks: the pure model against the mock, no DOM ----
+  function runChecks() {
+    // panel.create returns the registered singleton object itself (no factory here)
+    var P = NS.panel.has("trendmatrix") ? NS.panel.create("trendmatrix") : null, out = [], n = 0, bad = 0;
+    if (!P || !P._model) { checks.textContent = "panel probes unavailable"; return; }
+    var d = NS.api.mapDissection(diss), sc = { refMonth: null, drill: [] };
+    function t(name, cond, detail) { n++; if (!cond) bad++; out.push('<span class="' + (cond ? "ok" : "bad") + '">' + (cond ? "PASS" : "FAIL") + "</span> " + name + (detail ? "  — " + detail : "")); }
+    function V(o) { var b = { unit: "ton", window: "trailing", hidden: {}, moving: false, sort: "volume", minMt: 0, ly: false }, k; for (k in o) if (Object.prototype.hasOwnProperty.call(o, k)) b[k] = o[k]; return b; }
+    var M0 = P._model(d, null, sc, V({}), false);
+    t("model ok on happy", M0.ok, M0.rows.length + " rows, " + M0.months.length + " months");
+    t("running month partial", !!M0.partial[M0.months[M0.months.length - 1]]);
+    t("latest complete = month before partial", M0.latest === M0.months[M0.months.length - 2], M0.latest);
+    // a. moving: the mock puts Hog Grower's latest complete month at |z| >= 1.5
+    var Mm = P._model(d, null, sc, V({ moving: true }), false), i, names = [];
+    for (i = 0; i < Mm.rows.length; i++) names.push(Mm.rows[i].ssg);
+    t("moving filter keeps only moving rows", Mm.rows.length >= 1 && Mm.rows.length < M0.rows.length && Mm.movingCount === Mm.rows.length, Mm.movingCount + " of " + Mm.movingOf + " -> " + names.join(", "));
+    t("moving count is over the unfiltered set", Mm.movingOf === M0.rows.length);
+    t("hiddenMoving accounts for the rest", Mm.hiddenMoving === M0.rows.length - Mm.rows.length);
+    // z on the moving row is >= 1.5 and computed from >= 3 points
+    var z = Mm.rows.length ? Mm.rows[0].stats : null;
+    t("moving z >= 1.5 with >= 3 points", !!z && Math.abs(z.z) >= P.MOVING_Z && z.n >= 3, z ? "z=" + z.z.toFixed(2) + " n=" + z.n : "");
+    // the moving test excludes cells under THIN_MT: Untagged carries 2 MT cells
+    var st = P._stats({ "2026-01": { tons: 2, gm_ton: 4519296 }, "2026-02": { tons: 2, gm_ton: 4519296 }, "2026-03": { tons: 2, gm_ton: 4519296 }, "2026-04": { tons: 100, gm_ton: 5000 }, "2026-05": { tons: 100, gm_ton: 5100 }, "2026-06": { tons: 100, gm_ton: 5050 } }, ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"], "2026-06");
+    t("thin cells excluded from the series", st.n === 3 && st.mean === 5050, "n=" + st.n + " mean=" + st.mean);
+    var st2 = P._stats({ "2026-04": { tons: 100, gm_ton: 5000 }, "2026-05": { tons: 100, gm_ton: 5100 } }, ["2026-04", "2026-05"], "2026-05");
+    t("too few points -> no verdict", st2.z === null && st2.moving === false && st2.sd === null);
+    // b. sort
+    function desc(rows, key) { var k, prev = null, ok = true, v; for (k = 0; k < rows.length; k++) { v = key(rows[k]); if (v === null) continue; if (prev !== null && v > prev) ok = false; prev = v; } return ok; }
+    var Ml = P._model(d, null, sc, V({ sort: "latest" }), false);
+    t("sort latest: descending, nulls last", desc(Ml.rows, function (r) { return r.latestV; }) && (Ml.rows[Ml.rows.length - 1].latestV === null || Ml.rows[0].latestV !== null));
+    var Mc = P._model(d, null, sc, V({ sort: "change3" }), false);
+    t("sort 3-month change: descending", desc(Mc.rows, function (r) { return r.change3; }) && Mc.changeFrom !== null, "from " + Mc.changeFrom + " to " + Mc.latest);
+    var Mv = P._model(d, null, sc, V({ sort: "volatility" }), false);
+    t("sort volatility: sd descending", desc(Mv.rows, function (r) { return r.stats ? r.stats.sd : null; }));
+    t("sort volume: tonnage descending", desc(M0.rows, function (r) { return r.tonsShown; }));
+    // c. min MT
+    var mid = M0.rows[Math.floor(M0.rows.length / 2)].tonsShown, Mt = P._model(d, null, sc, V({ minMt: mid }), false), under = 0;
+    for (i = 0; i < M0.rows.length; i++) if (M0.rows[i].tonsShown < mid) under++;
+    t("min MT hides rows under the threshold", Mt.hiddenMin === under && Mt.rows.length === M0.rows.length - under, "min " + mid + " MT hides " + Mt.hiddenMin);
+    t("AVG row untouched by the filters", JSON.stringify(Mt.avg) === JSON.stringify(M0.avg));
+    // d. categories
+    var hid = {}; hid[M0.rows[0].ssg] = true;
+    var Mh = P._model(d, null, sc, V({ hidden: hid }), false);
+    t("category picker hides one row", Mh.hidden === 1 && Mh.rows.length === M0.rows.length - 1);
+    // e. vs LY on the real 12-month spine: nothing comparable, header note says why
+    var My = P._model(d, null, sc, V({ ly: true }), false);
+    t("vs LY on a 12-month spine: no column, note present", My.lyCount === 0 && My.lyNote.length > 0, My.lyNote);
+    // e. vs LY on the synthetic 24-month spine: comparable only on/after the cutoff
+    var dw = NS.api.mapDissection(wideDiss()), Mw = P._model(dw, null, sc, V({ ly: true }), false), k, allAfter = true, cnt = 0;
+    for (k in Mw.lyOf) if (Object.prototype.hasOwnProperty.call(Mw.lyOf, k)) { cnt++; if (Mw.lyOf[k] < P.LY_CUTOFF) allAfter = false; }
+    t("synthetic spine: LY only on/after " + P.LY_CUTOFF, cnt > 0 && cnt === Mw.lyCount && allAfter && Mw.lyCount < Mw.months.length, Mw.lyCount + " of " + Mw.months.length + " months; note: " + Mw.lyNote);
+    var r0 = Mw.rows[0], m0 = null; for (k in Mw.lyOf) if (Object.prototype.hasOwnProperty.call(Mw.lyOf, k)) { m0 = k; break; }
+    t("LY delta = current - LY in the displayed unit", !!r0 && !!r0.ly[m0] && (r0.ly[m0].none || Math.abs(r0.ly[m0].v - (r0.vals[m0].v - P._cell(r0.cells[Mw.lyOf[m0]], "ton").v)) < 1e-9), r0 && r0.ly[m0] ? r0.ssg + " " + m0 + ": " + r0.ly[m0].text : "");
+    // thin guard survives
+    var Mu = P._model(d, null, sc, V({ sort: "volume", minMt: 0 }), false);
+    t("thin-tonnage cells withheld", Mu.withheld > 0, Mu.withheld + " cells");
+    // row click crumb model
+    var Ms = P._model(d, null, { refMonth: null, drill: [{ dim: "ssg", value: M0.rows[1].ssg, label: M0.rows[1].ssg }] }, V({}), false);
+    t("ssg crumb marks the selected row", !!Ms.ssgCrumb && Ms.rows[1].selected === true);
+    checks.innerHTML = (bad ? '<span class="bad">' + bad + " FAILED</span> / " : '<span class="ok">ALL PASS</span> ') + n + " checks\n" + out.join("\n");
+  }
+
   document.querySelector(".bar").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     var d = b.getAttribute("data-do");
     if (d === "theme") { var r = document.documentElement; r.setAttribute("data-theme", r.getAttribute("data-theme") === "light" ? "" : "light"); return; }
+    if (d === "checks") { runChecks(); return; }
     render(d);
   });
   render("loading");
-  setTimeout(function () { render("fresh"); }, 900);
+  setTimeout(function () { render("fresh"); runChecks(); }, 900);
 })();
 </script>
 </body>
