@@ -49,7 +49,11 @@
     customer: undefined,
     group_by: 'bu',
     compare:  'pp',
-    unit:     'kg'
+    unit:     'kg',
+    // Bridge base window: 'lfl' truncates last month to the days elapsed this month;
+    // 'full' compares against the WHOLE prior month. Bridge panel only — the hero
+    // tiles keep their own vs-PP rule. Ignored on 7D, which is a rolling window.
+    bridge_base: 'lfl'
   };
 
   // Last fetched payload — kept so unit toggle can re-render matrix without refetch.
@@ -77,6 +81,12 @@
     { v: 'ton',  l: '₱/ton' },
     { v: 'gp_pct', l: 'GP%' },
     { v: 'gp',   l: '₱ GP' }
+  ];
+  // Bridge base window. Only offered when the compare month is still running —
+  // once it is complete both modes resolve to the same full month.
+  var BRIDGE_BASES = [
+    { v: 'lfl',  l: 'Same days' },
+    { v: 'full', l: 'Full month' }
   ];
   var PERIODS = [
     { v: '7D',  l: '7D' },
@@ -158,6 +168,8 @@
     '.mexp-panel-t{font-size:12px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;color:var(--text2)}',
     '.mexp-panel-st{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.2px;margin-top:3px;line-height:1.45}',
     '.mexp-panel-hcol{display:flex;flex-direction:column;gap:0}',
+    '.mexp-basemode{display:flex;gap:5px;flex-shrink:0}',
+    '.mexp-basemode .mexp-chip{font-size:10px;padding:4px 9px}',
     '.mexp-canvas-wrap{position:relative;width:100%;min-height:240px;flex:1 1 auto}',
     '.mexp-canvas-wrap canvas{width:100%!important;display:block}',
     // canonical bridge loading hint (overlay, non-destructive — only shown until phase B lands)
@@ -287,6 +299,9 @@
             '<div class="mexp-panel-h"><div class="mexp-panel-hcol">' +
               '<span class="mexp-panel-t" id="mexp-bridge-title">GM/ton Bridge</span>' +
               '<span class="mexp-panel-st">Finished feed · exact Bennet (customer×SKU) · Price &amp; Cost are real levers, Mix is composition</span>' +
+            '</div>' +
+            '<div class="mexp-basemode" id="mexp-bridge-base" style="display:none">' +
+              chipRow('bridge_base', BRIDGE_BASES, STATE.bridge_base) +
             '</div></div>' +
             '<div class="mexp-canvas-wrap"><canvas id="mexp-bridge"></canvas>' +
               '<div class="mexp-bridge-load" id="mexp-bridge-load">loading bridge…</div>' +
@@ -396,6 +411,14 @@
       fetchAndRender();
       return;
     }
+    if (group === 'bridge_base') {
+      // Bridge-only: the hero tiles and matrix don't move, so refetch phase B alone.
+      if (STATE.bridge_base === val) return;
+      STATE.bridge_base = val;
+      setChipActive('bridge_base', val);
+      refetchBridgeOnly();
+      return;
+    }
     if (group === 'region') { STATE.region = val; setChipActive('region', val); }
     else if (group === 'bu') { STATE.bu = val; setChipActive('bu', val); }
     else if (group === 'compare') { STATE.compare = val; setChipActive('compare', val); }
@@ -441,6 +464,8 @@
   function dissectionParams() {
     var p = baseParams();
     p.include = 'dissection';
+    // Bridge-only knob — kept out of baseParams so phase A keeps one cache entry.
+    p.bridge_base = STATE.bridge_base;
     return p;
   }
   // Stable signature of the scope (ignores _t cache-buster + include) so we can
@@ -529,6 +554,15 @@
 
     // Chain phase B (slow) under the SAME seq, so a newer phase A abandons it.
     fetchDissection(seq);
+  }
+
+  // Re-run phase B only (bridge base-window toggle). Bumping fetchSeq is what
+  // supersedes an older phase B — but it would also make an in-flight phase A
+  // abandon its hero/matrix render, so fall back to the full path in that case.
+  function refetchBridgeOnly() {
+    if (typeof window.apiFetch !== 'function') return;
+    if (LAST.coreInFlight || !LAST.hasCore) { fetchAndRender(); return; }
+    fetchDissection(++LAST.fetchSeq);
   }
 
   // ---- Phase B: lazy dissection (5 panels + 12-month category table) ----
@@ -702,13 +736,26 @@
     if (cb.available !== false) LAST.bridgeGood = true;   // a real bridge has painted
     if (load) load.style.display = 'none';
 
-    // Header: "GM/ton Bridge — <base> → <compare>" (+ partial flag).
+    // Header: "GM/ton Bridge — <base> → <compare>". Prefer the explicit labels: once
+    // the window stops being a whole month (7D, or a truncated base) the month keys
+    // describe something other than what the bars were built from.
     if (title) {
       var hdr = 'GM/ton Bridge';
-      if (cb.available !== false && cb.base_month && cb.compare_month) {
-        hdr += ' — ' + cb.base_month + ' → ' + cb.compare_month;
-      }
+      var bl = cb.base_label || cb.base_month, cl = cb.compare_label || cb.compare_month;
+      if (cb.available !== false && bl && cl) hdr += ' — ' + bl + ' → ' + cl;
       title.textContent = hdr;
+    }
+
+    // Base-window toggle: only meaningful while the compare window is still running
+    // AND the period is month-anchored. On 7D (rolling) and on a closed month there is
+    // no choice to make, so don't offer a control that would silently do nothing.
+    var baseBox = $('mexp-bridge-base');
+    if (baseBox) {
+      var offerToggle = cb.available !== false &&
+        cb.base_mode !== 'trailing_window' &&
+        cb.compare_partial === true;
+      baseBox.style.display = offerToggle ? 'flex' : 'none';
+      if (offerToggle) setChipActive('bridge_base', STATE.bridge_base);
     }
 
     if (note) {

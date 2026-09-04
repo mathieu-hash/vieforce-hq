@@ -1,7 +1,7 @@
 // Axiom tests for the v2 GM/ton bridge. Run: node api/lib/__tests__/margin_bridge_v2.test.js
 'use strict'
 const { bridgeExactGMperTon, significance } = require('../margin_bridge_v2')
-const { priorPeriodWindow, nthShippingDay, walkShippingDays } = require('../margin_window')
+const { priorPeriodWindow, nthShippingDay, walkShippingDays, walkShippingDaysBack, resolveLikeForLike, resolveTrailingWindow } = require('../margin_window')
 
 let fails = 0
 const ok = (name, cond, extra) => {
@@ -157,5 +157,66 @@ console.log('\n== significance band ==')
   ok('too few samples degrades gracefully', significance(1, [1, 2]).available === false)
 }
 
-console.log(fails === 0 ? '\nALL TESTS PASSED\n' : `\n${fails} TEST(S) FAILED\n`)
-process.exit(fails === 0 ? 0 : 1)
+console.log('\n== bridge base window: like-for-like vs full prior month ==')
+// The probe stands in for MAX(DocDate) in scope.
+const probeSep4 = async () => [{ d: new Date(2026, 8, 4) }]
+const probeAugDone = async () => [{ d: new Date(2026, 7, 31) }]
+
+async function windowTests() {
+  {
+    const W = await resolveLikeForLike(probeSep4, '', {}, '2026-08', '2026-09')
+    ok('lfl truncates the base month', W.meta.base_window[1] === '2026-08-05', `got ${W.meta.base_window[1]}`)
+    ok('lfl matches shipping days', W.meta.base_shipping_days === W.meta.compare_shipping_days)
+    ok('lfl mix is comparable', W.meta.mix_comparable === true)
+    ok('lfl mode reported', W.meta.base_mode === 'like_for_like')
+  }
+  {
+    const W = await resolveLikeForLike(probeSep4, '', {}, '2026-08', '2026-09', { fullBaseMonth: true })
+    ok('full keeps the whole base month', W.meta.base_window[1] === '2026-08-31', `got ${W.meta.base_window[1]}`)
+    ok('full is NOT like-for-like', W.meta.like_for_like === false)
+    ok('full flags mix as not comparable', W.meta.mix_comparable === false)
+    ok('full leaves the compare side untouched', W.meta.compare_window[1] === '2026-09-04')
+    ok('full mode reported', W.meta.base_mode === 'full_prior_month')
+  }
+  {
+    // A CLOSED compare month: the two modes must resolve to identical windows.
+    const a = await resolveLikeForLike(probeAugDone, '', {}, '2026-07', '2026-08')
+    const b = await resolveLikeForLike(probeAugDone, '', {}, '2026-07', '2026-08', { fullBaseMonth: true })
+    ok('closed month: modes coincide',
+      a.meta.base_window.join() === b.meta.base_window.join() &&
+      a.meta.compare_window.join() === b.meta.compare_window.join())
+    ok('closed month: both stay like-for-like', a.meta.like_for_like === true && b.meta.like_for_like === true)
+  }
+
+  console.log('\n== bridge base window: 7D rolling ==')
+  {
+    // Selected 7D window 2026-08-29 -> 2026-09-04. Aug 30 is a Sunday and Aug 31 a
+    // holiday, so the compare side is 5 shipping days: Aug 29 + Sep 1,2,3,4.
+    const W = await resolveTrailingWindow(probeSep4, '', {}, new Date(2026, 7, 29), new Date(2026, 8, 4))
+    ok('rolling keeps the selected window', W.meta.compare_window.join() === '2026-08-29,2026-09-04', `got ${W.meta.compare_window.join()}`)
+    ok('rolling counts 5 shipping days', W.meta.compare_shipping_days === 5, `got ${W.meta.compare_shipping_days}`)
+    ok('rolling base is the run immediately before', W.meta.base_window.join() === '2026-08-24,2026-08-28', `got ${W.meta.base_window.join()}`)
+    ok('rolling sides are equal length', W.meta.base_shipping_days === W.meta.compare_shipping_days)
+    ok('rolling never anchors on a month', W.meta.base_month === null && W.meta.compare_month === null)
+    ok('rolling mode reported', W.meta.base_mode === 'trailing_window')
+  }
+  {
+    // Posting lag: nothing posted after Sep 2 -> both sides shrink to 3 shipping days.
+    const lag = async () => [{ d: new Date(2026, 8, 2) }]
+    const W = await resolveTrailingWindow(lag, '', {}, new Date(2026, 7, 29), new Date(2026, 8, 4))
+    ok('lag clips the compare side', W.meta.compare_window[1] === '2026-09-02', `got ${W.meta.compare_window[1]}`)
+    ok('lag shrinks the base to match', W.meta.base_shipping_days === 3 && W.meta.compare_shipping_days === 3,
+      `base=${W.meta.base_shipping_days} cmp=${W.meta.compare_shipping_days}`)
+    ok('lag is flagged partial', W.meta.compare_partial === true)
+  }
+  {
+    // The backward walker must skip Sundays exactly as the forward one does.
+    const d = walkShippingDaysBack(new Date(2026, 7, 28), 5)
+    ok('5 shipping days back from Aug 28 lands on Aug 24', d.getDate() === 24, `got ${d.toDateString()}`)
+  }
+
+  console.log(fails === 0 ? '\nALL TESTS PASSED\n' : `\n${fails} TEST(S) FAILED\n`)
+  process.exit(fails === 0 ? 0 : 1)
+}
+
+windowTests()

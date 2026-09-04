@@ -46,6 +46,8 @@ const REGION_PREFIX = { Luzon: 'L-%', Visayas: 'V-%', Mindanao: 'M-%' }
 // all Vismin feed (~70% undercount). See reference_sap_b1_margin_model memory.
 const OLD_LY_SCOPE = '(103,104,105,106,101,102)'
 
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 const norm = (v, allow, def) => { const k = String(v || '').trim().toLowerCase(); return allow.includes(k) ? k : def }
 const normRegion = (r) => { const v = String(r || 'ALL').trim(); return /^(luzon|visayas|mindanao|other)$/i.test(v) ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : 'ALL' }
 
@@ -65,9 +67,13 @@ module.exports = async (req, res) => {
   const customer = (typeof req.query.customer === 'string' && req.query.customer.trim()) ? req.query.customer.trim() : null
   const groupBy = DIMS[norm(req.query.group_by, Object.keys(DIMS), DEFAULT_GROUP_BY)] ? norm(req.query.group_by, Object.keys(DIMS), DEFAULT_GROUP_BY) : DEFAULT_GROUP_BY
   const compare = norm(req.query.compare, ['pp', 'ly'], 'pp')
+  // Bridge base window. 'lfl' (default) truncates the base month to the elapsed
+  // shipping days of the compare month; 'full' keeps the whole prior month. Affects
+  // the dissection bridges ONLY — the hero tiles keep their own vs-PP rule.
+  const bridgeBase = norm(req.query.bridge_base, ['lfl', 'full'], 'lfl')
   const include = new Set(String(req.query.include || 'bridge,trend,movers,gap').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
 
-  const cacheKey = ['mexp_v9', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, [...include].sort().join('+')].join('_')
+  const cacheKey = ['mexp_v9', session.id, session.role, refMonthKey, period, region, bu, customer || '-', groupBy, compare, bridgeBase, [...include].sort().join('+')].join('_')
   const cached = cache.get(cacheKey)
   if (cached) return res.json(cached)
 
@@ -613,7 +619,13 @@ module.exports = async (req, res) => {
           let canonicalBridge = { available: false, reason: 'pre-2026 anchor — customer/SKU codes not comparable across the Jan-2026 consolidation' }
           let netBridge = { available: false, reason: 'pre-2026 anchor' }
           let windowMeta = null
-          if (baseMonth < '2026-01' || cmpMonth < '2026-01') {
+          // 7D = rolling. The bridge follows the SELECTED window, not calendar months.
+          const rollingBridge = period === '7D'
+          // Compact labels for the panel header. Month keys for the month-anchored
+          // periods; explicit date ranges once the window stops being a month.
+          const dayLbl = (iso) => { const [y, m, d] = iso.split('-'); return `${+d} ${MON[+m - 1]}` }
+          const rangeLbl = (w) => (w[0] === w[1] ? dayLbl(w[0]) : `${dayLbl(w[0])} – ${dayLbl(w[1])}`)
+          if (!rollingBridge && (baseMonth < '2026-01' || cmpMonth < '2026-01')) {
             priceDrillOut = { available: false, reason: 'pre-2026 anchor' }
           } else {
             try {
@@ -637,17 +649,29 @@ module.exports = async (req, res) => {
                 LEFT JOIN OCRD C ON C.CardCode=T0.CardCode LEFT JOIN OCRG G ON G.GroupCode=C.GroupCode
                 WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
                   AND T0.DocDate>=@c0 AND T0.DocDate<@c1 ${dw}`
-              const W = await mwin.resolveLikeForLike(query, probeSql, dp, baseMonth, cmpMonth)
+              //
+              // 7D is a ROLLING period and has no month anchor. Sending it through the
+              // month resolver produced a Jul->Aug full-month bridge under a 7-day header.
+              // Route it to the trailing-window resolver instead, which compares the
+              // selected days against the equal run of shipping days before them.
+              const W = rollingBridge
+                ? await mwin.resolveTrailingWindow(query, probeSql, dp, dateFrom, dateTo)
+                : await mwin.resolveLikeForLike(query, probeSql, dp, baseMonth, cmpMonth, { fullBaseMonth: bridgeBase === 'full' })
               const b0 = W.b0, b1 = W.b1, c0 = W.c0, c1 = W.c1
               dp.b0 = b0; dp.b1 = b1; dp.c0 = c0; dp.c1 = c1
               windowMeta = W.meta
+              // A rolling base window can reach back across the Jan-2026 consolidation,
+              // where customer/SKU codes were re-coded and live rows simply stop.
+              if (b0 < MIGRATION_CUTOFF) {
+                throw Object.assign(new Error('base window crosses the Jan-2026 consolidation'), { softBridge: true })
+              }
               // `disc` = OINV.DiscSum allocated to the line pro-rata on LineTotal. It is NOT
               // in LineTotal/GrssProfit (verified: DocTotal = SUM(LineTotal) - DiscSum + VatSum
               // + TotalExpns reconciles on 10,555/10,555 discounted 2026 invoices), so carrying
               // it here is what makes the NET bridge below possible.
               const DRILL_SQL = `
-                SELECT ym, ssg, sku, name, cust, custname, bu, region, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp, SUM(disc) disc FROM (
-                  SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
+                SELECT win, ssg, sku, name, cust, custname, bu, region, SUM(rev) rev, SUM(kg) kg, SUM(gp) gp, SUM(disc) disc FROM (
+                  SELECT CASE WHEN T0.DocDate>=@c0 AND T0.DocDate<@c1 THEN 'C' ELSE 'B' END win, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
                     ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
                     T1.LineTotal rev, T1.InvQty kg, T1.GrssProfit gp,
@@ -659,7 +683,7 @@ module.exports = async (req, res) => {
                   WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
                   UNION ALL
-                  SELECT FORMAT(T0.DocDate,'yyyy-MM') ym, ISNULL(S.Name,'UNSPEC') ssg,
+                  SELECT CASE WHEN T0.DocDate>=@c0 AND T0.DocDate<@c1 THEN 'C' ELSE 'B' END win, ISNULL(S.Name,'UNSPEC') ssg,
                     T1.ItemCode sku, T2.ItemName name, T0.CardCode cust, T0.CardName custname,
                     ISNULL(G.GroupName,'UNSPEC') bu, ${REGION_CASE} region,
                     -T1.LineTotal rev, -T1.InvQty kg, -T1.GrssProfit gp,
@@ -670,11 +694,14 @@ module.exports = async (req, res) => {
                   LEFT JOIN [@OITMSSG] S ON S.Code=T2.U_SSG
                   WHERE T0.CANCELED='N' AND T1.InvQty>0 AND T2.ItmsGrpCod=103
                     AND ((T0.DocDate>=@b0 AND T0.DocDate<@b1) OR (T0.DocDate>=@c0 AND T0.DocDate<@c1)) ${dw}
-                ) X GROUP BY ym, ssg, sku, name, cust, custname, bu, region`
+                ) X GROUP BY win, ssg, sku, name, cust, custname, bu, region`
               const drillRaw = await query(DRILL_SQL, dp)
               const toRow = r => ({ ssg: r.ssg || 'UNSPEC', sku: r.sku, name: r.name, cust: r.cust, custname: r.custname, bu: r.bu || 'UNSPEC', region: r.region || 'UNSPEC', rev: Number(r.rev) || 0, revenue: Number(r.rev) || 0, kg: Number(r.kg) || 0, gp: Number(r.gp) || 0, disc: Number(r.disc) || 0 })
-              const baseRows = drillRaw.filter(r => r.ym === baseMonth).map(toRow)
-              const cmpRows = drillRaw.filter(r => r.ym === cmpMonth).map(toRow)
+              // Rows are tagged by WINDOW, not by month key. A month key cannot express a
+              // rolling 7D pair (both sides can sit inside one month, or straddle two), and
+              // it silently dropped every row once the windows stopped being whole months.
+              const baseRows = drillRaw.filter(r => r.win === 'B').map(toRow)
+              const cmpRows = drillRaw.filter(r => r.win === 'C').map(toRow)
               const pd = cube.priceDrill(baseRows, cmpRows)
 
               // Per-SKU booked-COGS component ratio (RM/Packaging/Feedtag) from production
@@ -717,7 +744,10 @@ module.exports = async (req, res) => {
                 // pairs at the SAME shipping-day truncation. Without it a 0.5-sigma wiggle
                 // reads exactly like a finding.
                 let sig = { available: false, reason: 'not computed' }
-                try {
+                // The band is built from MONTH-over-MONTH deltas. A 7-day delta measured
+                // against it would read as "noise" almost by construction, so don't print it.
+                if (rollingBridge) sig = { available: false, reason: 'noise band is month-over-month; not applicable to a rolling window' }
+                else try {
                   const hist = cube.trajectory(C.rows, C.months)
                     .filter(t => !t.partial && Number.isFinite(t.gm_per_ton))
                     .map(t => t.gm_per_ton)
@@ -728,11 +758,23 @@ module.exports = async (req, res) => {
 
                 const oneSided = cbk.mix_detail.one_sided_share
                 const churny = cbk.mix_detail.churn_dominated
+                // What the panel header should actually say. The month keys stop describing
+                // the bridge the moment the window is not a whole month, so carry explicit
+                // labels rather than letting the front-end infer them.
+                const baseLbl = rollingBridge ? rangeLbl(W.meta.base_window) : baseMonth
+                const cmpLbl = rollingBridge ? rangeLbl(W.meta.compare_window) : cmpMonth
+                // NULL, not the month the window happens to sit in. A rolling bridge has no
+                // month anchor, and leaving a plausible-looking month key here is how the
+                // panel lied in the first place — any consumer must read the labels/windows.
+                const baseM = rollingBridge ? null : baseMonth
+                const cmpM = rollingBridge ? null : cmpMonth
                 canonicalBridge = {
                   available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
                   method: 'Bennet indicator · customer×SKU · exact · symmetric mix split',
                   window: W.meta,
-                  base_month: baseMonth, compare_month: cmpMonth,
+                  base_month: baseM, compare_month: cmpM,
+                  base_label: baseLbl, compare_label: cmpLbl,
+                  base_mode: W.meta.base_mode,
                   compare_partial: W.meta.compare_partial, like_for_like: W.meta.like_for_like,
                   prior_gm_ton: R(cbk.gm0_per_ton), current_gm_ton: R(cbk.gm1_per_ton),
                   delta: R(cbk.delta),
@@ -787,8 +829,14 @@ module.exports = async (req, res) => {
                     .map(x => ({ ssg: x.key === 'UNSPEC' ? 'Untagged' : x.key, value: R(x.value) }))
                     .filter(x => x.value !== 0),
 
-                  note: 'GM/ton bridge · finished feed (103) · ' + baseMonth + ' → ' + cmpMonth
-                    + (W.meta.compare_partial ? ` · LIKE-FOR-LIKE: both sides truncated to ${W.meta.compare_shipping_days} shipping days (month ${W.meta.month_progress_pct}% elapsed, last posted ${W.meta.last_posted_date})` : ' · both months complete')
+                  note: 'GM/ton bridge · finished feed (103) · ' + baseLbl + ' → ' + cmpLbl
+                    + (W.meta.base_mode === 'trailing_window'
+                        ? ` · ROLLING: ${W.meta.compare_shipping_days} shipping days to ${W.meta.last_posted_date} vs the ${W.meta.base_shipping_days} shipping days immediately before`
+                        : W.meta.base_mode === 'full_prior_month'
+                          ? ` · FULL PRIOR MONTH: all ${W.meta.base_shipping_days} shipping days of ${baseMonth} vs ${W.meta.compare_shipping_days} elapsed (month ${W.meta.month_progress_pct}% in, last posted ${W.meta.last_posted_date}). Price & Cost stay valid; the Mix bars are NOT like-for-like and are inflated by customers who simply have not ordered yet`
+                          : W.meta.compare_partial
+                            ? ` · LIKE-FOR-LIKE: both sides truncated to ${W.meta.compare_shipping_days} shipping days (month ${W.meta.month_progress_pct}% elapsed, last posted ${W.meta.last_posted_date})`
+                            : ' · both windows complete')
                     + '. Price & Cost = SAME customer + SAME SKU. Customer/BU Mix & Product Mix = composition; their split is the symmetric mean of both decomposition orderings — see mix_ordering for the range. Bennet decomposition, reconciles exactly.'
                     + (churny ? ` WARNING: mix is churn-dominated (${Math.round(oneSided * 100)}% of the mix effect comes from customer×SKU cells present in only one window; matched cells cover only ${Math.round(cbk.mix_detail.matched_kg_share * 100)}% of current tonnage). That is timing, not a commercial shift — do not headline the mix split.` : '')
                 }
@@ -809,7 +857,9 @@ module.exports = async (req, res) => {
                       available: true, unit: 'php_per_ton', scope: 'finished_feed_103',
                       method: 'Bennet indicator · customer×SKU · exact · NET of off-invoice discount',
                       window: W.meta,
-                      base_month: baseMonth, compare_month: cmpMonth,
+                      base_month: baseM, compare_month: cmpM,
+                      base_label: baseLbl, compare_label: cmpLbl,
+                      base_mode: W.meta.base_mode,
                       compare_partial: W.meta.compare_partial, like_for_like: W.meta.like_for_like,
                       prior_gm_ton: R(nbk.gm0_per_ton), current_gm_ton: R(nbk.gm1_per_ton), delta: R(nbk.delta),
                       price: R(nbk.price), cost: R(nbk.cost),
@@ -874,6 +924,12 @@ module.exports = async (req, res) => {
             } catch (e) {
               console.warn('[margin-explorer] price drill failed:', e.message)
               priceDrillOut = { available: false, reason: e.message }
+              // A window we deliberately refused (e.g. a rolling base reaching back across
+              // the Jan-2026 consolidation) must say so, not inherit the pre-2026 default.
+              if (e.softBridge) {
+                canonicalBridge = { available: false, reason: e.message }
+                netBridge = { available: false, reason: e.message }
+              }
             }
           }
 

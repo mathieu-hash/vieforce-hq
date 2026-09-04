@@ -52,10 +52,18 @@ function nthShippingDay(ym, target) {
  *           @c0 / @c1 bound. Must apply the SAME scope + filters as the bridge,
  *           otherwise the elapsed window is measured on a different universe.
  * scopeParams: extra bound params the scope SQL needs (region prefix, bu, cust).
+ * opts.fullBaseMonth: OPT-OUT of the truncation — keep the WHOLE base month against
+ *   the elapsed compare window. Asked for deliberately ("how does my current run-rate
+ *   price/cost compare against all of last month?"), and legitimate for the Price and
+ *   Cost bars, which compare the same customer x SKU cells either way. It is NOT
+ *   legitimate for the Mix bars: against 26 base days, a customer that simply has not
+ *   ordered yet reads as an exit and its entire weight lands in Mix. Callers must
+ *   surface meta.base_mode / meta.mix_comparable rather than print the mix silently.
  *
  * Returns { b0, b1, c0, c1, meta }. b1/c1 are EXCLUSIVE upper bounds.
  */
-async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpMonth) {
+async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpMonth, opts) {
+  const fullBase = Boolean(opts && opts.fullBaseMonth)
   const c0 = firstOf(cmpMonth)
   const cMonthEnd = lastOf(cmpMonth)
   const cNext = nextMonthOf(cmpMonth)
@@ -79,10 +87,12 @@ async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpM
   const partial = cShipDays < cShipDaysFull
 
   // Base window: same elapsed shipping days when the compare month is partial;
-  // the whole month when it is complete.
+  // the whole month when it is complete — or when the caller explicitly asked for the
+  // full prior month. When the compare month is complete the two modes coincide.
   const b0 = firstOf(baseMonth)
   const bMonthEnd = lastOf(baseMonth)
-  const bEnd = partial ? nthShippingDay(baseMonth, cShipDays) : bMonthEnd
+  const truncated = partial && !fullBase
+  const bEnd = truncated ? nthShippingDay(baseMonth, cShipDays) : bMonthEnd
   const bShipDays = countShippingDays(b0, bEnd)
 
   return {
@@ -92,7 +102,11 @@ async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpM
       base_month: baseMonth,
       compare_month: cmpMonth,
       compare_partial: partial,
-      like_for_like: partial ? bShipDays === cShipDays : true,
+      base_mode: fullBase ? 'full_prior_month' : 'like_for_like',
+      like_for_like: truncated ? bShipDays === cShipDays : !partial,
+      // Price/Cost compare matched customer x SKU cells and survive an unequal window.
+      // Mix is a share shift and does not: unmatched days become phantom entries/exits.
+      mix_comparable: !(partial && fullBase),
       base_window: [fmt(b0), fmt(bEnd)],
       compare_window: [fmt(c0), fmt(cEnd)],
       base_shipping_days: bShipDays,
@@ -101,9 +115,11 @@ async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpM
       month_progress_pct: cShipDaysFull > 0 ? Math.round((cShipDays / cShipDaysFull) * 1000) / 10 : null,
       last_posted_date: fmt(cEnd),
       last_posted_source: probeOk ? 'MAX(DocDate) in scope' : 'fallback: month end (probe failed)',
-      note: partial
-        ? `Base month truncated to the same ${cShipDays} shipping days as the elapsed compare window. Both sides exclude Sundays and PH holidays.`
-        : 'Both windows are complete months.',
+      note: !partial
+        ? 'Both windows are complete months.'
+        : truncated
+          ? `Base month truncated to the same ${cShipDays} shipping days as the elapsed compare window. Both sides exclude Sundays and PH holidays.`
+          : `FULL PRIOR MONTH: all ${bShipDays} shipping days of ${baseMonth} against the ${cShipDays} elapsed shipping days of ${cmpMonth}. Price and Cost stay valid (same customer + same SKU either way). The Mix bars do NOT — a customer that has simply not ordered yet this month reads as an exit against a full base month, so mix is inflated by timing.`,
     },
   }
 }
@@ -111,6 +127,89 @@ async function resolveLikeForLike(runner, scopeSql, scopeParams, baseMonth, cmpM
 function fmt(d) {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${dd}`
+}
+
+// Walk BACKWARD from `end` until `n` shipping days have been consumed. Returns the
+// first day of that run (so [result, end] contains exactly n shipping days).
+function walkShippingDaysBack(end, n) {
+  const cur = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  if (n <= 0) return cur
+  let count = 0, last = cur
+  for (let guard = 0; guard < 400; guard++) {
+    if (!isClosed(cur)) {
+      count++
+      last = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate())
+      if (count >= n) return last
+    }
+    cur.setDate(cur.getDate() - 1)
+  }
+  return last
+}
+
+/**
+ * Window pair for a ROLLING period (7D) — the case the month-anchored resolver above
+ * cannot express at all.
+ *
+ * THE BUG THIS FIXES: the dissection bridge derived its anchors from the calendar
+ * months the selected window happens to touch, then dropped the running month as
+ * "partial". On 7D that reduced Aug 29 -> Sep 4 to the month pair Jul -> Aug: the
+ * panel silently answered a question nobody asked, with a full-month bridge sitting
+ * under a 7-day header. Nothing in the payload said the window had been replaced.
+ *
+ * THE RULE: compare window = the selected range, clipped to the last date that has
+ * actually posted in scope. Base window = the equal number of SHIPPING days
+ * immediately preceding it. Shipping days, not calendar days, so a Sunday inside one
+ * side does not quietly buy the other side an extra trading day.
+ *
+ * Same { b0, b1, c0, c1, meta } contract as resolveLikeForLike. b1/c1 EXCLUSIVE.
+ */
+async function resolveTrailingWindow(runner, scopeSql, scopeParams, dateFrom, dateTo) {
+  const c0 = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate())
+  const selEnd = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate())
+
+  // Same data-driven end as the month resolver: posting lag means `dateTo` (today) is
+  // usually ahead of the last invoice actually in scope.
+  let cEnd = selEnd
+  let probeOk = false
+  try {
+    const r = await runner(scopeSql, { ...scopeParams, c0, c1: addDays(selEnd, 1) })
+    const d = r && r[0] && r[0].d ? new Date(r[0].d) : null
+    if (d && !isNaN(d)) {
+      const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      if (dd < cEnd) cEnd = dd
+      probeOk = true
+    }
+  } catch (e) {
+    probeOk = false
+  }
+  if (cEnd < c0) cEnd = c0
+
+  const cShipDays = countShippingDays(c0, cEnd)
+  const bEnd = addDays(c0, -1)
+  const b0 = walkShippingDaysBack(bEnd, cShipDays)
+  const bShipDays = countShippingDays(b0, bEnd)
+
+  return {
+    b0, b1: addDays(bEnd, 1),
+    c0, c1: addDays(cEnd, 1),
+    meta: {
+      base_month: null,
+      compare_month: null,
+      compare_partial: cEnd < selEnd,
+      base_mode: 'trailing_window',
+      like_for_like: bShipDays === cShipDays,
+      mix_comparable: bShipDays === cShipDays,
+      base_window: [fmt(b0), fmt(bEnd)],
+      compare_window: [fmt(c0), fmt(cEnd)],
+      base_shipping_days: bShipDays,
+      compare_shipping_days: cShipDays,
+      compare_shipping_days_full_month: null,
+      month_progress_pct: null,
+      last_posted_date: fmt(cEnd),
+      last_posted_source: probeOk ? 'MAX(DocDate) in scope' : 'fallback: selected range end (probe failed)',
+      note: `Rolling window: the ${cShipDays} shipping days ending ${fmt(cEnd)} against the ${bShipDays} shipping days immediately before them. Both sides exclude Sundays and PH holidays.`,
+    },
+  }
 }
 
 // Walk forward from `start` until `n` shipping days have been consumed, never past
@@ -175,4 +274,4 @@ function priorPeriodWindow(period, dateFrom, effectiveEnd) {
   }
 }
 
-module.exports = { resolveLikeForLike, nthShippingDay, walkShippingDays, priorPeriodWindow, firstOf, lastOf, nextMonthOf, fmt }
+module.exports = { resolveLikeForLike, resolveTrailingWindow, nthShippingDay, walkShippingDays, walkShippingDaysBack, priorPeriodWindow, firstOf, lastOf, nextMonthOf, addDays, fmt }
