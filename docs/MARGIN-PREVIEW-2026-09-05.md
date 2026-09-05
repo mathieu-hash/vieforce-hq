@@ -57,3 +57,9 @@ Merged-view validation: all 177 repository tests pass. Browser verified customer
 
 ## VieForce visual system
 Preview styling now follows the current app.html brand system: Montserrat interface text, Source Code Pro numbers, the existing logo, navy/cyan palette, lime/red effects, shared radii and surface/table treatments. The preview theme stylesheet mirrors the current HQ dark/light token definitions; it does not import the older hq.css palette. Its theme control reads/writes the existing vf_theme preference and synchronizes changes from other same-origin tabs. No live-page styles or calculations changed. Browser checked dark/light rendering and retained numeric reconciliation. Brand assets are served by the local-only review adapter as well as normal production static hosting.
+
+
+## Native HQ release
+User authorized deployment as “Margin Explorer V2” directly below the existing Margin Explorer. The new native page uses the HQ shell and original matrix table spacing, typography and borders with the approved V2 content. The reusable controller namespaces static and generated IDs, and all page CSS is scoped, leaving the existing explorer intact. The standalone preview remains available. V2 API access remains executive/service only.
+
+Pre-release validation: 177 tests, client scan, complete CSS scope audit, mounted-page category drill and pricing scenario verified. Existing deployed margin API returned 200. Direct laptop SAP read attempt timed out (VPN gate); new query validation must run through Cloud Run immediately after deploy. Deploy via push to master triggers API and frontend releases. No credentials, frozen extracts or local harness included.

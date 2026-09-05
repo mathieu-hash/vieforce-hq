@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/css/dsm-home.css">
 <link rel="stylesheet" href="/css/rsm-home.css">
 <link rel="stylesheet" href="/css/table-numbers.css">
+<link rel="stylesheet" href="/css/margin-explorer-v2.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -1053,9 +1054,9 @@ body{
       <div class="nav-item" onclick="navTo('pg-margin-explorer',this)">
         <span class="nav-icon">🔬</span><span class="nav-label">Margin Explorer</span>
       </div>
-      <a class="nav-item" href="margin-preview.html" style="text-decoration:none" target="_blank" rel="noopener">
-        <span class="nav-icon">↗</span><span class="nav-label">Margin Preview</span>
-      </a>
+      <div class="nav-item" onclick="navTo('pg-margin-explorer-v2',this)">
+        <span class="nav-icon">🔬</span><span class="nav-label">Margin Explorer V2</span>
+      </div>
       <div class="nav-item" onclick="navTo('pg-team',this)">
         <span class="nav-icon">👥</span><span class="nav-label">Sales Team</span>
       </div>
@@ -2682,6 +2683,7 @@ body{
       <!-- ===== MARGIN EXPLORER ===== -->
       <!-- Controller (js/margin-explorer.js) fills this section on navTo('pg-margin-explorer'). -->
       <div class="page" id="pg-margin-explorer"></div>
+      <div class="page" id="pg-margin-explorer-v2"></div>
 
 
       <!-- ===== INSIGHTS — v2 REBUILD (2026-04-18) ===== -->
@@ -3711,6 +3713,8 @@ body{
 <script src="js/margin-explorer-dissection.js"></script>
 <script src="js/margin-explorer-netbridge.js"></script>
 <script src="js/margin-explorer.js"></script>
+<script src="js/margin-preview.js"></script>
+<script src="js/margin-explorer-v2.js"></script>
 <script>
 /* ===== AUTH GATE ===== */
 var S = requireAuth();
@@ -3931,7 +3935,7 @@ function initApp(s) {
   }
   setTimeout(injectExportButtons, 400);      // initial inject after DOM + first-load renders
   // Auto-refresh every 60s
-  setInterval(function(){ if(PG==='pg-margin-explorer') return; DC = {}; loadPage(PG); stampRefresh(); }, 60000);
+  setInterval(function(){ if(PG==='pg-margin-explorer'||PG==='pg-margin-explorer-v2') return; DC = {}; loadPage(PG); stampRefresh(); }, 60000);
   stampRefresh();  // initial stamp
   // Re-inject whenever a page's tables refresh (debounced)
   var exportInjectTimer;
@@ -4084,6 +4088,7 @@ var pageTitles = {
   'pg-custdetail':['Customer Detail',''],
   'pg-margin':['Margin Alerts','YTD'],
   'pg-margin-explorer':['Margin Explorer','Gross-margin analysis'],
+  'pg-margin-explorer-v2':['Margin Explorer V2','Margin analysis and contribution drills'],
   'pg-insights':['Customer Intelligence','Buying Patterns · Whitespace · Growth Vectors'],
   'pg-team':['Sales Team','Org Scorecard · YTD vs Budget'],
   'pg-budget':['Budget & P&L','FY 2026 · vs Actual'],
@@ -4224,6 +4229,7 @@ function loadPage(id){
     case 'pg-customers': loadCust(); break;
     case 'pg-margin': loadMargin(); break;
     case 'pg-margin-explorer': loadMarginExplorer(); break;
+    case 'pg-margin-explorer-v2': loadMarginExplorerV2(); break;
     case 'pg-custdetail': loadCustDetail(); break;
     case 'pg-insights': loadIntelligence(); break;
     case 'pg-team': loadTeam(); break;

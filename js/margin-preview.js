@@ -1,7 +1,7 @@
 /* Separate executive preview. All business data comes from the authenticated endpoint. */
-(function () {
+function mountMarginExplorerV2(root, prefix) {
   'use strict';
-  var $ = function (s) { return document.getElementById(s); };
+  var $ = function (s) { return document.getElementById((prefix || '') + s); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var n = function (v, digits) { return v == null ? '—' : Number(v).toLocaleString('en-PH', { maximumFractionDigits: digits == null ? 0 : digits }); };
   var money = function (v) { return v == null ? '—' : '₱' + n(v); };
@@ -44,7 +44,7 @@
     $('cross-table').textContent = 'Choose columns and build the comparison for the current selection.';
   }
   function breadcrumbs() {
-    $('breadcrumbs').innerHTML = '<button id="back" ' + (!back.length ? 'disabled' : '') + '>← Back</button><button id="clear">All finished feed</button>' + Object.entries(S.filters).map(function (x) { return '<span>›</span><button data-remove="' + x[0] + '">' + esc(D.dimensions[x[0]]) + ': ' + esc((S.labels || {})[x[0]] || x[1]) + ' ×</button>'; }).join('') + '<button id="save-view">Save this view</button><button id="restore-view">Restore saved view</button>';
+    $('breadcrumbs').innerHTML = '<button id="' + (prefix || '') + 'back" ' + (!back.length ? 'disabled' : '') + '>← Back</button><button id="' + (prefix || '') + 'clear">All finished feed</button>' + Object.entries(S.filters).map(function (x) { return '<span>›</span><button data-remove="' + x[0] + '">' + esc(D.dimensions[x[0]]) + ': ' + esc((S.labels || {})[x[0]] || x[1]) + ' ×</button>'; }).join('') + '<button id="' + (prefix || '') + 'save-view">Save this view</button><button id="' + (prefix || '') + 'restore-view">Restore saved view</button>';
     $('back').onclick = function () { if (back.length) { S = back.pop(); controls(); load(); } };
     $('clear').onclick = function () { remember(); S.filters = {}; S.labels = {}; load(); };
     $('breadcrumbs').querySelectorAll('[data-remove]').forEach(function (b) { b.onclick = function () { remember(); delete S.filters[b.dataset.remove]; load(); }; });
@@ -100,7 +100,7 @@
   }
   function detail(r, m, group, filters) {
     var c = r.cells[m];
-    $('detail-body').innerHTML = '<p class="eyebrow">MONTHLY EVIDENCE</p><h2>' + esc(r.name) + '</h2><p>' + month(m) + ' · ' + esc(r.id) + '</p>' + (!c ? '<p>No comparable posted data for this cell.</p>' : '<div class="detail-metrics">' + [['Tons', n(c.tons, 1)], ['Reported GM/t', money(c.gm)], ['After-discount GM/t', money(c.net)], ['Selling price/t', money(c.price)], ['COGS/t', money(c.cost)], ['Total GP', money(c.gp)]].map(function (x) { return '<div><small>' + x[0] + '</small>' + x[1] + '</div>'; }).join('') + '</div>') + '<p class="callout">Monthly aggregates, not invoice evidence. Use Focus to dissect this business further. The current bridge comparison remains fixed.</p><button class="primary" id="detail-focus">Focus this business</button>';
+    $('detail-body').innerHTML = '<p class="eyebrow">MONTHLY EVIDENCE</p><h2>' + esc(r.name) + '</h2><p>' + month(m) + ' · ' + esc(r.id) + '</p>' + (!c ? '<p>No comparable posted data for this cell.</p>' : '<div class="detail-metrics">' + [['Tons', n(c.tons, 1)], ['Reported GM/t', money(c.gm)], ['After-discount GM/t', money(c.net)], ['Selling price/t', money(c.price)], ['COGS/t', money(c.cost)], ['Total GP', money(c.gp)]].map(function (x) { return '<div><small>' + x[0] + '</small>' + x[1] + '</div>'; }).join('') + '</div>') + '<p class="callout">Monthly aggregates, not invoice evidence. Use Focus to dissect this business further. The current bridge comparison remains fixed.</p><button class="primary" id="' + (prefix || '') + 'detail-focus">Focus this business</button>';
     $('detail-focus').onclick = function () { var f = Object.assign({}, filters), labels = {}; f[group] = r.id; labels[group] = r.name; $('detail').close(); focus(f, labels); };
     var evidenceButton = document.createElement('button'); evidenceButton.textContent = 'Show invoice evidence';
     var evidencePanel = document.createElement('div'); evidencePanel.className = 'table-scroll'; evidencePanel.style.marginTop = '18px';
@@ -168,7 +168,7 @@
     $('opportunity-table').querySelectorAll('[data-opportunity]').forEach(function (b) { b.onclick = function () { opportunityDetail(rows[+b.dataset.opportunity]); }; });
   }
   function opportunityDetail(r) {
-    $('detail-body').innerHTML = '<p class="eyebrow">PRICING OPPORTUNITY · FOR COMMERCIAL REVIEW</p><h2>' + esc(r.customer_name) + '</h2><p>' + esc(r.sku + ' · ' + r.sku_name) + '</p><p class="callout">' + esc(r.caveat) + '</p><p>' + esc(r.reason) + ' · ' + esc(r.evidence) + ' · peers from ' + month(r.peer_month) + ' · sized on ' + month(r.sizing_month) + '</p><div class="table-scroll"><table><thead><tr><th>Peers · same period</th><th>Tons</th><th>Net price/kg</th></tr></thead><tbody>' + r.peers.map(function (p) { return '<tr><td>' + esc(p.name) + '<small>' + esc(p.customer) + '</small></td><td>' + n(p.tons, 1) + '</td><td>' + n(p.net_price, 2) + '</td></tr>'; }).join('') + (!r.peers.length ? '<tr><td colspan="3">Cost-drift candidate; no qualified direct peer set.</td></tr>' : '') + '</tbody></table></div><h3>Test a full-month scenario</h3><div class="scenario"><label>Price increase · PHP/kg<input id="scenario-uplift" type="number" step="0.05" min="0" value="' + r.uplift.toFixed(2) + '"></label><label>Assumed volume loss · %<input id="scenario-loss" type="number" min="0" max="100" value="0"></label></div><p id="scenario-result" class="callout"></p><p class="muted">Fixed company base tons for comparability. Assumes booked cost/kg is avoidable on lost volume; overhead and customer replacement are not modelled. A sensitivity, not a forecast.</p><button class="primary" id="opportunity-focus">Explore this customer and SKU</button>';
+    $('detail-body').innerHTML = '<p class="eyebrow">PRICING OPPORTUNITY · FOR COMMERCIAL REVIEW</p><h2>' + esc(r.customer_name) + '</h2><p>' + esc(r.sku + ' · ' + r.sku_name) + '</p><p class="callout">' + esc(r.caveat) + '</p><p>' + esc(r.reason) + ' · ' + esc(r.evidence) + ' · peers from ' + month(r.peer_month) + ' · sized on ' + month(r.sizing_month) + '</p><div class="table-scroll"><table><thead><tr><th>Peers · same period</th><th>Tons</th><th>Net price/kg</th></tr></thead><tbody>' + r.peers.map(function (p) { return '<tr><td>' + esc(p.name) + '<small>' + esc(p.customer) + '</small></td><td>' + n(p.tons, 1) + '</td><td>' + n(p.net_price, 2) + '</td></tr>'; }).join('') + (!r.peers.length ? '<tr><td colspan="3">Cost-drift candidate; no qualified direct peer set.</td></tr>' : '') + '</tbody></table></div><h3>Test a full-month scenario</h3><div class="scenario"><label>Price increase · PHP/kg<input id="' + (prefix || '') + 'scenario-uplift" type="number" step="0.05" min="0" value="' + r.uplift.toFixed(2) + '"></label><label>Assumed volume loss · %<input id="' + (prefix || '') + 'scenario-loss" type="number" min="0" max="100" value="0"></label></div><p id="' + (prefix || '') + 'scenario-result" class="callout"></p><p class="muted">Fixed company base tons for comparability. Assumes booked cost/kg is avoidable on lost volume; overhead and customer replacement are not modelled. A sensitivity, not a forecast.</p><button class="primary" id="' + (prefix || '') + 'opportunity-focus">Explore this customer and SKU</button>';
     function scenario() { var u = Math.max(0, Number($('scenario-uplift').value) || 0), loss = Math.max(0, Math.min(100, Number($('scenario-loss').value) || 0)) / 100, kg = r.tons * 1000, reported = kg * ((1 - loss) * u - loss * (r.price - r.cost)), net = kg * ((1 - loss) * u * (1 - r.discount_rate) - loss * r.net); $('scenario-result').textContent = 'Change in reported GP: ' + money(reported) + ' / month · after discounts: ' + money(net) + ' · company impact at fixed base volume: ' + signed(D.national_base_tons ? reported / D.national_base_tons : null) + ' PHP/t.'; }
     $('scenario-uplift').oninput = scenario; $('scenario-loss').oninput = scenario; scenario();
     $('opportunity-focus').onclick = function () { $('detail').close(); focus({ customer: r.customer, sku: r.sku }, { customer: r.customer_name, sku: r.sku_name }); };
@@ -232,8 +232,9 @@
   $('next').onchange = function () { expanded.clear(); matrix(); };
   $('driver').onchange = contributors; $('minimum').oninput = opportunities; $('build-cross').onclick = cross; $('export').onclick = exportTable;
   $('detail').querySelector('.close').onclick = function () { $('detail').close(); };
-  document.querySelectorAll('[data-view]').forEach(function (b) { b.onclick = function () { document.querySelectorAll('[data-view]').forEach(function (x) { x.classList.toggle('active', x === b); }); ['history', 'opportunities', 'compare'].forEach(function (v) { $(v).hidden = v !== b.dataset.view; }); }; });
+  root.querySelectorAll('[data-view]').forEach(function (b) { b.onclick = function () { root.querySelectorAll('[data-view]').forEach(function (x) { x.classList.toggle('active', x === b); }); ['history', 'opportunities', 'compare'].forEach(function (v) { $(v).hidden = v !== b.dataset.view; }); }; });
   // Endpoint remains authoritative for authentication; an expired session produces an explicit error.
   load();
-})();
+}
+if (document.getElementById('preview-app')) mountMarginExplorerV2(document.body, '');
 
