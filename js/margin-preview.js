@@ -11,6 +11,7 @@
   if (!/^\d{4}-\d{2}$/.test(ym)) ym = now.toISOString().slice(0, 7);
   var previous = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 2, 1);
   var S = { asof: ym, current: ym, base: previous.getFullYear() + '-' + String(previous.getMonth() + 1).padStart(2, '0'), mode: 'same', basis: 'reported', group: 'ssg', filters: {} };
+  var drillExpanded = new Set(), lastComponent = null;
   var D = null, sequence = 0, sort = 'total', direction = -1, expanded = new Map(), back = [], rowLookup = new Map();
   function params(overrides) { return Object.assign({}, S, { filters: JSON.stringify(S.filters) }, overrides || {}); }
   async function fetchData(p) { return apiFetch('margin-preview', p); }
@@ -18,7 +19,7 @@
   function format(v, metric) { return v == null ? '—' : metric === 'pct' ? n(v, 1) + '%' : metric === 'tons' ? n(v, 1) : n(v); }
   function status(text, error) { $('status').textContent = text; $('status').className = error ? 'error' : ''; }
   async function load() {
-    var seq = ++sequence; $('rm-content').textContent = ''; $('load-rm').disabled = false;
+    var seq = ++sequence; drillExpanded.clear(); $('rm-content').textContent = ''; $('load-rm').disabled = false;
     $('apply').disabled = true; $('preview-app').setAttribute('aria-busy', 'true');
     ['history', 'opportunities', 'compare', 'kpis', 'waterfall', 'contributors'].forEach(function (id) { $(id).classList.add('loading'); });
     status('Updating selection…');
@@ -27,7 +28,7 @@
       if (seq !== sequence || !result) return;
       D = result; expanded.clear(); render();
       status((D.source_label || 'HQ · read-only SAP') + ' · refreshed ' + new Date(D.fetched_at).toLocaleString() + ' · last posting ' + (D.window.cutoff || 'none'));
-    } catch (e) { if (seq === sequence) { status('Could not load this selection. Previous results are hidden. ' + e.message, true); D = null; ['matrix', 'kpis', 'waterfall', 'contributors', 'opportunity-table', 'cross-table', 'segment-table', 'rm-content'].forEach(function (id) { $(id).textContent = 'Data unavailable for this selection.'; }); } }
+    } catch (e) { if (seq === sequence) { status('Could not load this selection. Previous results are hidden. ' + e.message, true); D = null; ['matrix', 'kpis', 'waterfall', 'contributors', 'opportunity-table', 'cross-table', 'rm-content'].forEach(function (id) { $(id).textContent = 'Data unavailable for this selection.'; }); } }
     finally { if (seq === sequence) { $('apply').disabled = false; $('preview-app').removeAttribute('aria-busy'); ['history', 'opportunities', 'compare', 'kpis', 'waterfall', 'contributors'].forEach(function (id) { $(id).classList.remove('loading'); }); } }
   }
   function dimensionOptions(select, fallback) {
@@ -38,7 +39,7 @@
   function render() {
     dimensionOptions($('group'), S.group); $('group').value = S.group;
     dimensionOptions($('next'), S.group === 'ssg' ? 'region' : 'customer'); dimensionOptions($('cross'), 'region');
-    dimensionOptions($('segment'), 'ssg'); breadcrumbs(); kpis(); matrix(); bridge(); contributors(); opportunities(); segmentDrill();
+    dimensionOptions($('segment'), 'customer'); $('region-filter').innerHTML = '<option value="">All regions</option>' + (D.regions || []).map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>';}).join(''); $('region-filter').value=S.filters.region||''; breadcrumbs(); kpis(); matrix(); bridge(); contributors(); opportunities();
     $('definitions').textContent = D.note;
     $('cross-table').textContent = 'Choose columns and build the comparison for the current selection.';
   }
@@ -135,48 +136,31 @@
     $('bridge-note').textContent = notes.join(' ');
     $('waterfall').querySelectorAll('[data-driver]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.driver; contributors(); $('contributors').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }; });
   }
+  function shareMarkers(r) {
+    var a=Math.max(0,Math.min(100,r.share0*100)), b=Math.max(0,Math.min(100,r.share1*100));
+    return '<span class="share-track" aria-hidden="true"><i style="left:'+Math.min(a,b)+'%;width:'+Math.abs(b-a)+'%"></i><b style="left:'+a+'%"></b><b class="after" style="left:'+b+'%"></b></span>'+n(r.share0*100,1)+'% → '+n(r.share1*100,1)+'% <strong>'+((r.share1-r.share0)>0?'+':'')+n((r.share1-r.share0)*100,1)+' pp</strong>';
+  }
   function componentTable() {
-    var driver = $('driver').value; $('rm-module').hidden = driver !== 'cost';
-    var definitions = { price: 'Price', cost: 'Cost', customer_mix: 'Customer mix', product_mix: 'Product mix' };
-    $('component-tabs').innerHTML = Object.entries(definitions).map(function (x) { return '<button data-component="' + x[0] + '" class="' + (driver === x[0] ? 'active' : '') + '"><span>' + x[1] + '</span><strong>' + signed(D.bridge.available ? D.bridge[x[0]] : null) + ' <small>PHP/t</small></strong></button>'; }).join('');
-    $('component-tabs').querySelectorAll('[data-component]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.component; contributors(); }; });
-    $('component-note').textContent = '';
-    if (!definitions[driver]) return false;
-    if (!D.bridge.available) { $('contributors').textContent = 'Both windows need positive volume to explain this component.'; return true; }
-    var isMix = driver === 'customer_mix' || driver === 'product_mix';
-    var drill = isMix ? (D.component_drills || {})[driver] : null;
-    if (isMix && !drill) { $('contributors').textContent = 'Refresh to load the new mix drill data.'; return true; }
-    var rows = isMix ? drill.rows.slice() : D.contributors.filter(function (r) { return r.matched; }).slice();
-    var impact = function (r) { return isMix ? r.value : r[driver]; };
-    rows.sort(function (a, b) { return Math.abs(impact(b)) - Math.abs(impact(a)); });
-    var top = rows.slice(0, 15), other = rows.slice(15).reduce(function (s, r) { return s + impact(r); }, 0);
-    var rate = driver === 'price' ? 'price' : 'cost';
-    var headers = isMix ? ['Base tons', 'Current tons', 'Base share', 'Current share', 'Share Δ · pp', 'Base GM/t', 'Current GM/t', 'Share effect · PHP/t'] : ['Base tons', 'Current tons', 'Base ' + rate + '/t', 'Current ' + rate + '/t', 'Rate Δ /t', 'Avg share', 'Effect · PHP/t'];
-    var html = '<table><thead><tr><th>' + (isMix ? driver === 'customer_mix' ? 'Customer' : 'Product / SKU' : 'Customer · SKU') + '</th>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
-    top.forEach(function (r, i) {
-      var values = isMix ? [n(r.tons0, 1), n(r.tons1, 1), n(r.share0 * 100, 2) + '%', n(r.share1 * 100, 2) + '%', (r.share_shift_pp > 0 ? '+' : '') + n(r.share_shift_pp, 2), money(r.gm_ton0), money(r.gm_ton1)] : [n(r.tons0, 1), n(r.tons1, 1), money(r[rate + '0']), money(r[rate + '1']), signed(r[rate + '1'] - r[rate + '0']), n((r.share0 + r.share1) * 50, 2) + '%'];
-      var name = isMix ? r.name : r.customer_name, code = isMix ? r.id : r.customer + ' · ' + r.sku + ' · ' + r.sku_name;
-      html += '<tr><td><button class="row-name" data-component-row="' + i + '">' + esc(name) + '</button><small>' + esc(code) + '</small></td>' + values.map(function (v) { return '<td>' + v + '</td>'; }).join('') + '<td class="' + (impact(r) < 0 ? 'negative' : 'positive') + '">' + signed(impact(r)) + '</td></tr>';
-    });
-    if (!top.length) html += '<tr><td colspan="' + (headers.length + 1) + '">No matched contributors in these windows.</td></tr>';
-    html += '</tbody><tfoot><tr><td>Other · ' + Math.max(0, rows.length - top.length) + ' rows</td><td colspan="' + headers.length + '">' + signed(other) + ' PHP/t</td></tr>';
-    if (isMix) html += '<tr><td>Shared customer–product interaction<small>Explicit adjustment; not assigned to individual rows</small></td><td colspan="' + headers.length + '">' + signed(drill.adjustment) + ' PHP/t</td></tr>';
-    html += '<tr><td>' + definitions[driver] + ' bridge total</td><td colspan="' + headers.length + '">' + signed(D.bridge[driver]) + ' PHP/t · ' + (Math.abs(rows.reduce(function (s, r) { return s + impact(r); }, 0) + (isMix ? drill.adjustment : 0) - D.bridge[driver]) < 1e-6 ? '✓ reconciles before rounding' : 'reconciliation unavailable') + '</td></tr></tfoot></table>';
-    $('contributors').innerHTML = html;
-    var note = isMix ? 'Rows show centred share effects at ' + (driver === 'customer_mix' ? 'customer' : 'SKU') + ' level. The explicit interaction adjustment reconciles that view to the bridge’s symmetric split; it is not a further commercial lever. One-sided orders may reflect timing.' : 'Same customer × SKU only. Effect = average tonnage share × change in ' + rate + ', ' + (driver === 'cost' ? 'with cost increases reducing margin.' : 'on the selected reported / after-discount basis.') + ' Click a row to focus; the dates stay fixed.';
-    if (isMix && !D.bridge.mix_ordering.sign_stable) note += ' Exploratory only: the customer/product split changes sign with ordering; the waterfall therefore shows combined mix.';
-    if (isMix && !D.window.mix_comparable) note += ' These windows are not comparable for interpreting mix.';
-    $('component-note').textContent = note;
-    $('contributors').querySelectorAll('[data-component-row]').forEach(function (b) { b.onclick = function () { var r = top[+b.dataset.componentRow]; if (isMix) { var f = {}, l = {}; f[drill.dimension] = r.id; l[drill.dimension] = r.name; focus(f, l); } else focus({ customer: r.customer, sku: r.sku }, { customer: r.customer_name, sku: r.sku_name }); }; });
-    return true;
+    var driver=$('driver').value, isMix=driver==='customer_mix'||driver==='product_mix'||driver==='mix';
+    if(lastComponent!==driver){drillExpanded.clear();if(isMix)$('segment').value=driver==='customer_mix'?'customer':'sku';lastComponent=driver;}
+    $('rm-module').hidden=driver!=='cost'; $('drill-group-label').hidden=isMix; $('segment-label').hidden=!isMix||driver==='mix';
+    var definitions={price:'Price',cost:'Cost',customer_mix:'Customer mix',product_mix:'Product mix'};
+    $('component-tabs').innerHTML=Object.entries(definitions).map(function(x){return '<button data-component="'+x[0]+'" class="'+(driver===x[0]?'active':'')+'"><span>'+x[1]+'</span><strong>'+signed(D.bridge.available?D.bridge[x[0]]:null)+' <small>PHP/t</small></strong></button>';}).join('');
+    $('component-tabs').querySelectorAll('[data-component]').forEach(function(b){b.onclick=function(){$('driver').value=b.dataset.component;contributors();};});
+    if(!D.bridge.available){$('component-note').textContent='';$('contributors').textContent='Both windows need positive volume to explain this component.';return;}
+    if(isMix){segmentDrill();return;}
+    var rate=driver, cells=D.contributors.filter(function(r){return r.matched;}), by=$('drill-group').value, lookup=[], max=0;
+    function group(list,dim,path){var map=new Map();list.forEach(function(r){var id=String(r[dim]||'UNKNOWN');if(!map.has(id))map.set(id,{id:id,name:r[dim+'_name']||id,dim:dim,rows:[],path:path.concat(id)});map.get(id).rows.push(r);});return [...map.values()].map(function(g){g.effect=g.rows.reduce(function(v,r){return v+r[driver];},0);g.tons0=g.rows.reduce(function(v,r){return v+r.tons0;},0);g.tons1=g.rows.reduce(function(v,r){return v+r.tons1;},0);g.before=g.rows.reduce(function(v,r){return v+r[rate+'0']*r.tons0;},0)/g.tons0;g.after=g.rows.reduce(function(v,r){return v+r[rate+'1']*r.tons1;},0)/g.tons1;return g;}).sort(function(a,b){return Math.abs(b.effect)-Math.abs(a.effect);});}
+    var roots=group(cells,by,[]), top=$('segment-all').checked?roots:roots.slice(0,7);
+    function gather(gs){gs.forEach(function(g){max=Math.max(max,Math.abs(g.effect));if(g.dim!=='sku'&&drillExpanded.has(JSON.stringify(g.path))){g.children=group(g.rows,g.dim==='ssg'?'customer':'sku',g.path);gather(g.children);}});}gather(top);
+    function draw(gs,depth){return gs.map(function(g){var index=lookup.length;lookup.push(g);var open=drillExpanded.has(JSON.stringify(g.path));return '<tr class="'+(depth?'child':'')+'"><td style="padding-left:'+(12+depth*24)+'px">'+(g.dim!=='sku'?'<button class="expand" data-drill-expand="'+index+'" aria-expanded="'+open+'" aria-label="'+(open?'Collapse ':'Expand ')+esc(g.name)+'">'+(open?'−':'+')+'</button>':'')+'<button class="row-name" data-drill-focus="'+index+'">'+esc(g.name)+'</button><small>'+esc(g.id)+'</small></td><td><div class="effect-cell">'+effectBar(g.effect,max)+'</div></td><td>'+money(g.before)+' → <strong>'+money(g.after)+'</strong></td><td>'+n(g.tons0,1)+' → '+n(g.tons1,1)+'</td></tr>'+(g.children?draw(g.children,depth+1):'');}).join('');}
+    var sum=roots.reduce(function(v,g){return v+g.effect;},0);
+    $('contributors').innerHTML='<table class="visual-drill"><thead><tr><th>'+ (by==='ssg'?'Feed category → Customer → SKU':'Customer → SKU')+'</th><th>Margin effect PHP/t</th><th>'+definitions[driver]+' /t before → after</th><th>Matched tons before → after</th></tr></thead><tbody>'+draw(top,0)+(!top.length?'<tr><td colspan="4">No matched customer/SKU cells.</td></tr>':'')+'</tbody><tfoot><tr><td>Other · '+(roots.length-top.length)+' groups</td><td>'+signed(roots.slice(top.length).reduce(function(v,g){return v+g.effect;},0))+'/t</td><td colspan="2">Children explain their parent; do not add both</td></tr><tr><td>'+definitions[driver]+' bridge total</td><td>'+signed(D.bridge[driver])+'/t</td><td colspan="2">'+(Math.abs(sum-D.bridge[driver])<1e-6?'✓ reconciles before rounding':'Reconciliation unavailable')+'</td></tr></tfoot></table>';
+    $('component-note').textContent='Expand + to see the rows behind each impact; click a name to focus the whole analysis. Effects sum matched customer × SKU contributions on the fixed selected-scope denominator. Parent rates are weighted averages and can change with the SKU mix; their difference is not the isolated '+rate+' effect. '+(driver==='cost'?'Higher cost reduces margin.':'Selling prices follow the selected margin basis.');
+    $('contributors').querySelectorAll('[data-drill-expand]').forEach(function(b){b.onclick=function(){var k=JSON.stringify(lookup[+b.dataset.drillExpand].path);if(drillExpanded.has(k))drillExpanded.delete(k);else drillExpanded.add(k);contributors();};});
+    $('contributors').querySelectorAll('[data-drill-focus]').forEach(function(b){b.onclick=function(){var g=lookup[+b.dataset.drillFocus],f={},l={},dims=by==='ssg'?['ssg','customer','sku']:['customer','sku'];g.path.forEach(function(id,i){f[dims[i]]=id;l[dims[i]]=g.rows[0][dims[i]+'_name']||id;});focus(f,l);};});
   }
-  function contributors() {
-    if (!D) return;
-    if (componentTable()) return;
-    var driver = $('driver').value, rows = D.contributors.slice().sort(function (a, b) { return Math.abs(b[driver]) - Math.abs(a[driver]); }), top = rows.slice(0, 15), other = rows.slice(15).reduce(function (s, r) { return s + r[driver]; }, 0);
-    $('contributors').innerHTML = '<table><thead><tr><th>Customer · SKU</th><th>Price</th><th>Cost</th><th>Mix</th><th>Total PHP/t</th></tr></thead><tbody>' + top.map(function (r, i) { return '<tr><td><button class="row-name" data-contributor="' + i + '">' + esc(r.customer_name) + '</button><small>' + esc(r.customer + ' · ' + r.sku + ' · ' + r.sku_name) + '</small></td>' + ['price', 'cost', 'mix', 'value'].map(function (k) { return '<td class="' + (r[k] < 0 ? 'negative' : 'positive') + '">' + signed(r[k]) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody><tfoot><tr><td>Other · selected driver</td><td colspan="4">' + signed(other) + ' PHP/t</td></tr></tfoot></table>';
-    $('contributors').querySelectorAll('[data-contributor]').forEach(function (b) { b.onclick = function () { var r = top[+b.dataset.contributor]; focus({ customer: r.customer, sku: r.sku }, { customer: r.customer_name, sku: r.sku_name }); }; });
-  }
+  function contributors(){if(D)componentTable();}
   function opportunities() {
     if (!D) return;
     var rows = D.opportunities.filter(function (r) { return r.php >= Number($('minimum').value); });
@@ -211,16 +195,14 @@
     return '<span class="effect-track" aria-hidden="true"><i class="' + (v < 0 ? 'loss' : 'gain') + '" style="left:' + (v < 0 ? 50-width : 50) + '%;width:' + width + '%"></i></span><strong class="' + (v < 0 ? 'negative' : 'positive') + '">' + signed(v) + '/t</strong>';
   }
   function segmentDrill() {
-    if (!D) return;
-    var dim=$('segment').value, drill=(D.segment_drills||{})[dim];
-    if(!drill){$('segment-table').textContent='Both windows need positive volume.';return;}
-    var all=drill.rows.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value);}), top=$('segment-all').checked?all:all.slice(0,7), max=Math.max.apply(null,all.map(function(r){return Math.abs(r.value);}));
-    $('segment-note').textContent='Centred share effect within the active selection · benchmark '+money(drill.center)+'/t. Alternative segment views do not add together or equal the bridge’s customer/product split. Open marker = before; blue marker = after. New to this window does not establish a new customer or product. '+(!D.window.mix_comparable?'Windows are not comparable for interpreting mix.':'');
-    $('segment-table').innerHTML='<table class="visual-drill"><thead><tr><th>'+esc(D.dimensions[dim])+'</th><th>Effect PHP/t</th><th>Volume share before → after</th><th>GM/t before → after</th></tr></thead><tbody>'+top.map(function(r,i){
-      var a=Math.max(0,Math.min(100,r.share0*100)),b=Math.max(0,Math.min(100,r.share1*100));
-      return '<tr><td><button class="row-name" data-segment-row="'+i+'">'+esc(r.name)+'</button>'+(!r.tons0?'<span class="pill">NEW TO WINDOW</span>':!r.tons1?'<span class="pill">ABSENT THIS WINDOW</span>':'')+'<small>'+esc(r.id)+'</small></td><td><div class="effect-cell">'+effectBar(r.value,max)+'</div></td><td><span class="share-track" aria-hidden="true"><i style="left:'+Math.min(a,b)+'%;width:'+Math.abs(b-a)+'%"></i><b style="left:'+a+'%"></b><b class="after" style="left:'+b+'%"></b></span>'+n(r.share0*100,1)+'% → '+n(r.share1*100,1)+'% <strong>'+(r.share_shift_pp>0?'+':'')+n(r.share_shift_pp,1)+' pp</strong></td><td>'+money(r.gm_ton0)+' → <strong>'+money(r.gm_ton1)+'</strong></td></tr>';
-    }).join('')+'</tbody><tfoot><tr><td>Other · '+(all.length-top.length)+' rows</td><td>'+signed(all.slice(top.length).reduce(function(v,r){return v+r.value;},0))+'/t</td><td colspan="2">Ranked by absolute effect · bars share one scale</td></tr><tr><td>'+esc(D.dimensions[dim])+' share effect</td><td>'+signed(drill.total)+'/t</td><td colspan="2">Within selected scope · totals before rounding</td></tr></tfoot></table>';
-    $('segment-table').querySelectorAll('[data-segment-row]').forEach(function(b){b.onclick=function(){var r=top[+b.dataset.segmentRow],f={},l={};f[dim]=r.id;l[dim]=r.name;focus(f,l);};});
+    if(!D)return;
+    var dim=$('segment').value,driver=$('driver').value,combined=driver==='mix',drill=(D.segment_drills||{})[dim]; if(combined)drill={center:(D.bridge.gm0_per_ton+D.bridge.gm1_per_ton)/2,total:D.bridge.mix_total,rows:D.contributors.map(function(r){return Object.assign({},r,{id:r.customer+' · '+r.sku,name:r.customer_name+' · '+r.sku_name,value:r.mix,gm_ton0:r.tons0?r.price0-r.cost0:null,gm_ton1:r.tons1?r.price1-r.cost1:null});})};
+    if(!drill){$('contributors').textContent='Both windows need positive volume.';return;}
+    var canonical=combined||(driver==='customer_mix'&&dim==='customer')||(driver==='product_mix'&&dim==='sku'),adjustment=canonical&&!combined?D.component_drills[driver].adjustment:0;
+    var all=drill.rows.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value);}),top=$('segment-all').checked?all:all.slice(0,7),max=Math.max.apply(null,all.map(function(r){return Math.abs(r.value);}));
+    $('component-note').textContent='Centred share effects against '+money(drill.center)+'/t. Open marker = before; blue = after. '+(combined?'Customer × SKU share effects reconcile to combined mix.':canonical?'The shared interaction adjustment reconciles this view to the selected bridge component.':'Alternative segment view: its total is not the selected bridge component, and must not be added to other segment views.')+' New/absent in a window may reflect timing. '+(!D.bridge.mix_ordering.sign_stable?'The customer/product split changes sign with ordering; interpret combined mix instead. ':'')+(!D.window.mix_comparable?'Windows are not comparable for interpreting mix.':'');
+    $('contributors').innerHTML='<table class="visual-drill"><thead><tr><th>'+(combined?'Customer · SKU':esc(D.dimensions[dim]))+'</th><th>Share effect PHP/t</th><th>Volume share before → after</th><th>GM/t before → after</th></tr></thead><tbody>'+top.map(function(r,i){return '<tr><td><button class="row-name" data-segment-row="'+i+'">'+esc(r.name)+'</button>'+(!r.tons0?'<span class="pill">NEW TO WINDOW</span>':!r.tons1?'<span class="pill">ABSENT THIS WINDOW</span>':'')+'<small>'+esc(r.id)+'</small></td><td><div class="effect-cell">'+effectBar(r.value,max)+'</div></td><td>'+shareMarkers(r)+'</td><td>'+money(r.gm_ton0)+' → <strong>'+money(r.gm_ton1)+'</strong></td></tr>';}).join('')+'</tbody><tfoot><tr><td>Other · '+(all.length-top.length)+' rows</td><td>'+signed(all.slice(top.length).reduce(function(v,r){return v+r.value;},0))+'/t</td><td colspan="2">Ranked by absolute effect</td></tr>'+(canonical&&!combined?'<tr><td>Shared customer–product interaction</td><td>'+signed(adjustment)+'/t</td><td colspan="2">Not assigned to individual rows</td></tr>':'')+'<tr><td>'+(canonical?(combined?'Combined mix':driver==='customer_mix'?'Customer mix':'Product mix')+' bridge total':esc(D.dimensions[dim])+' share effect')+'</td><td>'+signed(drill.total+adjustment)+'/t</td><td colspan="2">'+(canonical?'✓ reconciles before rounding':'Alternative view within selected scope')+'</td></tr></tfoot></table>';
+    $('contributors').querySelectorAll('[data-segment-row]').forEach(function(b){b.onclick=function(){var r=top[+b.dataset.segmentRow],f={},l={};if(combined){f={customer:r.customer,sku:r.sku};l={customer:r.customer_name,sku:r.sku_name};}else{f[dim]=r.id;l[dim]=r.name;}focus(f,l);};});
   }
   async function rmDrill() {
     var seq=sequence;$('load-rm').disabled=true;$('rm-content').textContent='Loading recipes and issue-price evidence…';
@@ -242,7 +224,7 @@
     var url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(function (r) { return r.map(csv).join(','); }).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     var a = document.createElement('a'); a.href = url; a.download = 'margin-' + S.group + '-' + S.asof + '.csv'; a.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
-  $('segment').onchange=segmentDrill; $('segment-all').onchange=segmentDrill; $('load-rm').onclick=rmDrill;
+  $('segment').onchange=segmentDrill; $('segment-all').onchange=contributors; $('drill-group').onchange=function(){drillExpanded.clear();contributors();}; $('region-filter').onchange=function(){remember();S.labels=S.labels||{};if(this.value){S.filters.region=this.value;S.labels.region=this.value;}else{delete S.filters.region;delete S.labels.region;}load();}; $('load-rm').onclick=rmDrill;
   controls();
   $('apply').onclick = function () { remember(); ['asof', 'base', 'current', 'mode', 'basis'].forEach(function (k) { S[k] = $(k).value; }); load(); };
   $('group').onchange = function () { remember(); S.group = this.value; load(); };

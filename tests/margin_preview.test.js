@@ -105,3 +105,10 @@ test('RM fixed recipe denominator counted once, basemix separate and missing ori
  const missing=rawMaterialImpact(sales,recipes,issues.filter(r=>!(r.ItemCode==='RM'&&r.ym==='2026-09')),opts)
  assert.equal(missing.rm_effect,0);assert.equal(missing.full_price_coverage,0);assert.equal(missing.missing.length,1)
 })
+test('Category and customer group contributions preserve bridge effects across categories',()=>{
+ const extra=[row('2026-08-03','C1','S2',500,15000,2000,{ssg:'BIRD',ssg_name:'Bird',region:'Visayas'}),row('2026-09-03','C1','S2',500,16000,2500,{ssg:'BIRD',ssg_name:'Bird',region:'Visayas'})]
+ const p=M.build([...rows,...extra],opts,'2026-09-05')
+ for(const metric of ['price','cost']){const grouped=new Map();for(const r of p.contributors.filter(r=>r.matched)){const key=JSON.stringify([r.ssg,r.customer]);grouped.set(key,(grouped.get(key)||0)+r[metric]);}assert.ok(Math.abs([...grouped.values()].reduce((a,b)=>a+b,0)-p.bridge[metric])<1e-8)}
+ assert.equal(new Set(p.contributors.filter(r=>r.customer==='C1').map(r=>r.ssg)).size,2)
+ const f=M.build([...rows,...extra],{...opts,filters:{region:'Visayas'}},'2026-09-05');assert.deepEqual(f.window,p.window);assert.equal(f.totals.current.kg,500);assert.equal(f.regions.length,2)
+})

@@ -75,7 +75,7 @@ function contributions(a, b, basis) {
     const p = x && y ? (s0 + s1) / 2 * (price(y) - price(x)) : 0
     const c = x && y ? -(s0 + s1) / 2 * ((y.revenue - y.gp) / y.kg - (x.revenue - x.gp) / x.kg) * 1000 : 0
     const mix = x && y ? ((margin(x) + margin(y)) / 2 - center) * (s1 - s0) : y ? (margin(y) - center) * s1 : -(margin(x) - center) * s0
-    return { customer: r.customer, customer_name: r.customer_name, sku: r.sku, sku_name: r.sku_name, price: p, cost: c, mix, value: p + c + mix, matched: !!(x && y),
+    return { ssg: id(r, 'ssg'), ssg_name: label(r, 'ssg'), customer: r.customer, customer_name: r.customer_name, sku: r.sku, sku_name: r.sku_name, price: p, cost: c, mix, value: p + c + mix, matched: !!(x && y),
       tons0: x ? x.kg / 1000 : 0, tons1: y ? y.kg / 1000 : 0,
       price0: x ? price(x) : null, price1: y ? price(y) : null,
       cost0: x ? (x.revenue - x.gp) / x.kg * 1000 : null, cost1: y ? (y.revenue - y.gp) / y.kg * 1000 : null,
@@ -161,7 +161,7 @@ function build(rows, opts, today) {
   const parentContributions = contributions(whole0, whole1, opts.basis)
   // Only customer/SKU filters can select parent cell contributions unambiguously; other dimensions split cells.
   const parentSupported = Object.keys(opts.filters).every(k => ['customer', 'sku'].includes(k))
-  return { months, dimensions: DIMS, options: opts, window: W, rows: [...groups.values()].map(finish).sort((a, b) => b.total.kg - a.total.kg), totals: finish(totals), bridge: B,
+  return { regions: [...new Map(rows.map(r => [id(r, 'region'), { id: id(r, 'region'), name: label(r, 'region') }])).values()].sort((a,b) => a.name.localeCompare(b.name)), months, dimensions: DIMS, options: opts, window: W, rows: [...groups.values()].map(finish).sort((a, b) => b.total.kg - a.total.kg), totals: finish(totals), bridge: B,
     segment_drills: segmentDrills(prior, cur, opts.basis, B), contributors: contributions(prior, cur, opts.basis), component_drills: componentDrills(prior, cur, opts.basis, B),
     company_contribution: parentSupported ? parentContributions.filter(r => match(r, opts.filters)).reduce((s, r) => s + r.value, 0) : null,
     opportunities: opportunities(selected, opts, nationalBase, rows), national_base_tons: nationalBase / 1000,
