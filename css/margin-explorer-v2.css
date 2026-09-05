@@ -214,3 +214,8 @@
 #pg-margin-explorer-v2 .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
 #pg-margin-explorer-v2 .table-scroll{max-width:100%}
 @media(max-width:900px){#pg-margin-explorer-v2 .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* V2 owns explicit comparison windows; hide unrelated global period/segment controls only on this page. */
+body:has(#pg-margin-explorer-v2.active) .topbar-controls,body:has(#pg-margin-explorer-v2.active) #hq-filter-bar{display:none!important}
+#pg-margin-explorer-v2 #mv2-matrix table{min-width:1750px;table-layout:auto}
+#pg-margin-explorer-v2 #mv2-matrix td:not(:first-child),#pg-margin-explorer-v2 #mv2-matrix th:not(:first-child){min-width:88px}

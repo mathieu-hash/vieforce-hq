@@ -235,6 +235,7 @@ function mountMarginExplorerV2(root, prefix) {
   root.querySelectorAll('[data-view]').forEach(function (b) { b.onclick = function () { root.querySelectorAll('[data-view]').forEach(function (x) { x.classList.toggle('active', x === b); }); ['history', 'opportunities', 'compare'].forEach(function (v) { $(v).hidden = v !== b.dataset.view; }); }; });
   // Endpoint remains authoritative for authentication; an expired session produces an explicit error.
   load();
+  return { refresh: load };
 }
 if (document.getElementById('preview-app')) mountMarginExplorerV2(document.body, '');
 
