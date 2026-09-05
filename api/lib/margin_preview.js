@@ -97,6 +97,16 @@ function componentDrills(prior, current, basis, B) {
   }
   return result
 }
+function segmentDrills(prior, current, basis, B) {
+  if (!B.available) return {}
+  const convert = r => ({ ...r, gp: r.gp - (basis === 'net' ? r.disc : 0) })
+  const a = prior.map(convert), b = current.map(convert), center = (B.gm0_per_ton + B.gm1_per_ton) / 2
+  return Object.fromEntries(Object.keys(DIMS).map(dim => {
+    const names = new Map([...prior, ...current].map(r => [id(r, dim), label(r, dim)]))
+    const lens = mixByDim(a, b, r => id(r, dim), null, center)
+    return [dim, { total: lens.total, center, rows: lens.detail.map(r => ({ ...r, id: r.key, name: names.get(r.key) || r.key })) }]
+  }))
+}
 function opportunities(rows, opts, denominator, peerRows = rows) {
   // Full prior month for sizing, never extrapolate four days into a full month.
   const base = rows.filter(r => r.date.slice(0, 7) === opts.base)
@@ -152,7 +162,7 @@ function build(rows, opts, today) {
   // Only customer/SKU filters can select parent cell contributions unambiguously; other dimensions split cells.
   const parentSupported = Object.keys(opts.filters).every(k => ['customer', 'sku'].includes(k))
   return { months, dimensions: DIMS, options: opts, window: W, rows: [...groups.values()].map(finish).sort((a, b) => b.total.kg - a.total.kg), totals: finish(totals), bridge: B,
-    contributors: contributions(prior, cur, opts.basis), component_drills: componentDrills(prior, cur, opts.basis, B),
+    segment_drills: segmentDrills(prior, cur, opts.basis, B), contributors: contributions(prior, cur, opts.basis), component_drills: componentDrills(prior, cur, opts.basis, B),
     company_contribution: parentSupported ? parentContributions.filter(r => match(r, opts.filters)).reduce((s, r) => s + r.value, 0) : null,
     opportunities: opportunities(selected, opts, nationalBase, rows), national_base_tons: nationalBase / 1000,
     concentration: metrics(total(cur.filter(r => r.brand_name === 'VIETOP'))),

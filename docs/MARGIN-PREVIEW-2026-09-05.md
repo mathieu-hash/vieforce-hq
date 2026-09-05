@@ -35,3 +35,11 @@ The approved direction is a separate review page centred on the monthly table an
 
 ## Bridge component drills
 Price and Cost now show matched customer/SKU before-and-after rates, tons, average shares and bar contributions. Customer Mix and Product Mix show customer/SKU shares, share changes, margins and standalone centred effects, plus an explicit shared-interaction adjustment to reconcile to the symmetric bridge bar. Top 15 rows plus Other reconcile before rounding. Clicking a row focuses its exact customer/SKU, preserving comparison dates. Split-instability warnings remain visible. Ten preview tests and all four browser component drills pass.
+
+
+## Visual segment and raw-material drills
+All eight dimensions have a centred share-effect view: signed bars, before/after volume-share markers, margin rates, top seven plus Other, show-all and exact-row focus. Each is an independent aggregation lens, not an additive bridge allocation. One-sided rows say new/absent in the window, not commercial acquisition/churn.
+
+Cost has an on-demand RM diagnostic using base-month WOR1 issued quantities per completed FG kg and OINM monthly production issue values/quantities. Fixed base-month SKU/dispatch-warehouse sales weights translate ingredient price changes to selected-scope PHP/t. Production warehouse suffix -PD is normalized; transfer origin is not inferred. Direct RM and basemix are separate; basemix is not exploded. Three documented erroneous orders are excluded. Recipe, fully-priced-recipe and component-price coverage are displayed, with missing evidence listed. Ingredient clicks reveal SKU/plant details. This is a production-price sensitivity, not a decomposition of sold COGS; batch lag, recipe changes, packaging, yield and revaluation are not modelled.
+
+Validation: 176 repository tests pass, including hand-calculated RM effects, denominator de-duplication, missing coverage and segment sum checks. Browser checks pass for all eight segment selectors, focus/Back and RM ingredient details, without page errors. Frozen August-to-September example has 89.3% recipe coverage and 26.8% fully priced recipes; covered direct RM price effect is about -370 PHP/t and basemix -37 PHP/t. These are partial-coverage estimates, not a forecast or confirmed invoice-cost attribution. Production queries remain unverified against live SAP.

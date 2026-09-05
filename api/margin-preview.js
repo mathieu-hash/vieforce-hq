@@ -5,6 +5,7 @@ const { serverError } = require('./lib/http')
 const { getManilaToday } = require('./lib/shipping_days')
 const { fmt } = require('./lib/margin_window')
 const model = require('./lib/margin_preview')
+const { rawMaterialImpact } = require('./lib/margin_preview_rm')
 const cache = require('../lib/cache')
 const EXECUTIVES = new Set(['service', 'admin', 'ceo', 'exec', 'evp', 'director'])
 
@@ -31,6 +32,12 @@ function source(header, lines, sign) {
     CASE WHEN T1.OcrCode2 LIKE 'L-%' THEN 'Luzon' WHEN T1.OcrCode2 LIKE 'V-%' THEN 'Visayas' WHEN T1.OcrCode2 LIKE 'M-%' THEN 'Mindanao' ELSE 'Other' END`
 }
 const SQL = source('OINV', 'INV1', '') + ' UNION ALL ' + source('ORIN', 'RIN1', '-')
+const RECIPE_SQL = `SELECT P.DocEntry,P.ItemCode FG,P.Warehouse,CONVERT(char(10),P.PostDate,23) PostDate,P.CmpltQty,C.ItemCode,I.ItemName,I.ItmsGrpCod grp,C.IssuedQty
+ FROM OWOR P JOIN WOR1 C ON C.DocEntry=P.DocEntry JOIN OITM F ON F.ItemCode=P.ItemCode JOIN OITM I ON I.ItemCode=C.ItemCode
+ WHERE F.ItmsGrpCod=103 AND P.PostDate>=@recipeStart AND P.PostDate<@recipeEnd`
+const ISSUE_SQL = `SELECT CONVERT(char(7),M.DocDate,23) ym,M.ItemCode,I.ItemName,I.ItmsGrpCod grp,M.Warehouse,SUM(M.OutQty) outq,SUM(CASE WHEN M.OutQty>0 THEN -M.TransValue ELSE 0 END) outval
+ FROM OINM M JOIN OITM I ON I.ItemCode=M.ItemCode WHERE M.DocDate>=@recipeStart AND M.DocDate<@issueEnd AND I.ItmsGrpCod IN (101,102) AND M.TransType=60
+ GROUP BY CONVERT(char(7),M.DocDate,23),M.ItemCode,I.ItemName,I.ItmsGrpCod,M.Warehouse`
 function evidenceSql(opts, month) {
   const expressions = { customer: 'T0.CardCode', sku: 'T1.ItemCode', ssg: "ISNULL(CONVERT(nvarchar(100),I.U_SSG),'UNKNOWN')", brand: "ISNULL(CONVERT(nvarchar(100),I.U_brands),'UNKNOWN')", bu: "ISNULL(CONVERT(nvarchar(100),C.GroupCode),'UNKNOWN')", dsm: 'CONVERT(nvarchar(100),T0.SlpCode)', warehouse: "ISNULL(T1.WhsCode,'UNKNOWN')", region: "CASE WHEN T1.OcrCode2 LIKE 'L-%' THEN 'Luzon' WHEN T1.OcrCode2 LIKE 'V-%' THEN 'Visayas' WHEN T1.OcrCode2 LIKE 'M-%' THEN 'Mindanao' ELSE 'Other' END" }
   const params = { month }, predicates = Object.entries(opts.filters).map(([k, v], i) => { params['f' + i] = v; return expressions[k] + '=@f' + i }).join(' AND ')
@@ -64,6 +71,19 @@ function createHandler(deps = {}) {
         const rows = await run(SQL, { start, end })
         entry = { rows: rows.map(r => ({ ...r, ...Object.fromEntries(model.NUMS.map(k => [k, Number(r[k]) || 0])) })), fetched_at: new Date().toISOString() }
         if (!deps.noCache) cache.set(key, entry, 300)
+      }
+      if (req.query.rm === '1') {
+        const rmKey = key + ':rm:' + opts.base + ':' + opts.current
+        let cost = deps.noCache ? null : cache.get(rmKey)
+        if (!cost) {
+          const [by, bm] = opts.base.split('-').map(Number), [cy, cm] = opts.current.split('-').map(Number)
+          const tomorrow = new Date(today() + 'T12:00:00'); tomorrow.setDate(tomorrow.getDate() + 1)
+          const next = fmt(new Date(cy, cm, 1))
+          const p = { recipeStart: opts.base + '-01', recipeEnd: fmt(new Date(by, bm, 1)), issueEnd: next < fmt(tomorrow) ? next : fmt(tomorrow) }
+          const [recipes, issues] = await Promise.all([run(RECIPE_SQL, p), run(ISSUE_SQL, p)])
+          cost = { recipes, issues, fetched_at: new Date().toISOString() }; if (!deps.noCache) cache.set(rmKey, cost, 300)
+        }
+        return res.json({ ...rawMaterialImpact(entry.rows, cost.recipes, cost.issues, opts), fetched_at: cost.fetched_at })
       }
       return res.json({ ...model.build(entry.rows, opts, today()), fetched_at: entry.fetched_at })
     } catch (e) { return serverError(res, e, 'margin-preview') }

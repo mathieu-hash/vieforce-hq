@@ -89,3 +89,19 @@ test('SQL is fixed read-only, parameterized and allocates discount against whole
   assert.match(SQL, /ORIN/)
   assert.doesNotMatch(SQL, /\b(INSERT|UPDATE|DELETE|EXEC|MERGE)\b/)
 })
+const { rawMaterialImpact } = require('../api/lib/margin_preview_rm')
+test('Every segment lens keeps exact identities and sums before rounding', () => {
+ const p=M.build(rows,opts,'2026-09-05'); assert.equal(Object.keys(p.segment_drills).length,8)
+ for(const lens of Object.values(p.segment_drills))assert.ok(Math.abs(lens.rows.reduce((s,r)=>s+r.value,0)-lens.total)<1e-8)
+ assert.deepEqual(p.segment_drills.customer.rows.map(r=>r.id).sort(),['C1','C2'])
+})
+test('RM fixed recipe denominator counted once, basemix separate and missing origins not inferred',()=>{
+ const sales=[row('2026-08-03','C1','S1',1000,30000,5000)]
+ const recipes=[{DocEntry:1,FG:'S1',Warehouse:'AC-PD',PostDate:'2026-08-01',CmpltQty:1000,ItemCode:'RM',ItemName:'Corn',grp:101,IssuedQty:600},{DocEntry:1,FG:'S1',Warehouse:'AC-PD',PostDate:'2026-08-01',CmpltQty:1000,ItemCode:'BM',ItemName:'Premix',grp:102,IssuedQty:100}]
+ const issues=['2026-08','2026-09'].flatMap((ym,i)=>[{ym,ItemCode:'RM',Warehouse:'AC-PD',outq:100,outval:1000+i*200},{ym,ItemCode:'BM',Warehouse:'AC-PD',outq:100,outval:2000-i*100}])
+ const p=rawMaterialImpact(sales,recipes,issues,opts)
+ assert.equal(p.rm_effect,-1200);assert.equal(p.premix_effect,100);assert.equal(p.total_effect,-1100);assert.equal(p.full_price_coverage,1)
+ assert.equal(rawMaterialImpact(sales.map(r=>({...r,warehouse:'BAC'})),recipes,issues,opts).available,false)
+ const missing=rawMaterialImpact(sales,recipes,issues.filter(r=>!(r.ItemCode==='RM'&&r.ym==='2026-09')),opts)
+ assert.equal(missing.rm_effect,0);assert.equal(missing.full_price_coverage,0);assert.equal(missing.missing.length,1)
+})

@@ -18,7 +18,7 @@
   function format(v, metric) { return v == null ? '—' : metric === 'pct' ? n(v, 1) + '%' : metric === 'tons' ? n(v, 1) : n(v); }
   function status(text, error) { $('status').textContent = text; $('status').className = error ? 'error' : ''; }
   async function load() {
-    var seq = ++sequence;
+    var seq = ++sequence; $('rm-content').textContent = ''; $('load-rm').disabled = false;
     $('apply').disabled = true; $('preview-app').setAttribute('aria-busy', 'true');
     ['history', 'opportunities', 'compare', 'kpis', 'waterfall', 'contributors'].forEach(function (id) { $(id).classList.add('loading'); });
     status('Updating selection…');
@@ -27,7 +27,7 @@
       if (seq !== sequence || !result) return;
       D = result; expanded.clear(); render();
       status((D.source_label || 'HQ · read-only SAP') + ' · refreshed ' + new Date(D.fetched_at).toLocaleString() + ' · last posting ' + (D.window.cutoff || 'none'));
-    } catch (e) { if (seq === sequence) { status('Could not load this selection. Previous results are hidden. ' + e.message, true); D = null; ['matrix', 'kpis', 'waterfall', 'contributors', 'opportunity-table', 'cross-table'].forEach(function (id) { $(id).textContent = 'Data unavailable for this selection.'; }); } }
+    } catch (e) { if (seq === sequence) { status('Could not load this selection. Previous results are hidden. ' + e.message, true); D = null; ['matrix', 'kpis', 'waterfall', 'contributors', 'opportunity-table', 'cross-table', 'segment-table', 'rm-content'].forEach(function (id) { $(id).textContent = 'Data unavailable for this selection.'; }); } }
     finally { if (seq === sequence) { $('apply').disabled = false; $('preview-app').removeAttribute('aria-busy'); ['history', 'opportunities', 'compare', 'kpis', 'waterfall', 'contributors'].forEach(function (id) { $(id).classList.remove('loading'); }); } }
   }
   function dimensionOptions(select, fallback) {
@@ -38,7 +38,7 @@
   function render() {
     dimensionOptions($('group'), S.group); $('group').value = S.group;
     dimensionOptions($('next'), S.group === 'ssg' ? 'region' : 'customer'); dimensionOptions($('cross'), 'region');
-    breadcrumbs(); kpis(); matrix(); bridge(); contributors(); opportunities();
+    dimensionOptions($('segment'), 'ssg'); breadcrumbs(); kpis(); matrix(); bridge(); contributors(); opportunities(); segmentDrill();
     $('definitions').textContent = D.note;
     $('cross-table').textContent = 'Choose columns and build the comparison for the current selection.';
   }
@@ -136,7 +136,7 @@
     $('waterfall').querySelectorAll('[data-driver]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.driver; contributors(); $('contributors').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }; });
   }
   function componentTable() {
-    var driver = $('driver').value;
+    var driver = $('driver').value; $('rm-module').hidden = driver !== 'cost';
     var definitions = { price: 'Price', cost: 'Cost', customer_mix: 'Customer mix', product_mix: 'Product mix' };
     $('component-tabs').innerHTML = Object.entries(definitions).map(function (x) { return '<button data-component="' + x[0] + '" class="' + (driver === x[0] ? 'active' : '') + '"><span>' + x[1] + '</span><strong>' + signed(D.bridge.available ? D.bridge[x[0]] : null) + ' <small>PHP/t</small></strong></button>'; }).join('');
     $('component-tabs').querySelectorAll('[data-component]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.component; contributors(); }; });
@@ -205,6 +205,33 @@
       $('cross-table').querySelectorAll('[data-cross-row]').forEach(function (b) { b.onclick = function () { var r = rows[+b.dataset.crossRow], c = columns[+b.dataset.crossCol], f = {}, l = {}; f[S.group] = r.id; f[col] = c[0]; l[S.group] = r.name; l[col] = c[1]; focus(f, l); }; });
     } catch (e) { if (seq === sequence) $('cross-table').textContent = 'Comparison unavailable. ' + e.message; } finally { $('build-cross').disabled = false; }
   }
+
+  function effectBar(v, max) {
+    var width = max > 0 ? Math.min(50, Math.abs(v) / max * 50) : 0;
+    return '<span class="effect-track" aria-hidden="true"><i class="' + (v < 0 ? 'loss' : 'gain') + '" style="left:' + (v < 0 ? 50-width : 50) + '%;width:' + width + '%"></i></span><strong class="' + (v < 0 ? 'negative' : 'positive') + '">' + signed(v) + '/t</strong>';
+  }
+  function segmentDrill() {
+    if (!D) return;
+    var dim=$('segment').value, drill=(D.segment_drills||{})[dim];
+    if(!drill){$('segment-table').textContent='Both windows need positive volume.';return;}
+    var all=drill.rows.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value);}), top=$('segment-all').checked?all:all.slice(0,7), max=Math.max.apply(null,all.map(function(r){return Math.abs(r.value);}));
+    $('segment-note').textContent='Centred share effect within the active selection · benchmark '+money(drill.center)+'/t. Alternative segment views do not add together or equal the bridge’s customer/product split. Open marker = before; blue marker = after. New to this window does not establish a new customer or product. '+(!D.window.mix_comparable?'Windows are not comparable for interpreting mix.':'');
+    $('segment-table').innerHTML='<table class="visual-drill"><thead><tr><th>'+esc(D.dimensions[dim])+'</th><th>Effect PHP/t</th><th>Volume share before → after</th><th>GM/t before → after</th></tr></thead><tbody>'+top.map(function(r,i){
+      var a=Math.max(0,Math.min(100,r.share0*100)),b=Math.max(0,Math.min(100,r.share1*100));
+      return '<tr><td><button class="row-name" data-segment-row="'+i+'">'+esc(r.name)+'</button>'+(!r.tons0?'<span class="pill">NEW TO WINDOW</span>':!r.tons1?'<span class="pill">ABSENT THIS WINDOW</span>':'')+'<small>'+esc(r.id)+'</small></td><td><div class="effect-cell">'+effectBar(r.value,max)+'</div></td><td><span class="share-track" aria-hidden="true"><i style="left:'+Math.min(a,b)+'%;width:'+Math.abs(b-a)+'%"></i><b style="left:'+a+'%"></b><b class="after" style="left:'+b+'%"></b></span>'+n(r.share0*100,1)+'% → '+n(r.share1*100,1)+'% <strong>'+(r.share_shift_pp>0?'+':'')+n(r.share_shift_pp,1)+' pp</strong></td><td>'+money(r.gm_ton0)+' → <strong>'+money(r.gm_ton1)+'</strong></td></tr>';
+    }).join('')+'</tbody><tfoot><tr><td>Other · '+(all.length-top.length)+' rows</td><td>'+signed(all.slice(top.length).reduce(function(v,r){return v+r.value;},0))+'/t</td><td colspan="2">Ranked by absolute effect · bars share one scale</td></tr><tr><td>'+esc(D.dimensions[dim])+' share effect</td><td>'+signed(drill.total)+'/t</td><td colspan="2">Within selected scope · totals before rounding</td></tr></tfoot></table>';
+    $('segment-table').querySelectorAll('[data-segment-row]').forEach(function(b){b.onclick=function(){var r=top[+b.dataset.segmentRow],f={},l={};f[dim]=r.id;l[dim]=r.name;focus(f,l);};});
+  }
+  async function rmDrill() {
+    var seq=sequence;$('load-rm').disabled=true;$('rm-content').textContent='Loading recipes and issue-price evidence…';
+    try {
+      var data=await fetchData(params({rm:'1'}));if(seq!==sequence)return;
+      if(!data.available){$('rm-content').textContent=data.reason;return;}
+      var max=Math.max.apply(null,data.rows.map(function(r){return Math.abs(r.effect);}));
+      $('rm-content').innerHTML='<p class="callout">ESTIMATE · '+esc(data.base)+' full-month basket → '+esc(data.current)+' issue prices (MTD if partial). Direct RM: <strong>'+signed(data.rm_effect)+'/t</strong> · Basemix/premix: <strong>'+signed(data.premix_effect)+'/t</strong>. Not a reconciliation to the invoice Cost bar.</p><p>Recipe coverage: <strong>'+n(data.recipe_coverage*100,1)+'%</strong> of base sales. Fully priced recipes: <strong>'+n(data.full_price_coverage*100,1)+'%</strong>. Matched component quantity: '+n(data.component_price_coverage*100,1)+'%. Base basket: '+n(data.base_tons,1)+' t.</p><div class="table-scroll"><table class="visual-drill"><thead><tr><th>Ingredient · click for SKU / plant</th><th>Estimated effect</th><th>Issue PHP/kg before → after</th><th>Equivalent kg / selected feed ton</th></tr></thead><tbody>'+data.rows.map(function(r,i){return '<tr><td><button class="row-name" data-rm-row="'+i+'">'+esc(r.name)+'</button><small>'+esc(r.code)+' · '+(r.group===101?'Direct RM':'Basemix / premix')+'</small></td><td><div class="effect-cell">'+effectBar(r.effect,max)+'</div></td><td>'+n(r.price0,2)+' → '+n(r.price1,2)+'</td><td>'+n(r.inclusion_kg_t,1)+'</td></tr>';}).join('')+'</tbody></table></div><p class="footnote">'+esc(data.method)+'</p><p class="footnote">'+esc(data.limitations)+'</p><details><summary>Coverage gaps · '+data.missing.length+' records (tonnage not additive)</summary>'+data.missing.map(function(r){return '<p>'+esc(r.sku+' · '+r.plant+' · '+(r.ingredient||'')+' — '+r.reason)+'</p>';}).join('')+'</details>';
+      $('rm-content').querySelectorAll('[data-rm-row]').forEach(function(b){b.onclick=function(){var r=data.rows[+b.dataset.rmRow];$('detail-body').innerHTML='<h2>'+esc(r.name)+'</h2><p>Fixed base recipe and sales basket · estimated selected-scope effect</p><div class="table-scroll"><table><thead><tr><th>SKU / plant</th><th>Base tons</th><th>Recipe kg/t</th><th>PHP/kg before → after</th><th>Effect PHP/t</th></tr></thead><tbody>'+r.details.map(function(d){return '<tr><td>'+esc(d.sku_name)+'<small>'+esc(d.sku+' · '+d.plant)+'</small></td><td>'+n(d.tons,1)+'</td><td>'+n(d.inclusion_kg_t,1)+'</td><td>'+n(d.price0,2)+' → '+n(d.price1,2)+'</td><td>'+signed(d.effect)+'</td></tr>';}).join('')+'</tbody></table></div>';$('detail').showModal();};});
+    }catch(e){if(seq===sequence)$('rm-content').textContent='RM detail unavailable. '+e.message;}finally{if(seq===sequence)$('load-rm').disabled=false;}
+  }
   function exportTable() {
     if (!D) return;
     var metric = $('metric').value;
@@ -215,6 +242,7 @@
     var url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(function (r) { return r.map(csv).join(','); }).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     var a = document.createElement('a'); a.href = url; a.download = 'margin-' + S.group + '-' + S.asof + '.csv'; a.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
+  $('segment').onchange=segmentDrill; $('segment-all').onchange=segmentDrill; $('load-rm').onclick=rmDrill;
   controls();
   $('apply').onclick = function () { remember(); ['asof', 'base', 'current', 'mode', 'basis'].forEach(function (k) { S[k] = $(k).value; }); load(); };
   $('group').onchange = function () { remember(); S.group = this.value; load(); };
