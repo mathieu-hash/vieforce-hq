@@ -53,3 +53,7 @@ Customer/Product Mix use share markers and before/after margins in the same tabl
 Plan and verification: attach category metadata to canonical contribution cells; render one hierarchical component table; move share views inside it; synchronize region state; test multi-category customer attribution and fixed windows; exercise browser expansion, component switches, regional scope, RM and focus. This updates the previous separate-panel design following the user's explicit implementation approval.
 
 Merged-view validation: all 177 repository tests pass. Browser verified customer → SKU and category → customer → SKU expansion, Price/Cost totals, default and alternative mix views, combined mix, regional KPIs/bridge, category focus and Back, and retained RM coverage detail. Preview only; no deployment.
+
+
+## VieForce visual system
+Preview styling now follows the current app.html brand system: Montserrat interface text, Source Code Pro numbers, the existing logo, navy/cyan palette, lime/red effects, shared radii and surface/table treatments. The preview theme stylesheet mirrors the current HQ dark/light token definitions; it does not import the older hq.css palette. Its theme control reads/writes the existing vf_theme preference and synchronizes changes from other same-origin tabs. No live-page styles or calculations changed. Browser checked dark/light rendering and retained numeric reconciliation. Brand assets are served by the local-only review adapter as well as normal production static hosting.
