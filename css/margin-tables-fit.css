@@ -1,0 +1,29 @@
+/* Fit the standalone preview and native V2 tables to their available panel width. */
+:is(#preview-app,#pg-margin-explorer-v2) .panel{min-width:0}
+:is(#preview-app,#pg-margin-explorer-v2) .table-scroll{width:100%;max-width:100%;container-type:inline-size}
+:is(#preview-app,#pg-margin-explorer-v2) table{width:100%;min-width:0;table-layout:fixed}
+:is(#preview-app,#pg-margin-explorer-v2) th,:is(#preview-app,#pg-margin-explorer-v2) td{min-width:0;max-width:none;white-space:normal;overflow-wrap:break-word;padding:8px 6px}
+:is(#preview-app,#pg-margin-explorer-v2) th{font-size:10px;line-height:1.4}
+:is(#preview-app,#pg-margin-explorer-v2) td:first-child,:is(#preview-app,#pg-margin-explorer-v2) th:first-child{min-width:0;max-width:none;width:26%}
+:is(#preview-app,#pg-margin-explorer-v2) .row-name{max-width:100%;overflow-wrap:anywhere;white-space:normal}
+:is(#preview-app,#pg-margin-explorer-v2) td:first-child small{overflow-wrap:anywhere}
+#preview-app #matrix table,#pg-margin-explorer-v2 #mv2-matrix table{min-width:0;width:100%;table-layout:fixed}
+#preview-app #matrix th,#preview-app #matrix td,#pg-margin-explorer-v2 #mv2-matrix th,#pg-margin-explorer-v2 #mv2-matrix td{min-width:0;width:6%;padding:8px 3px;font-size:clamp(9px,1cqw,12px);line-height:1.45}
+#preview-app #matrix th:first-child,#preview-app #matrix td:first-child,#pg-margin-explorer-v2 #mv2-matrix th:first-child,#pg-margin-explorer-v2 #mv2-matrix td:first-child{width:16%;min-width:0;max-width:none}
+#preview-app #matrix .cell,#pg-margin-explorer-v2 #mv2-matrix .cell{font-size:inherit;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#preview-app #matrix .row-name,#pg-margin-explorer-v2 #mv2-matrix .row-name{font-size:inherit}
+#preview-app #matrix td:first-child small,#pg-margin-explorer-v2 #mv2-matrix td:first-child small{font-size:9px}
+:is(#preview-app,#pg-margin-explorer-v2) .visual-drill{min-width:0;table-layout:fixed}
+:is(#preview-app,#pg-margin-explorer-v2) .visual-drill th:first-child,:is(#preview-app,#pg-margin-explorer-v2) .visual-drill td:first-child{width:29%}
+:is(#preview-app,#pg-margin-explorer-v2) .effect-cell{min-width:0;width:100%;gap:8px;display:flex}
+:is(#preview-app,#pg-margin-explorer-v2) .effect-track{width:auto;min-width:20px;flex:1}
+:is(#preview-app,#pg-margin-explorer-v2) .effect-cell strong{min-width:0;flex-shrink:0;font-size:11px}
+:is(#preview-app,#pg-margin-explorer-v2) .share-track{width:min(70px,70%);margin:0 10px 4px 0}
+:is(#preview-app,#pg-margin-explorer-v2) .visual-drill .child .row-name{border-left:2px solid var(--divider);padding-left:8px}
+:is(#preview-app,#pg-margin-explorer-v2) .visual-drill .pill{display:inline-block;white-space:normal;margin:4px 0;padding:3px 6px}
+@container(max-width:900px){
+ :is(#preview-app,#pg-margin-explorer-v2) .visual-drill td{font-size:10px}
+ :is(#preview-app,#pg-margin-explorer-v2) .visual-drill .row-name{font-size:10px}
+ :is(#preview-app,#pg-margin-explorer-v2) .share-track{display:block}
+ :is(#preview-app,#pg-margin-explorer-v2) .effect-cell{gap:4px}
+}

@@ -70,7 +70,7 @@ function mountMarginExplorerV2(root, prefix) {
     function value(r) { if (sort === 'name') return r.name; if (sort === 'delta') return r.current[metric] == null || r.prior[metric] == null ? -Infinity : r.current[metric] - r.prior[metric]; return (sort === 'total' ? r.total : r.cells[sort] || {})[metric] ?? -Infinity; }
     rows.sort(function (a, b) { return direction * (typeof value(a) === 'string' ? value(a).localeCompare(value(b)) : value(a) - value(b)); });
     rowLookup.clear();
-    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th>' + D.months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? ' · MTD' : '') + '</th>'; }).join('') + '<th data-sort="total">Period total / weighted</th><th data-sort="delta">Window Δ</th></tr></thead>';
+    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th>' + D.months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? ' · MTD' : '') + '</th>'; }).join('') + '<th data-sort="total" title="Period total for amounts; weighted average for rates">Total / avg</th><th data-sort="delta" title="Change over the selected bridge windows">Change</th></tr></thead>';
     function row(r, group, filters, child) {
       var key = 'row' + rowLookup.size; rowLookup.set(key, { r: r, group: group, filters: filters });
       var vals = D.months.map(function (m) { return (r.cells[m] || {})[metric]; }).filter(function (x) { return x != null; });
@@ -86,7 +86,7 @@ function mountMarginExplorerV2(root, prefix) {
       return html;
     }).join('');
     $('matrix').innerHTML = '<table>' + head + '<tbody>' + (body || '<tr><td colspan="15">No matching rows.</td></tr>') + '</tbody><tfoot><tr><td>Selection total · all rows</td>' + D.months.map(function (m) { return '<td>' + format((D.totals.cells[m] || {})[metric], metric) + '</td>'; }).join('') + '<td>' + format(D.totals.total[metric], metric) + '</td><td>' + signed(D.totals.current[metric] == null || D.totals.prior[metric] == null ? null : D.totals.current[metric] - D.totals.prior[metric]) + '</td></tr></tfoot></table>';
-    $('table-note').textContent = rows.length + ' rows · Columns show posted monthly actuals. Window Δ follows the bridge dates, not necessarily the full month. Rates are weighted from pesos and tons. Pre-2026 cells are unavailable, not zero. Search does not change selection totals.';
+    $('table-note').textContent = rows.length + ' rows · Columns show posted monthly actuals. Change follows the bridge dates, not necessarily the full month. Rates are weighted from pesos and tons. Pre-2026 cells are unavailable, not zero. Search does not change selection totals.';
     $('matrix').querySelectorAll('[data-sort]').forEach(function (b) { b.onclick = function () { direction = sort === b.dataset.sort ? -direction : -1; sort = b.dataset.sort; matrix(); }; });
     $('matrix').querySelectorAll('[data-focus]').forEach(function (b) { b.onclick = function () { var x = rowLookup.get(b.dataset.focus), f = Object.assign({}, x.filters), l = {}; f[x.group] = x.r.id; l[x.group] = x.r.name; focus(f, l); }; });
     $('matrix').querySelectorAll('[data-expand]').forEach(function (b) { b.onclick = async function () {
