@@ -2,3 +2,5 @@
 
 /* Waterfall buttons must not inherit ordinary control padding. */
 .waterfall .bar{padding:0;border:0;min-height:2px}.bar-value{z-index:1;pointer-events:none}
+
+.component-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 15px}.component-tabs button{text-align:left;padding:13px 15px;background:#f5f8f8}.component-tabs button.active{border-color:var(--blue);background:#e8f5f8;box-shadow:inset 0 3px var(--blue)}.component-tabs span{display:block;color:var(--muted);font-size:11px;margin-bottom:8px}.component-tabs strong{font-size:20px}.component-tabs small{font-size:10px;font-weight:400}.component-tabs+ p{margin-bottom:15px}@media(max-width:700px){.component-tabs{grid-template-columns:repeat(2,1fr)}}

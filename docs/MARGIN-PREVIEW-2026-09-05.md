@@ -32,3 +32,6 @@ New production SQL has not run against SAP. Before publishing: validate the endp
 ## Design and build order
 
 The approved direction is a separate review page centred on the monthly table and linked bridges, followed by evidence-led pricing opportunities. Work order: isolated endpoint/model; shared exact selection; table and drills; bridges and contributors; pricing scenarios; browser and regression checks. A standalone specification was delivered in the Codex task outputs before implementation. This document records the implemented scope, not approval to replace the existing page.
+
+## Bridge component drills
+Price and Cost now show matched customer/SKU before-and-after rates, tons, average shares and bar contributions. Customer Mix and Product Mix show customer/SKU shares, share changes, margins and standalone centred effects, plus an explicit shared-interaction adjustment to reconcile to the symmetric bridge bar. Top 15 rows plus Other reconcile before rounding. Clicking a row focuses its exact customer/SKU, preserving comparison dates. Split-instability warnings remain visible. Ten preview tests and all four browser component drills pass.

@@ -36,6 +36,22 @@ test('Partial full-month comparison flags mix; monthly history remains whole', (
   const same = M.build(rows, opts, '2026-09-05')
   assert.ok(same.totals.prior.kg < same.totals.cells['2026-08'].kg)
 })
+test('Four component drills reconcile with underlying rates and explicit shared interaction', () => {
+  const data = [...rows, row('2026-08-04', 'C1', 'S2', 800, 40000, 12000), row('2026-09-03', 'C2', 'S2', 1600, 75000, 19000)]
+  for (const basis of ['reported', 'net']) {
+    const p = M.build(data, { ...opts, basis }, '2026-09-05')
+    for (const key of ['customer_mix', 'product_mix']) {
+      const drill = p.component_drills[key]
+      assert.ok(Math.abs(drill.rows.reduce((s, r) => s + r.value, 0) + drill.adjustment - p.bridge[key]) < 1e-6)
+      assert.ok(drill.rows.every(r => r.id && r.name && Number.isFinite(r.share_shift_pp)))
+    }
+    assert.ok(Math.abs(p.component_drills.customer_mix.adjustment - p.component_drills.product_mix.adjustment) < 1e-6)
+    for (const r of p.contributors.filter(r => r.matched)) {
+      assert.ok(Math.abs((r.price1 - r.price0) * (r.share0 + r.share1) / 2 - r.price) < 1e-6)
+      assert.ok(Math.abs(-(r.cost1 - r.cost0) * (r.share0 + r.share1) / 2 - r.cost) < 1e-6)
+    }
+  }
+})
 test('Non-positive net-volume cells are disclosed by bridge', () => {
   const p = M.build([...rows, row('2026-09-03', 'RET', 'BAD', -100, -3000, -500)], opts, '2026-09-05')
   assert.equal(p.bridge.dropped_cells.current, 1)

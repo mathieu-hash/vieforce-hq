@@ -121,7 +121,7 @@
     if (!b.available) { $('waterfall').textContent = b.reason; $('reconciles').textContent = 'Insufficient volume'; $('bridge-note').textContent = 'Both comparison windows need positive volume.'; return; }
     var stable = b.mix_ordering.sign_stable;
     var vals = [{ label: 'Base', value: b.gm0_per_ton, total: true }, { label: 'Price', value: b.price, driver: 'price' }, { label: 'Cost', value: b.cost, driver: 'cost' }];
-    if (stable) vals.push({ label: 'Customer mix', value: b.customer_mix, driver: 'mix' }, { label: 'Product mix', value: b.product_mix, driver: 'mix' }); else vals.push({ label: 'Combined mix', value: b.mix_total, driver: 'mix' });
+    if (stable) vals.push({ label: 'Customer mix', value: b.customer_mix, driver: 'customer_mix' }, { label: 'Product mix', value: b.product_mix, driver: 'product_mix' }); else vals.push({ label: 'Combined mix', value: b.mix_total, driver: 'mix' });
     vals.push({ label: 'Current', value: b.gm1_per_ton, total: true });
     var running = 0; vals.forEach(function (v) { v.bottom = v.total ? Math.min(0, v.value) : Math.min(running, running + v.value); v.top = v.total ? Math.max(0, v.value) : Math.max(running, running + v.value); running = v.total ? v.value : running + v.value; });
     var lo = Math.min(0, ...vals.map(function (v) { return v.bottom; })), hi = Math.max(1, ...vals.map(function (v) { return v.top; })), range = hi - lo;
@@ -135,8 +135,44 @@
     $('bridge-note').textContent = notes.join(' ');
     $('waterfall').querySelectorAll('[data-driver]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.driver; contributors(); $('contributors').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }; });
   }
+  function componentTable() {
+    var driver = $('driver').value;
+    var definitions = { price: 'Price', cost: 'Cost', customer_mix: 'Customer mix', product_mix: 'Product mix' };
+    $('component-tabs').innerHTML = Object.entries(definitions).map(function (x) { return '<button data-component="' + x[0] + '" class="' + (driver === x[0] ? 'active' : '') + '"><span>' + x[1] + '</span><strong>' + signed(D.bridge.available ? D.bridge[x[0]] : null) + ' <small>PHP/t</small></strong></button>'; }).join('');
+    $('component-tabs').querySelectorAll('[data-component]').forEach(function (b) { b.onclick = function () { $('driver').value = b.dataset.component; contributors(); }; });
+    $('component-note').textContent = '';
+    if (!definitions[driver]) return false;
+    if (!D.bridge.available) { $('contributors').textContent = 'Both windows need positive volume to explain this component.'; return true; }
+    var isMix = driver === 'customer_mix' || driver === 'product_mix';
+    var drill = isMix ? (D.component_drills || {})[driver] : null;
+    if (isMix && !drill) { $('contributors').textContent = 'Refresh to load the new mix drill data.'; return true; }
+    var rows = isMix ? drill.rows.slice() : D.contributors.filter(function (r) { return r.matched; }).slice();
+    var impact = function (r) { return isMix ? r.value : r[driver]; };
+    rows.sort(function (a, b) { return Math.abs(impact(b)) - Math.abs(impact(a)); });
+    var top = rows.slice(0, 15), other = rows.slice(15).reduce(function (s, r) { return s + impact(r); }, 0);
+    var rate = driver === 'price' ? 'price' : 'cost';
+    var headers = isMix ? ['Base tons', 'Current tons', 'Base share', 'Current share', 'Share Δ · pp', 'Base GM/t', 'Current GM/t', 'Share effect · PHP/t'] : ['Base tons', 'Current tons', 'Base ' + rate + '/t', 'Current ' + rate + '/t', 'Rate Δ /t', 'Avg share', 'Effect · PHP/t'];
+    var html = '<table><thead><tr><th>' + (isMix ? driver === 'customer_mix' ? 'Customer' : 'Product / SKU' : 'Customer · SKU') + '</th>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
+    top.forEach(function (r, i) {
+      var values = isMix ? [n(r.tons0, 1), n(r.tons1, 1), n(r.share0 * 100, 2) + '%', n(r.share1 * 100, 2) + '%', (r.share_shift_pp > 0 ? '+' : '') + n(r.share_shift_pp, 2), money(r.gm_ton0), money(r.gm_ton1)] : [n(r.tons0, 1), n(r.tons1, 1), money(r[rate + '0']), money(r[rate + '1']), signed(r[rate + '1'] - r[rate + '0']), n((r.share0 + r.share1) * 50, 2) + '%'];
+      var name = isMix ? r.name : r.customer_name, code = isMix ? r.id : r.customer + ' · ' + r.sku + ' · ' + r.sku_name;
+      html += '<tr><td><button class="row-name" data-component-row="' + i + '">' + esc(name) + '</button><small>' + esc(code) + '</small></td>' + values.map(function (v) { return '<td>' + v + '</td>'; }).join('') + '<td class="' + (impact(r) < 0 ? 'negative' : 'positive') + '">' + signed(impact(r)) + '</td></tr>';
+    });
+    if (!top.length) html += '<tr><td colspan="' + (headers.length + 1) + '">No matched contributors in these windows.</td></tr>';
+    html += '</tbody><tfoot><tr><td>Other · ' + Math.max(0, rows.length - top.length) + ' rows</td><td colspan="' + headers.length + '">' + signed(other) + ' PHP/t</td></tr>';
+    if (isMix) html += '<tr><td>Shared customer–product interaction<small>Explicit adjustment; not assigned to individual rows</small></td><td colspan="' + headers.length + '">' + signed(drill.adjustment) + ' PHP/t</td></tr>';
+    html += '<tr><td>' + definitions[driver] + ' bridge total</td><td colspan="' + headers.length + '">' + signed(D.bridge[driver]) + ' PHP/t · ' + (Math.abs(rows.reduce(function (s, r) { return s + impact(r); }, 0) + (isMix ? drill.adjustment : 0) - D.bridge[driver]) < 1e-6 ? '✓ reconciles before rounding' : 'reconciliation unavailable') + '</td></tr></tfoot></table>';
+    $('contributors').innerHTML = html;
+    var note = isMix ? 'Rows show centred share effects at ' + (driver === 'customer_mix' ? 'customer' : 'SKU') + ' level. The explicit interaction adjustment reconciles that view to the bridge’s symmetric split; it is not a further commercial lever. One-sided orders may reflect timing.' : 'Same customer × SKU only. Effect = average tonnage share × change in ' + rate + ', ' + (driver === 'cost' ? 'with cost increases reducing margin.' : 'on the selected reported / after-discount basis.') + ' Click a row to focus; the dates stay fixed.';
+    if (isMix && !D.bridge.mix_ordering.sign_stable) note += ' Exploratory only: the customer/product split changes sign with ordering; the waterfall therefore shows combined mix.';
+    if (isMix && !D.window.mix_comparable) note += ' These windows are not comparable for interpreting mix.';
+    $('component-note').textContent = note;
+    $('contributors').querySelectorAll('[data-component-row]').forEach(function (b) { b.onclick = function () { var r = top[+b.dataset.componentRow]; if (isMix) { var f = {}, l = {}; f[drill.dimension] = r.id; l[drill.dimension] = r.name; focus(f, l); } else focus({ customer: r.customer, sku: r.sku }, { customer: r.customer_name, sku: r.sku_name }); }; });
+    return true;
+  }
   function contributors() {
     if (!D) return;
+    if (componentTable()) return;
     var driver = $('driver').value, rows = D.contributors.slice().sort(function (a, b) { return Math.abs(b[driver]) - Math.abs(a[driver]); }), top = rows.slice(0, 15), other = rows.slice(15).reduce(function (s, r) { return s + r[driver]; }, 0);
     $('contributors').innerHTML = '<table><thead><tr><th>Customer · SKU</th><th>Price</th><th>Cost</th><th>Mix</th><th>Total PHP/t</th></tr></thead><tbody>' + top.map(function (r, i) { return '<tr><td><button class="row-name" data-contributor="' + i + '">' + esc(r.customer_name) + '</button><small>' + esc(r.customer + ' · ' + r.sku + ' · ' + r.sku_name) + '</small></td>' + ['price', 'cost', 'mix', 'value'].map(function (k) { return '<td class="' + (r[k] < 0 ? 'negative' : 'positive') + '">' + signed(r[k]) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody><tfoot><tr><td>Other · selected driver</td><td colspan="4">' + signed(other) + ' PHP/t</td></tr></tfoot></table>';
     $('contributors').querySelectorAll('[data-contributor]').forEach(function (b) { b.onclick = function () { var r = top[+b.dataset.contributor]; focus({ customer: r.customer, sku: r.sku }, { customer: r.customer_name, sku: r.sku_name }); }; });

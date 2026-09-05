@@ -1,5 +1,5 @@
 'use strict'
-const { bridgeExactGMperTon } = require('./margin_bridge_v2')
+const { bridgeExactGMperTon, mixByDim } = require('./margin_bridge_v2')
 const { nthShippingDay, fmt } = require('./margin_window')
 const { countShippingDays } = require('./shipping_days')
 
@@ -75,8 +75,27 @@ function contributions(a, b, basis) {
     const p = x && y ? (s0 + s1) / 2 * (price(y) - price(x)) : 0
     const c = x && y ? -(s0 + s1) / 2 * ((y.revenue - y.gp) / y.kg - (x.revenue - x.gp) / x.kg) * 1000 : 0
     const mix = x && y ? ((margin(x) + margin(y)) / 2 - center) * (s1 - s0) : y ? (margin(y) - center) * s1 : -(margin(x) - center) * s0
-    return { customer: r.customer, customer_name: r.customer_name, sku: r.sku, sku_name: r.sku_name, price: p, cost: c, mix, value: p + c + mix, matched: !!(x && y) }
+    return { customer: r.customer, customer_name: r.customer_name, sku: r.sku, sku_name: r.sku_name, price: p, cost: c, mix, value: p + c + mix, matched: !!(x && y),
+      tons0: x ? x.kg / 1000 : 0, tons1: y ? y.kg / 1000 : 0,
+      price0: x ? price(x) : null, price1: y ? price(y) : null,
+      cost0: x ? (x.revenue - x.gp) / x.kg * 1000 : null, cost1: y ? (y.revenue - y.gp) / y.kg * 1000 : null,
+      share0: s0, share1: s1 }
   }).sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+}
+function componentDrills(prior, current, basis, B) {
+  if (!B.available) return {}
+  const convert = r => ({ ...r, cust: r.customer, custname: r.customer_name, name: r.sku_name,
+    revenue: r.revenue - (basis === 'net' ? r.disc : 0), gp: r.gp - (basis === 'net' ? r.disc : 0) })
+  const a = prior.map(convert), b = current.map(convert), center = (B.gm0_per_ton + B.gm1_per_ton) / 2
+  const result = {}
+  for (const [component, dim] of [['customer_mix', 'customer'], ['product_mix', 'sku']]) {
+    const names = new Map([...prior, ...current].map(r => [String(r[dim]), r[dim + '_name'] || r[dim]]))
+    const lens = mixByDim(a, b, r => String(r[dim]), null, center)
+    result[component] = { dimension: dim, total: B[component], standalone_total: lens.total,
+      adjustment: B[component] - lens.total, center,
+      rows: lens.detail.map(r => ({ ...r, id: r.key, name: names.get(r.key) || r.key })) }
+  }
+  return result
 }
 function opportunities(rows, opts, denominator, peerRows = rows) {
   // Full prior month for sizing, never extrapolate four days into a full month.
@@ -133,7 +152,7 @@ function build(rows, opts, today) {
   // Only customer/SKU filters can select parent cell contributions unambiguously; other dimensions split cells.
   const parentSupported = Object.keys(opts.filters).every(k => ['customer', 'sku'].includes(k))
   return { months, dimensions: DIMS, options: opts, window: W, rows: [...groups.values()].map(finish).sort((a, b) => b.total.kg - a.total.kg), totals: finish(totals), bridge: B,
-    contributors: contributions(prior, cur, opts.basis),
+    contributors: contributions(prior, cur, opts.basis), component_drills: componentDrills(prior, cur, opts.basis, B),
     company_contribution: parentSupported ? parentContributions.filter(r => match(r, opts.filters)).reduce((s, r) => s + r.value, 0) : null,
     opportunities: opportunities(selected, opts, nationalBase, rows), national_base_tons: nationalBase / 1000,
     concentration: metrics(total(cur.filter(r => r.brand_name === 'VIETOP'))),
