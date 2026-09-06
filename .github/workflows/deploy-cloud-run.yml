@@ -1,7 +1,8 @@
-# Production API on Google Cloud Run. Runs on every push to master (after CI).
+# Production API on Google Cloud Run. Runs on every push to master.
+# The deploy job is gated on the same unit tests + client secret scan that
+# ci.yml runs, so a red test suite can no longer ship to production.
 # Requires repo secret: GCP_SA_KEY (JSON for a service account with Cloud Run +
-# Cloud Build permissions for source deploys). Until that secret exists, this
-# workflow fails independently of CI — see .planning/RUNBOOK_DEPLOY.md.
+# Cloud Build permissions for source deploys) — see .planning/RUNBOOK_DEPLOY.md.
 
 name: Deploy Cloud Run (API)
 
@@ -20,7 +21,27 @@ env:
   SERVICE: vieforce-hq-api
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Client bundle secret scan (SEC-04)
+        run: node scripts/ci-scan-client.mjs
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
