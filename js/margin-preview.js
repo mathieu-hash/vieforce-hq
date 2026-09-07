@@ -76,25 +76,45 @@ function mountMarginExplorerV2(root, prefix) {
     function value(r) { if (sort === 'name') return r.name; if (sort === 'delta') return r.current[metric] == null || r.prior[metric] == null ? -Infinity : r.current[metric] - r.prior[metric]; return (sort === 'total' ? r.total : r.cells[sort] || {})[metric] ?? -Infinity; }
     rows.sort(function (a, b) { return direction * (typeof value(a) === 'string' ? value(a).localeCompare(value(b)) : value(a) - value(b)); });
     rowLookup.clear();
-    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th>' + D.months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? ' · MTD' : '') + '</th>'; }).join('') + '<th data-sort="total" title="Period total for amounts; weighted average for rates">Total / avg</th><th data-sort="delta" title="Change over the selected bridge windows">Change</th></tr></thead>';
+    // Months with no posted data anywhere in the selection (pre-2026 history) go to the footnote, not to a column of dashes.
+    var months = D.months.filter(function (m) { return D.totals.cells[m] || D.rows.some(function (r) { return r.cells[m]; }); });
+    if (!months.length) months = D.months;
+    var hidden = D.months.filter(function (m) { return months.indexOf(m) < 0; });
+    var isAmount = metric === 'gp' || metric === 'tons', upGood = metric !== 'cost';
+    var day = function (s) { return new Date(s + 'T12:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' }); };
+    var span = function (w) { return w && w.length === 2 ? (w[0].slice(0, 7) === w[1].slice(0, 7) ? day(w[0]) + '–' + w[1].slice(8).replace(/^0/, '') : day(w[0]) + '–' + day(w[1])) : ''; };
+    var windows = D.window.base && D.window.current ? span(D.window.base) + ' → ' + span(D.window.current) : '';
+    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th><th class="spark">Trend</th>' + months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? '<small>MTD · to ' + day(D.window.cutoff) + '</small>' : '') + '</th>'; }).join('') + '<th data-sort="total" class="summary" title="Period total for amounts; weighted average for rates">' + (isAmount ? 'Total' : 'Wtd avg') + '<small>' + months.length + ' months</small></th><th data-sort="delta" class="summary" title="Change over the selected bridge windows">Change<small>' + esc(windows) + '</small></th></tr></thead>';
+    // Word-sized line of the row across the shown months; gaps break the line, the dashed rule is the row average, the dot is the latest month.
+    function spark(cells) {
+      var pts = months.map(function (m) { return (cells[m] || {})[metric]; }), vals = pts.filter(function (x) { return x != null; });
+      if (vals.length < 2) return '';
+      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length, W = 84, H = 24, pad = 3;
+      var x = function (i) { return (pad + i * (W - 2 * pad) / Math.max(1, months.length - 1)).toFixed(1); }, y = function (v) { return (max === min ? H / 2 : H - pad - (v - min) / (max - min) * (H - 2 * pad)).toFixed(1); };
+      var d = [], last = -1; pts.forEach(function (v, i) { if (v == null) { d.push(null); return; } d.push((d.length && d[d.length - 1] !== null ? 'L' : 'M') + x(i) + ' ' + y(v)); last = i; });
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><line x1="0" x2="' + W + '" y1="' + y(mean) + '" y2="' + y(mean) + '"/><path d="' + d.filter(Boolean).join(' ') + '"/><circle cx="' + x(last) + '" cy="' + y(pts[last]) + '" r="2.5"/></svg>';
+    }
+    function changeCell(cur, prior) { var v = cur == null || prior == null ? null : cur - prior; return '<td class="summary change ' + (v > 0 ? 'positive' : v < 0 ? 'negative' : '') + '">' + signed(v) + '</td>'; }
     function row(r, group, filters, child) {
       var key = 'row' + rowLookup.size; rowLookup.set(key, { r: r, group: group, filters: filters });
-      var vals = D.months.map(function (m) { return (r.cells[m] || {})[metric]; }).filter(function (x) { return x != null; });
-      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
-      return '<tr class="' + (child ? 'child' : '') + '"><td>' + (!child ? '<button class="expand" data-expand="' + key + '" aria-label="Expand ' + esc(r.name) + '">' + (expanded.has(r.id) ? '−' : '+') + '</button>' : '↳ ') + '<button class="row-name" data-focus="' + key + '">' + esc(r.name) + '</button><small>' + esc(r.id) + ' · ' + n(r.total.tons, 1) + ' t</small></td>' + D.months.map(function (m) {
-        var v = (r.cells[m] || {})[metric], style = heat && v != null && max > min ? ' style="background:rgba(0,166,206,' + (0.03 + .16 * (v - min) / (max - min)) + ')"' : '';
+      var vals = months.map(function (m) { return (r.cells[m] || {})[metric]; }).filter(function (x) { return x != null; });
+      var mean = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0, spread = Math.max.apply(null, vals.map(function (v) { return Math.abs(v - mean); }).concat(0));
+      return '<tr class="' + (child ? 'child' : '') + '"><td>' + (!child ? '<button class="expand" data-expand="' + key + '" aria-label="Expand ' + esc(r.name) + '">' + (expanded.has(r.id) ? '−' : '+') + '</button>' : '<span class="child-mark" aria-hidden="true">↳</span>') + '<button class="row-name" data-focus="' + key + '">' + esc(r.name) + '</button><small>' + (r.id === r.name ? '' : esc(r.id) + ' · ') + n(r.total.tons, 0) + ' t</small></td><td class="spark">' + spark(r.cells) + '</td>' + months.map(function (m) {
+        var v = (r.cells[m] || {})[metric], style = '';
+        // Diverging shade against the row's own average: green when the month is better than the row's norm, red when worse (cost inverts).
+        if (heat && v != null && spread > 0) style = ' style="background:color-mix(in oklab,var(--' + ((v >= mean) === upGood ? 'green' : 'red') + ') ' + Math.round(Math.abs(v - mean) / spread * 28) + '%,transparent)"';
         return '<td' + style + ' class="' + (v < 0 ? 'negative' : '') + '"><button class="cell" data-cell="' + key + '" data-month="' + m + '">' + format(v, metric) + '</button></td>';
-      }).join('') + '<td>' + format(r.total[metric], metric) + '</td><td>' + signed(r.current[metric] == null || r.prior[metric] == null ? null : r.current[metric] - r.prior[metric]) + '</td></tr>';
+      }).join('') + '<td class="summary">' + format(r.total[metric], metric) + '</td>' + changeCell(r.current[metric], r.prior[metric]) + '</tr>';
     }
     var body = rows.map(function (r) {
       var html = row(r, S.group, {}, false), children = expanded.get(r.id);
       if (children) children.rows.forEach(function (c) { var parent = {}; parent[S.group] = r.id; html += row(c, children.group, parent, true); });
       return html;
     }).join('');
-    $('matrix').innerHTML = '<table>' + head + '<tbody>' + (body || '<tr><td colspan="15">No matching rows.</td></tr>') + '</tbody><tfoot><tr><td>Selection total · all rows</td>' + D.months.map(function (m) { return '<td>' + format((D.totals.cells[m] || {})[metric], metric) + '</td>'; }).join('') + '<td>' + format(D.totals.total[metric], metric) + '</td><td>' + signed(D.totals.current[metric] == null || D.totals.prior[metric] == null ? null : D.totals.current[metric] - D.totals.prior[metric]) + '</td></tr></tfoot></table>';
+    $('matrix').innerHTML = '<table>' + head + '<tbody>' + (body || '<tr><td colspan="' + (months.length + 4) + '">No matching rows.</td></tr>') + '</tbody><tfoot><tr><td>Selection total · all rows</td><td class="spark">' + spark(D.totals.cells) + '</td>' + months.map(function (m) { return '<td>' + format((D.totals.cells[m] || {})[metric], metric) + '</td>'; }).join('') + '<td class="summary">' + format(D.totals.total[metric], metric) + '</td>' + changeCell(D.totals.current[metric], D.totals.prior[metric]) + '</tr></tfoot></table>';
     var sortedHead = $('matrix').querySelector('th[data-sort="' + sort + '"]');
-    if (sortedHead) { sortedHead.classList.add('sorted'); sortedHead.setAttribute('aria-sort', direction < 0 ? 'descending' : 'ascending'); sortedHead.insertAdjacentHTML('beforeend', '<span class="sort-arrow" aria-hidden="true">' + (direction < 0 ? '▼' : '▲') + '</span>'); }
-    $('table-note').textContent = rows.length + ' rows · Columns show posted monthly actuals. Change follows the bridge dates, not necessarily the full month. Rates are weighted from pesos and tons. Pre-2026 cells are unavailable, not zero. Search does not change selection totals.';
+    if (sortedHead) { sortedHead.classList.add('sorted'); sortedHead.setAttribute('aria-sort', direction < 0 ? 'descending' : 'ascending'); var sub = sortedHead.querySelector('small'); (sub || sortedHead).insertAdjacentHTML(sub ? 'beforebegin' : 'beforeend', '<span class="sort-arrow" aria-hidden="true">' + (direction < 0 ? '▼' : '▲') + '</span>'); }
+    $('table-note').textContent = rows.length + ' rows · Columns show posted monthly actuals. ' + (hidden.length ? month(hidden[0]) + (hidden.length > 1 ? '–' + month(hidden[hidden.length - 1]) : '') + ' not shown: no posted data in this selection' + (hidden[0] < '2026-01' ? ' (pre-2026 history is unavailable, not zero)' : '') + '. ' : '') + 'Change follows the bridge dates, not necessarily the full month. Rates are weighted from pesos and tons. ' + (heat ? 'Shading compares each month with its own row average' + (upGood ? '' : '; lower cost shades green') + '. ' : '') + 'Search does not change selection totals.';
     $('matrix').querySelectorAll('[data-sort]').forEach(function (b) { b.onclick = function () { direction = sort === b.dataset.sort ? -direction : -1; sort = b.dataset.sort; matrix(); }; });
     $('matrix').querySelectorAll('[data-focus]').forEach(function (b) { b.onclick = function () { var x = rowLookup.get(b.dataset.focus), f = Object.assign({}, x.filters), l = {}; f[x.group] = x.r.id; l[x.group] = x.r.name; focus(f, l); }; });
     $('matrix').querySelectorAll('[data-expand]').forEach(function (b) { b.onclick = async function () {
