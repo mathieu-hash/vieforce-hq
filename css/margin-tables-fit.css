@@ -8,8 +8,8 @@
 :is(#preview-app,#pg-margin-explorer-v2) .row-name{max-width:100%;overflow-wrap:anywhere;white-space:normal}
 :is(#preview-app,#pg-margin-explorer-v2) td:first-child small{overflow-wrap:anywhere}
 #preview-app #matrix table,#pg-margin-explorer-v2 #mv2-matrix table{min-width:0;width:100%;table-layout:fixed}
-#preview-app #matrix th,#preview-app #matrix td,#pg-margin-explorer-v2 #mv2-matrix th,#pg-margin-explorer-v2 #mv2-matrix td{min-width:0;width:6%;padding:8px 3px;font-size:clamp(9px,1cqw,12px);line-height:1.45}
-#preview-app #matrix th:first-child,#preview-app #matrix td:first-child,#pg-margin-explorer-v2 #mv2-matrix th:first-child,#pg-margin-explorer-v2 #mv2-matrix td:first-child{width:16%;min-width:0;max-width:none}
+#preview-app #matrix th,#preview-app #matrix td,#pg-margin-explorer-v2 #mv2-matrix th,#pg-margin-explorer-v2 #mv2-matrix td{min-width:0;padding:7px 6px;font-size:clamp(11px,1.05cqw,13px);line-height:1.45}
+#preview-app #matrix th:first-child,#preview-app #matrix td:first-child,#pg-margin-explorer-v2 #mv2-matrix th:first-child,#pg-margin-explorer-v2 #mv2-matrix td:first-child{width:17%;min-width:0;max-width:none}
 #preview-app #matrix .cell,#pg-margin-explorer-v2 #mv2-matrix .cell{font-size:inherit;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #preview-app #matrix .row-name,#pg-margin-explorer-v2 #mv2-matrix .row-name{font-size:inherit}
 #preview-app #matrix td:first-child small,#pg-margin-explorer-v2 #mv2-matrix td:first-child small{font-size:9px}
@@ -27,3 +27,48 @@
  :is(#preview-app,#pg-margin-explorer-v2) .share-track{display:block}
  :is(#preview-app,#pg-margin-explorer-v2) .effect-cell{gap:4px}
 }
+/* Matrix readability 2026-09-07: trend column, summary block set apart, two-line headers, cell affordance, diverging shade. */
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.spark,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.spark{width:92px;padding:4px 6px;cursor:default}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.spark svg{display:block;width:100%;height:24px;overflow:visible}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.spark path{fill:none;stroke:var(--text3);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.spark line{stroke:var(--text4);stroke-width:1;stroke-dasharray:2 3}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.spark circle{fill:var(--blue)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) tfoot td.spark path{stroke:var(--text)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th small{display:block;font-weight:500;letter-spacing:0;text-transform:none;font-size:9px;line-height:1.3;color:var(--text4);margin-top:2px}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.summary,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.summary{width:9%;border-left:1px solid var(--divider)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.summary+th.summary,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.summary+td.summary{border-left:0}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.summary{background:color-mix(in oklab,var(--bg2) 55%,transparent);font-weight:600;color:var(--text)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) tr:hover td.summary{background:var(--surface-hover)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change{font-weight:700}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change.positive{color:var(--green)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change.negative{color:var(--red)}
+[data-theme="light"] :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change.positive{color:var(--green2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .cell{cursor:pointer;border-radius:3px;padding:1px 4px;margin:-1px -4px;transition:background .15s,color .15s}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .cell:hover{background:var(--glow-blue);color:var(--text)}
+/* Narrow panels (phones): the matrix keeps desktop column widths and scrolls inside its panel; the first column stays pinned. */
+@container(max-width:900px){
+ :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) table{min-width:880px}
+ :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th:first-child,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td:first-child{width:150px;box-shadow:1px 0 0 var(--divider)}
+ :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td{font-size:12px}
+}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child-mark{position:absolute;left:9px;top:8px;color:var(--text3)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td:first-child{padding-left:24px}
+/* Round 2: tonnage + share as a column, single-line names, child rows tinted, change bars on one scale, exhibit takeaway. */
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th:first-child,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td:first-child{width:15%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td{padding:6px 6px}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td:first-child small{display:inline;margin:0 0 0 6px;font-size:9px;vertical-align:baseline}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.tons,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.tons{width:8%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.tons{white-space:nowrap;color:var(--text2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .share-bar{display:block;height:3px;margin-top:4px;border-radius:2px;background:var(--divider);overflow:hidden}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .share-bar i{display:block;height:100%;background:var(--text3)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) tfoot td.tons{font-weight:700;color:var(--text)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td{background:color-mix(in oklab,var(--bg2) 60%,transparent)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td:first-child{background:var(--bg2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child:hover td{background:var(--surface-hover)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child .row-name{font-weight:600;color:var(--text2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.change,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change{width:11%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track{display:inline-block;vertical-align:middle;position:relative;width:60px;height:8px;margin:-2px 8px 0 0;background:linear-gradient(to right,transparent 48%,var(--divider) 48%,var(--divider) 52%,transparent 52%)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track i{position:absolute;top:1px;height:6px;border-radius:3px}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track .gain{background:var(--green)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track .loss{background:var(--red)}
+:is(#preview-app #history,#pg-margin-explorer-v2 #mv2-history) .panel-head .muted{color:var(--text2);font-size:12px;max-width:80ch}
