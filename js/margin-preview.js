@@ -73,7 +73,7 @@ function mountMarginExplorerV2(root, prefix) {
     if (!D) return;
     var metric = $('metric').value, search = $('search').value.toLowerCase(), heat = $('heat').checked;
     var rows = D.rows.filter(function (r) { return (r.name + ' ' + r.id).toLowerCase().includes(search); });
-    function value(r) { if (sort === 'name') return r.name; if (sort === 'delta') return r.current[metric] == null || r.prior[metric] == null ? -Infinity : r.current[metric] - r.prior[metric]; return (sort === 'total' ? r.total : r.cells[sort] || {})[metric] ?? -Infinity; }
+    function value(r) { if (sort === 'name') return r.name; if (sort === 'tons') return r.total.tons; if (sort === 'delta') return r.current[metric] == null || r.prior[metric] == null ? -Infinity : r.current[metric] - r.prior[metric]; return (sort === 'total' ? r.total : r.cells[sort] || {})[metric] ?? -Infinity; }
     rows.sort(function (a, b) { return direction * (typeof value(a) === 'string' ? value(a).localeCompare(value(b)) : value(a) - value(b)); });
     rowLookup.clear();
     // Months with no posted data anywhere in the selection (pre-2026 history) go to the footnote, not to a column of dashes.
@@ -84,7 +84,7 @@ function mountMarginExplorerV2(root, prefix) {
     var day = function (s) { return new Date(s + 'T12:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' }); };
     var span = function (w) { return w && w.length === 2 ? (w[0].slice(0, 7) === w[1].slice(0, 7) ? day(w[0]) + '–' + w[1].slice(8).replace(/^0/, '') : day(w[0]) + '–' + day(w[1])) : ''; };
     var windows = D.window.base && D.window.current ? span(D.window.base) + ' → ' + span(D.window.current) : '';
-    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th><th class="spark">Trend</th>' + months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? '<small>MTD · to ' + day(D.window.cutoff) + '</small>' : '') + '</th>'; }).join('') + '<th data-sort="total" class="summary" title="Period total for amounts; weighted average for rates">' + (isAmount ? 'Total' : 'Wtd avg') + '<small>' + months.length + ' months</small></th><th data-sort="delta" class="summary" title="Change over the selected bridge windows">Change<small>' + esc(windows) + '</small></th></tr></thead>';
+    var head = '<thead><tr><th data-sort="name">' + esc(D.dimensions[S.group]) + '</th><th data-sort="tons" class="tons">Tons<small>share of selection</small></th><th class="spark">Trend</th>' + months.map(function (m) { return '<th data-sort="' + m + '" class="' + (m === D.window.cutoff.slice(0, 7) && D.window.partial ? 'partial' : '') + '">' + month(m) + (m === S.current && D.window.partial ? '<small>MTD · to ' + day(D.window.cutoff) + '</small>' : '') + '</th>'; }).join('') + '<th data-sort="total" class="summary" title="Period total for amounts; weighted average for rates">' + (isAmount ? 'Total' : 'Wtd avg') + '<small>' + months.length + ' months</small></th><th data-sort="delta" class="summary change" title="Change over the selected bridge windows">Change<small>' + esc(windows) + '</small></th></tr></thead>';
     // Word-sized line of the row across the shown months; gaps break the line, the dashed rule is the row average, the dot is the latest month.
     function spark(cells) {
       var pts = months.map(function (m) { return (cells[m] || {})[metric]; }), vals = pts.filter(function (x) { return x != null; });
@@ -94,24 +94,45 @@ function mountMarginExplorerV2(root, prefix) {
       var d = [], last = -1; pts.forEach(function (v, i) { if (v == null) { d.push(null); return; } d.push((d.length && d[d.length - 1] !== null ? 'L' : 'M') + x(i) + ' ' + y(v)); last = i; });
       return '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><line x1="0" x2="' + W + '" y1="' + y(mean) + '" y2="' + y(mean) + '"/><path d="' + d.filter(Boolean).join(' ') + '"/><circle cx="' + x(last) + '" cy="' + y(pts[last]) + '" r="2.5"/></svg>';
     }
-    function changeCell(cur, prior) { var v = cur == null || prior == null ? null : cur - prior; return '<td class="summary change ' + (v > 0 ? 'positive' : v < 0 ? 'negative' : '') + '">' + signed(v) + '</td>'; }
+    var changeOf = function (r) { return r.current[metric] == null || r.prior[metric] == null ? null : r.current[metric] - r.prior[metric]; };
+    // Change bars share one scale across every row on screen, so magnitudes compare by eye before the digits are read.
+    var shown = rows.slice(); rows.forEach(function (r) { var c = expanded.get(r.id); if (c) shown = shown.concat(c.rows); });
+    var maxChange = Math.max.apply(null, shown.map(function (r) { return Math.abs(changeOf(r) || 0); }).concat(0)), allTons = D.totals.total.tons || 0;
+    function changeCell(r) {
+      var v = changeOf(r), w = v != null && maxChange > 0 ? Math.abs(v) / maxChange * 50 : 0;
+      return '<td class="summary change ' + (v > 0 ? 'positive' : v < 0 ? 'negative' : '') + '"><span class="delta-track" aria-hidden="true"><i class="' + (v < 0 ? 'loss' : 'gain') + '" style="left:' + (v < 0 ? 50 - w : 50) + '%;width:' + w + '%"></i></span>' + signed(v) + '</td>';
+    }
+    function tonsCell(r) { var share = allTons > 0 ? r.total.tons / allTons * 100 : 0; return '<td class="tons" title="' + n(share, 1) + '% of selection tons">' + n(r.total.tons, 0) + '<span class="share-bar" aria-hidden="true"><i style="width:' + Math.min(100, share) + '%"></i></span></td>'; }
     function row(r, group, filters, child) {
       var key = 'row' + rowLookup.size; rowLookup.set(key, { r: r, group: group, filters: filters });
       var vals = months.map(function (m) { return (r.cells[m] || {})[metric]; }).filter(function (x) { return x != null; });
       var mean = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0, spread = Math.max.apply(null, vals.map(function (v) { return Math.abs(v - mean); }).concat(0));
-      return '<tr class="' + (child ? 'child' : '') + '"><td>' + (!child ? '<button class="expand" data-expand="' + key + '" aria-label="Expand ' + esc(r.name) + '">' + (expanded.has(r.id) ? '−' : '+') + '</button>' : '<span class="child-mark" aria-hidden="true">↳</span>') + '<button class="row-name" data-focus="' + key + '">' + esc(r.name) + '</button><small>' + (r.id === r.name ? '' : esc(r.id) + ' · ') + n(r.total.tons, 0) + ' t</small></td><td class="spark">' + spark(r.cells) + '</td>' + months.map(function (m) {
+      return '<tr class="' + (child ? 'child' : '') + '"><td>' + (!child ? '<button class="expand" data-expand="' + key + '" aria-label="Expand ' + esc(r.name) + '">' + (expanded.has(r.id) ? '−' : '+') + '</button>' : '<span class="child-mark" aria-hidden="true">↳</span>') + '<button class="row-name" data-focus="' + key + '">' + esc(r.name) + '</button>' + (r.id === r.name ? '' : '<small>' + esc(r.id) + '</small>') + '</td>' + tonsCell(r) + '<td class="spark">' + spark(r.cells) + '</td>' + months.map(function (m) {
         var v = (r.cells[m] || {})[metric], style = '';
         // Diverging shade against the row's own average: green when the month is better than the row's norm, red when worse (cost inverts).
         if (heat && v != null && spread > 0) style = ' style="background:color-mix(in oklab,var(--' + ((v >= mean) === upGood ? 'green' : 'red') + ') ' + Math.round(Math.abs(v - mean) / spread * 28) + '%,transparent)"';
         return '<td' + style + ' class="' + (v < 0 ? 'negative' : '') + '"><button class="cell" data-cell="' + key + '" data-month="' + m + '">' + format(v, metric) + '</button></td>';
-      }).join('') + '<td class="summary">' + format(r.total[metric], metric) + '</td>' + changeCell(r.current[metric], r.prior[metric]) + '</tr>';
+      }).join('') + '<td class="summary">' + format(r.total[metric], metric) + '</td>' + changeCell(r) + '</tr>';
     }
     var body = rows.map(function (r) {
       var html = row(r, S.group, {}, false), children = expanded.get(r.id);
       if (children) children.rows.forEach(function (c) { var parent = {}; parent[S.group] = r.id; html += row(c, children.group, parent, true); });
       return html;
     }).join('');
-    $('matrix').innerHTML = '<table>' + head + '<tbody>' + (body || '<tr><td colspan="' + (months.length + 4) + '">No matching rows.</td></tr>') + '</tbody><tfoot><tr><td>Selection total · all rows</td><td class="spark">' + spark(D.totals.cells) + '</td>' + months.map(function (m) { return '<td>' + format((D.totals.cells[m] || {})[metric], metric) + '</td>'; }).join('') + '<td class="summary">' + format(D.totals.total[metric], metric) + '</td>' + changeCell(D.totals.current[metric], D.totals.prior[metric]) + '</tr></tfoot></table>';
+    $('matrix').innerHTML = '<table>' + head + '<tbody>' + (body || '<tr><td colspan="' + (months.length + 5) + '">No matching rows.</td></tr>') + '</tbody><tfoot><tr><td>Selection total · all rows</td><td class="tons">' + n(allTons, 0) + '</td><td class="spark">' + spark(D.totals.cells) + '</td>' + months.map(function (m) { return '<td>' + format((D.totals.cells[m] || {})[metric], metric) + '</td>'; }).join('') + '<td class="summary">' + format(D.totals.total[metric], metric) + '</td>' + changeCell(D.totals) + '</tr></tfoot></table>';
+    // The exhibit's own takeaway, computed from the rows on screen: selection change, largest mover (and the largest counter-mover), heaviest row against the selection average.
+    var sub = $('history').querySelector('.panel-head .muted');
+    if (sub) {
+      var unit = metric === 'gp' ? '' : isAmount ? ' t' : metric === 'pct' ? ' pts' : '/t', fmtDelta = function (v) { return metric === 'gp' ? signedMoney(v) : signed(v) + unit; };
+      var tot = changeOf(D.totals), movers = D.rows.map(function (r) { return { r: r, c: changeOf(r) }; }).filter(function (x) { return x.c != null; }).sort(function (a, b) { return Math.abs(b.c) - Math.abs(a.c); });
+      var heavy = D.rows.slice().sort(function (a, b) { return b.total.tons - a.total.tons; })[0];
+      if (tot == null || !movers.length || !heavy || !allTons) sub.textContent = 'Expand a row into the next dimension, or select it to focus the whole analysis.';
+      else {
+        var lead = movers[0], counter = movers.find(function (x) { return x.c !== 0 && Math.sign(x.c) !== Math.sign(lead.c); });
+        var gap = !isAmount && heavy.total[metric] != null && D.totals.total[metric] != null ? heavy.total[metric] - D.totals.total[metric] : null;
+        sub.textContent = span(D.window.current) + ' vs ' + span(D.window.base) + ': selection ' + fmtDelta(tot) + '. Largest move ' + lead.r.name + ' ' + fmtDelta(lead.c) + ' (' + n(lead.r.total.tons / allTons * 100, 0) + '% of tons)' + (counter ? '; ' + counter.r.name + ' ' + fmtDelta(counter.c) : '') + '. ' + (heavy === lead.r ? 'It runs' : heavy.name + ' carries ' + n(heavy.total.tons / allTons * 100, 0) + '% of tons') + (gap != null ? ' at ' + format(heavy.total[metric], metric) + unit + ', ' + n(Math.abs(gap)) + (gap < 0 ? ' below' : ' above') + ' the selection average' : '') + '.';
+      }
+    }
     var sortedHead = $('matrix').querySelector('th[data-sort="' + sort + '"]');
     if (sortedHead) { sortedHead.classList.add('sorted'); sortedHead.setAttribute('aria-sort', direction < 0 ? 'descending' : 'ascending'); var sub = sortedHead.querySelector('small'); (sub || sortedHead).insertAdjacentHTML(sub ? 'beforebegin' : 'beforeend', '<span class="sort-arrow" aria-hidden="true">' + (direction < 0 ? '▼' : '▲') + '</span>'); }
     $('table-note').textContent = rows.length + ' rows · Columns show posted monthly actuals. ' + (hidden.length ? month(hidden[0]) + (hidden.length > 1 ? '–' + month(hidden[hidden.length - 1]) : '') + ' not shown: no posted data in this selection' + (hidden[0] < '2026-01' ? ' (pre-2026 history is unavailable, not zero)' : '') + '. ' : '') + 'Change follows the bridge dates, not necessarily the full month. Rates are weighted from pesos and tons. ' + (heat ? 'Shading compares each month with its own row average' + (upGood ? '' : '; lower cost shades green') + '. ' : '') + 'Search does not change selection totals.';

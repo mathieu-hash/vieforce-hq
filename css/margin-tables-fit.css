@@ -53,3 +53,22 @@
 }
 :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child-mark{position:absolute;left:9px;top:8px;color:var(--text3)}
 :is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td:first-child{padding-left:24px}
+/* Round 2: tonnage + share as a column, single-line names, child rows tinted, change bars on one scale, exhibit takeaway. */
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th:first-child,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td:first-child{width:15%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td{padding:6px 6px}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td:first-child small{display:inline;margin:0 0 0 6px;font-size:9px;vertical-align:baseline}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.tons,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.tons{width:8%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.tons{white-space:nowrap;color:var(--text2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .share-bar{display:block;height:3px;margin-top:4px;border-radius:2px;background:var(--divider);overflow:hidden}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .share-bar i{display:block;height:100%;background:var(--text3)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) tfoot td.tons{font-weight:700;color:var(--text)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td{background:color-mix(in oklab,var(--bg2) 60%,transparent)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child td:first-child{background:var(--bg2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child:hover td{background:var(--surface-hover)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .child .row-name{font-weight:600;color:var(--text2)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) th.change,:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) td.change{width:11%}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track{display:inline-block;vertical-align:middle;position:relative;width:60px;height:8px;margin:-2px 8px 0 0;background:linear-gradient(to right,transparent 48%,var(--divider) 48%,var(--divider) 52%,transparent 52%)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track i{position:absolute;top:1px;height:6px;border-radius:3px}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track .gain{background:var(--green)}
+:is(#preview-app #matrix,#pg-margin-explorer-v2 #mv2-matrix) .delta-track .loss{background:var(--red)}
+:is(#preview-app #history,#pg-margin-explorer-v2 #mv2-history) .panel-head .muted{color:var(--text2);font-size:12px;max-width:80ch}
